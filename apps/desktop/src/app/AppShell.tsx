@@ -31,17 +31,28 @@ function ShellFrame(): JSX.Element {
   const location = useLocation();
 
   const goToLock = useCallback(() => navigate('/lock'), [navigate]);
-  const onNavigate = useCallback((route: NavRoute) => navigate(route), [navigate]);
+  const onNavigate = useCallback(
+    (route: NavRoute) => navigate(route),
+    [navigate],
+  );
 
   const activeRoute: NavRoute | undefined =
-    location.pathname === '/today' || location.pathname === '/' ? '/today' : undefined;
+    location.pathname === '/today' || location.pathname === '/'
+      ? '/today'
+      : undefined;
 
   return (
-    <div data-testid="app-shell" className="flex h-screen flex-col bg-white text-[14px]">
+    <div
+      data-testid="app-shell"
+      className="flex h-screen flex-col bg-white text-[14px]"
+    >
       <TopBar onLock={goToLock} />
       <div className="flex min-h-0 flex-1">
         <SideNav activeRoute={activeRoute} onNavigate={onNavigate} />
-        <main className="min-w-0 flex-1 overflow-auto" data-testid="content-area">
+        <main
+          className="min-w-0 flex-1 overflow-auto"
+          data-testid="content-area"
+        >
           <Routes>
             <Route path="/" element={<Navigate to="/today" replace />} />
             <Route path="/today" element={<TodayScreen />} />

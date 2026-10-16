@@ -41,3 +41,8 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 __pycache__/
+
+# Test output
+junit.xml
+**/junit.xml
+.worklog/**/e2e/

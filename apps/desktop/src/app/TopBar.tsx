@@ -34,7 +34,8 @@ export function TopBar({ onHelp, onLock }: TopBarProps): JSX.Element {
       if (event.isComposing) {
         return;
       }
-      const ctrlK = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
+      const ctrlK =
+        (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
       if (event.key === 'F2' || ctrlK) {
         event.preventDefault();
         focusSearch();

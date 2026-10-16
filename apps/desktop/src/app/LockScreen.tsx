@@ -18,9 +18,14 @@ export function LockScreen(): JSX.Element {
         aria-label={t('lock.title')}
         className="flex w-[420px] flex-col items-center gap-4 rounded-lg border border-slate-200 bg-white p-8 shadow"
       >
-        <span className="text-lg font-semibold text-slate-900">{t('app.name')}</span>
+        <span className="text-lg font-semibold text-slate-900">
+          {t('app.name')}
+        </span>
 
-        <label htmlFor="lock-pin-input" className="w-full text-sm text-slate-700">
+        <label
+          htmlFor="lock-pin-input"
+          className="w-full text-sm text-slate-700"
+        >
           {t('lock.title')}
         </label>
         <input

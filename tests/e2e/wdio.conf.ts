@@ -11,6 +11,7 @@
 // executor to the freshly built --debug binary); it falls back to the
 // conventional Tauri v2 debug output path.
 import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -18,9 +19,12 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..', '..');
 
+// Cargo workspace: the Tauri app crate lives under
+// apps/desktop/src-tauri but the compiled binary lands in the shared
+// WORKSPACE-ROOT target dir, not a per-crate target dir.
 const defaultBinary = path.join(
   repoRoot,
-  'apps/desktop/src-tauri/target/debug/homeoclinic-desktop',
+  'target/debug/homeoclinic-desktop',
 );
 const appBinary = process.env.HC_APP_BINARY
   ? path.resolve(process.env.HC_APP_BINARY)
@@ -31,6 +35,56 @@ if (!existsSync(appBinary)) {
     `infra_incomplete: application binary not found at ${appBinary}. ` +
       `Build it with: npm --prefix apps/desktop run tauri build -- --debug, ` +
       `or set HC_APP_BINARY to the built binary path.`,
+  );
+}
+
+// tauri-driver needs an ABSOLUTE path to the native webdriver; a bare name
+// like "WebKitWebDriver" makes it report
+// "can not find the supplied binary path WebKitWebDriver". Resolve to an
+// absolute path: honour HC_NATIVE_DRIVER if set, otherwise locate
+// WebKitWebDriver on PATH (via `command -v`) or in common install locations.
+function resolveNativeDriver(): string {
+  const override = process.env.HC_NATIVE_DRIVER;
+  if (override) {
+    const abs = path.resolve(override);
+    if (!existsSync(abs)) {
+      throw new Error(
+        `infra_incomplete: HC_NATIVE_DRIVER points to ${abs} but no file ` +
+          `exists there.`,
+      );
+    }
+    return abs;
+  }
+
+  // Try PATH first (command -v resolves to an absolute path on Linux).
+  try {
+    const found = execFileSync('sh', ['-c', 'command -v WebKitWebDriver'], {
+      encoding: 'utf8',
+    }).trim();
+    if (found && existsSync(found)) {
+      return path.resolve(found);
+    }
+  } catch {
+    // not on PATH; fall through to common locations
+  }
+
+  const commonLocations = [
+    '/usr/bin/WebKitWebDriver',
+    '/usr/local/bin/WebKitWebDriver',
+    '/usr/lib/webkit2gtk-4.1/WebKitWebDriver',
+    '/usr/lib/webkit2gtk-4.0/WebKitWebDriver',
+  ];
+  for (const candidate of commonLocations) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `infra_incomplete: WebKitWebDriver not found on PATH or in ` +
+      `[${commonLocations.join(', ')}]. Install it (e.g. ` +
+      `apt-get install webkit2gtk-driver) or set HC_NATIVE_DRIVER to the ` +
+      `absolute path of the webdriver binary.`,
   );
 }
 
@@ -91,8 +145,7 @@ export const config: WebdriverIO.Config = {
 
   // Start tauri-driver before the session; it proxies to WebKitWebDriver.
   onPrepare: () => {
-    const nativeDriver =
-      process.env.HC_NATIVE_DRIVER ?? 'WebKitWebDriver';
+    const nativeDriver = resolveNativeDriver();
     tauriDriver = spawn(
       'tauri-driver',
       [

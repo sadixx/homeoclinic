@@ -13,7 +13,12 @@
 // Router-free by design: it renders buttons with stable testids and reports the
 // chosen route through `onNavigate` (AppShell wires it to the router). This keeps
 // the component unit-testable without a Router provider.
-import { CalendarDays, Settings as SettingsIcon, Users, type LucideIcon } from 'lucide-react';
+import {
+  CalendarDays,
+  Settings as SettingsIcon,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 
 import { features } from '@/shared/features';
 import { t, type StringKey } from '@/shared/strings';
@@ -38,13 +43,37 @@ interface NavItem {
 }
 
 const ITEMS: readonly NavItem[] = [
-  { route: '/today', labelKey: 'nav.today', testid: 'nav-today', shortcut: 'F3', Icon: CalendarDays, enabled: true },
-  { route: '/patients', labelKey: 'nav.patients', testid: 'nav-patients', shortcut: 'F4', Icon: Users, enabled: features.patients },
-  { route: '/settings', labelKey: 'nav.settings', testid: 'nav-settings', shortcut: '', Icon: SettingsIcon, enabled: features.settings },
+  {
+    route: '/today',
+    labelKey: 'nav.today',
+    testid: 'nav-today',
+    shortcut: 'F3',
+    Icon: CalendarDays,
+    enabled: true,
+  },
+  {
+    route: '/patients',
+    labelKey: 'nav.patients',
+    testid: 'nav-patients',
+    shortcut: 'F4',
+    Icon: Users,
+    enabled: features.patients,
+  },
+  {
+    route: '/settings',
+    labelKey: 'nav.settings',
+    testid: 'nav-settings',
+    shortcut: '',
+    Icon: SettingsIcon,
+    enabled: features.settings,
+  },
 ];
 
 /** Vertical left nav, 180px wide, keyboard operable. */
-export function SideNav({ activeRoute, onNavigate }: SideNavProps): JSX.Element {
+export function SideNav({
+  activeRoute,
+  onNavigate,
+}: SideNavProps): JSX.Element {
   return (
     <nav
       data-testid="side-nav"
