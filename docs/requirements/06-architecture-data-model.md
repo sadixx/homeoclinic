@@ -2,29 +2,39 @@
 
 ## 1. Repository layout (monorepo)
 
+> Authoritative layout: `docs/CODE-LAYOUT.md` (decision: `docs/adr/0001-code-layout.md`).
+> The tree below is kept in sync with it. Earlier revisions of this section
+> named the crates `core`, `repertory`, `licence`, `storage`; that naming is
+> superseded by the `hc-*` crate split below.
+
 ```
 homeoclinic/
   apps/desktop/            # Tauri 2 app: src-tauri (Rust) + src (React/TS)
-  crates/core/             # Pure Rust domain logic: patients, visits, rx, billing (no UI, fully unit tested)
-  crates/repertory/        # Search, repertorisation algorithms, pack loader/verifier
-  crates/licence/          # Licence verify, identity lock, clock guard, UPI/WhatsApp QR, offer codes (shared with vendor tool and MVP2 server)
-  crates/storage/          # SQLCipher access, migrations, backup/restore
-  tools/vendor-licence/    # MVP1: offline licence issuing tool (internal)
+  crates/hc-domain/        # Entities, value types, validation; no IO
+  crates/hc-storage/       # SQLCipher access, migrations, repositories, audit, backup/restore
+  crates/hc-search/        # Patient search, phonetic keys, ranking, filters
+  crates/hc-repertory/     # Packs, channels, rubric search, bitset scoring, citations, MM
+  crates/hc-licence/       # Licence verify, identity lock, clock guard, UPI/WhatsApp QR, offer codes (shared with vendor tool and MVP2 server)
+  crates/hc-docs/          # Print/PDF rendering
+  crates/hc-app/           # Use-case services + typed Tauri commands
+  tools/vendor-licence-tool/ # MVP1: offline licence issuing tool (internal)
   services/licence-server/ # MVP2: axum + PostgreSQL: activation, payments webhook, portal API
   web/portal/              # MVP2: purchase + customer portal (mobile first)
   tools/content-builder/   # CLI: import (OOREP dump, CSV, OCR) -> proofread -> build signed .hcpack
+  tools/seed/              # Synthetic data generator
   content-sources/         # source files + REGISTRY.md (internal-eval/ never ships in public builds)
-  docs/                    # These requirement files + ADRs
+  docs/                    # requirements/, design/, ui/, rules/, milestones/, adr/, task-tracker/
 ```
 
 Rule: UI calls Rust only via typed Tauri commands (generate TS types with `specta`/`tauri-specta`). No SQL in the UI.
 
 ## 2. Databases
 
-Two SQLite files per install, so content updates never touch patient data:
+Two encrypted patient-side SQLite files per install, plus read-only content
+packs, so content updates never touch patient data:
 - `clinic.db` (SQLCipher encrypted): patient and clinic data.
-- `content/*.db` (one per pack, read-only, signed): repertory and MM data. Attached read-only at runtime.
-- `user_content.db` (encrypted): "My repertory" additions, bookmarks, notes, custom synonyms.
+- `user_content.db` (SQLCipher encrypted): "My repertory" additions, bookmarks, notes, custom synonyms.
+- `content/*.db` (one per pack, read-only, signed): repertory and MM data, attached read-only at runtime; shipped as `.hcpack`, not part of the two patient DBs.
 
 ## 3. Core schema (clinic.db), minimum columns
 

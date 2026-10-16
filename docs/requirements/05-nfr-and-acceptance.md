@@ -96,8 +96,8 @@ Rule: every security, licence and anti-tamper feature (NFR-020..025, LIC, TAM, B
 
 ## 6. Quality gates (CI must enforce)
 
-- Unit tests: repertorisation algorithms with hand-computed fixtures, licence verify/identity lock/clock rollback, offline UPI and WhatsApp QR strings, offer-code verify, typed-key group check, backup encrypt/decrypt round trip, search ranking golden tests. Coverage >= 80% for `core` crate.
-- Integration tests: DB migrations from every prior schema; end-to-end UI tests (Playwright via tauri-driver) for the 13 core flows below.
+- Unit tests: repertorisation algorithms with hand-computed fixtures, licence verify/identity lock/clock rollback, offline UPI and WhatsApp QR strings, offer-code verify, typed-key group check, backup encrypt/decrypt round trip, search ranking golden tests. Coverage >= 80% for the `hc-domain` crate.
+- Integration tests: DB migrations from every prior schema; end-to-end UI tests (WebdriverIO via tauri-driver) for the 13 core flows below.
 - Lint: clippy -D warnings, eslint, prettier, TypeScript strict.
 - Build artifacts for Windows and Linux on every main-branch commit (GitHub Actions or equivalent).
 
