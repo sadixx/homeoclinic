@@ -21,6 +21,10 @@ hc-agents/dist/
 *.db-shm
 **/secrets/
 
+# HC-MVP1-005: real build config (placeholders live in config/app-config.template.toml)
+config/app-config.local.toml
+config/*.local.*
+
 # internal_eval content (GPL / unlicensed): kept locally, never pushed
 content-sources/internal-eval/**/*.sql.gz
 content-sources/internal-eval/**/*.hcpack
