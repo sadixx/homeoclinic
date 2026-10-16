@@ -1,0 +1,37 @@
+@startuml
+!include <C4/C4_Component>
+title Desktop Components - Rust crates and UI modules
+Container_Boundary(ui, "Desktop UI (React)") {
+  Component(uih, "home/today", "Today list, follow-ups due")
+  Component(uip, "patients + search", "Register, search, dashboard")
+  Component(uic, "case + visit", "Template forms, follow-up status")
+  Component(uir, "repertory + MM", "Search, tree, clipboard, results")
+  Component(uix, "prescription + billing", "Rx, print, invoice, receipts")
+  Component(uis, "backup, settings, licence", "Admin screens")
+}
+Container_Boundary(core, "Desktop Core (Rust)") {
+  Component(app, "hc-app", "Tauri commands, use-case services, event bus")
+  Component(dom, "hc-domain", "Entities, value types, validation (no IO)")
+  Component(sto, "hc-storage", "SQLCipher pool, migrations, repos, backup/restore")
+  Component(sea, "hc-search", "Patient search, phonetic keys, ranking")
+  Component(rep, "hc-repertory", "Pack registry, rubric search, scoring, citations")
+  Component(lic, "hc-licence", "Verify, identity lock, clock guard, UPI + WhatsApp QR, offer codes")
+  Component(docs, "hc-docs", "HTML templates to PDF, amount in words")
+}
+Rel(uih, app, "commands")
+Rel(uip, app, "commands")
+Rel(uic, app, "commands")
+Rel(uir, app, "commands")
+Rel(uix, app, "commands")
+Rel(uis, app, "commands")
+Rel(app, sea, "")
+Rel(app, rep, "")
+Rel(app, lic, "")
+Rel(app, docs, "")
+Rel(app, sto, "")
+Rel(sea, sto, "")
+Rel(sto, dom, "")
+Rel(rep, dom, "")
+Rel(lic, dom, "")
+Rel(docs, dom, "")
+@enduml

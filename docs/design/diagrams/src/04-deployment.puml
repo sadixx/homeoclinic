@@ -1,0 +1,57 @@
+@startuml
+title Deployment - MVP1 (clinic PC + operator laptop) and MVP2 backend
+node "Clinic PC (Windows 10/11 or Linux x64)" as pc {
+  artifact "HomeoClinic installer\n(NSIS/MSI or AppImage/deb)" as inst
+  node "HomeoClinic process" {
+    component "Webview UI" as w
+    component "Rust core" as r
+  }
+  folder "Data folder" {
+    database "clinic.db" as c
+    database "user_content.db" as u
+    folder "content/ (.hcpack)" as p
+    folder "files/  backups/  logs/  licence/" as f
+  }
+}
+node "Operator laptop (MVP1, offline)" as op {
+  component "Vendor Licence Tool" as vlt
+  artifact "Hardware signing key" as hk
+}
+node "USB drive" as usb {
+  artifact ".hcbak backup"
+  artifact "offline update / .hcpack"
+}
+node "Doctor's phone" as ph {
+  component "UPI app + WhatsApp + Email" as pa
+  component "Browser: Portal (MVP2)" as pb
+}
+cloud "Business UPI / bank" as bank
+cloud "AWS ap-south-1 (MVP2, not in MVP1)" {
+  node "ECS Fargate" {
+    component "Licence API" as api
+    component "Portal (static, CDN)" as por
+  }
+  database "RDS PostgreSQL" as pg
+  component "KMS (Ed25519 key)" as kms
+}
+cloud "Razorpay (MVP2)" as rz
+w --> r
+r --> c
+r --> u
+r --> p
+r --> f
+r ..> usb : backup / import
+r ..> api : MVP2 only
+pa ..> pc : MVP1: scans Pay QR + WhatsApp QR\nfrom the PC screen
+pa --> bank : MVP1: UPI payment
+pa ..> vlt : MVP1: WhatsApp proof
+bank ..> vlt : operator checks UTR
+vlt ..> pa : MVP1: email .hclic + certificate
+vlt --> hk
+pb --> por
+pb --> rz : UPI
+por --> api
+api --> pg
+api --> kms
+rz --> api : webhook
+@enduml

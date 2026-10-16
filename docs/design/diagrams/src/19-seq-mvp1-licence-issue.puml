@@ -1,0 +1,29 @@
+@startuml
+title MVP1 purchase and activation with no servers (PAY-010..016, LIC-040..064)
+actor Doctor
+participant "HomeoClinic app\n(clinic PC, offline)" as APP
+participant "Doctor's phone\n(UPI app, WhatsApp, email)" as PH
+participant "Our business UPI\n(bank / UPI business app)" as BANK
+actor Operator
+participant "Vendor Licence Tool\n(offline laptop + hardware key)" as VLT
+Doctor -> APP : Buy / Renew, choose 6 months or 1 year\n(optional offer code)
+Doctor -> APP : confirm name, reg no, email, mobile
+APP -> APP : build upi://pay link (our UPI ID, amount,\nnote = install_id + plan) and render QR offline
+APP -> APP : build wa.me link with pre-typed message, render QR
+APP --> Doctor : Pay QR + WhatsApp QR + "licence by email within 1 hour"
+Doctor -> PH : scan Pay QR
+PH -> BANK : UPI payment (amount prefilled), UPI PIN
+BANK --> PH : success + UTR
+Doctor -> PH : scan WhatsApp QR, attach screenshot, send
+PH --> Operator : WhatsApp message + screenshot
+Operator -> BANK : find payment by UTR / install_id,\nconfirm amount and date
+Operator -> VLT : paste message, enter UTR + amount
+VLT -> VLT : reject duplicate UTR,\namount -> plan, validity (stack on renewal)
+VLT -> VLT : sign licence (Ed25519 on hardware key)\nmake .hclic, certificate PDF, invoice
+VLT --> Operator : email draft with attachments + WhatsApp reply text
+Operator --> PH : email (.hclic + certificate PDF + invoice)\nWhatsApp "licence sent to your email"
+Doctor -> APP : import .hclic (drag-drop / double-click)\nor scan certificate QR, or type key
+APP -> APP : verify signature, dates, clock guard,\nlock name + reg no for prints
+APP --> Doctor : "Licensed to Dr ... until <date>"
+note over Operator, VLT : Target: within 1 hour in support hours (LIC-049)
+@enduml

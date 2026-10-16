@@ -1,0 +1,20 @@
+@startuml
+title Tamper-proof release pipeline (TAM-001..012)
+start
+:Locked CI runner checks out tagged release;
+:Build frontend (minify + mangle);
+:Encrypt UI assets, embed in Rust binary (TAM-001);
+:Compile release: fat LTO, strip symbols,\nno debug info, devtools removed (TAM-002);
+:Compile-time string encryption (TAM-003);
+:Obfuscate hc-licence + pack-decrypt modules (TAM-008);
+:Hash code sections, sign manifest via hardware key\n(MVP2: KMS/HSM),\ninject into binary (TAM-005);
+:Authenticode (EV) / GPG sign via HSM (TAM-006);
+:Build installers (NSIS/MSI, AppImage/deb), sign;
+if (Release scan passes?\nno symbols, no devtools, no plain secrets,\nsignatures valid, Defender + AV clean) then (yes)
+  :Publish to update server + offline USB package;
+  stop
+else (no)
+  #pink:Block release, alert team;
+  stop
+endif
+@enduml

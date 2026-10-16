@@ -1,0 +1,321 @@
+ID,Title,Stage,Epic ID,Epic,Milestone,Feature ID,Feature,Type,Priority,Estimate (days),Requirements,Done when,Epic depends on,Labels,Status,Description
+HC-MVP2-001,"Licence API (axum + PostgreSQL) with activate, offline activate, deactivate, refresh",MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F01,Licence server,dev,P0,5,LSRV-001,API integration tests pass,PILOT,"MVP2,MVP2,dev,P0",To do,"Licence API (axum + PostgreSQL) with activate, offline activate, deactivate, refresh
+
+Done when: API integration tests pass
+Requirements: LSRV-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: dev, priority P0, estimate 5 days"
+HC-MVP2-002,Admin dashboard behind SSO and 2FA,MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F01,Licence server,dev,P0,4,"LSRV-002, LSRV-006","Issue, extend, revoke from dashboard",PILOT,"MVP2,MVP2,dev,P0",To do,"Admin dashboard behind SSO and 2FA
+
+Done when: Issue, extend, revoke from dashboard
+Requirements: LSRV-002, LSRV-006
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: dev, priority P0, estimate 4 days"
+HC-MVP2-003,"KMS or HSM signing, key rotation plan",MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F01,Licence server,ops,P0,2,LSRV-003,Signing never exposes private key,PILOT,"MVP2,MVP2,ops,P0",To do,"KMS or HSM signing, key rotation plan
+
+Done when: Signing never exposes private key
+Requirements: LSRV-003
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: ops, priority P0, estimate 2 days"
+HC-MVP2-004,Rate limiting and abuse detection,MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F01,Licence server,dev,P0,2,"LSRV-004, TAM-011",Abuse scenarios blocked in tests,PILOT,"MVP2,MVP2,dev,P0",To do,"Rate limiting and abuse detection
+
+Done when: Abuse scenarios blocked in tests
+Requirements: LSRV-004, TAM-011
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: dev, priority P0, estimate 2 days"
+HC-MVP2-005,Import Vendor Licence Tool register,MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F01,Licence server,dev,P0,1.5,"SRV-002, LIC-048",All MVP1 licences present and valid,PILOT,"MVP2,MVP2,dev,P0",To do,"Import Vendor Licence Tool register
+
+Done when: All MVP1 licences present and valid
+Requirements: SRV-002, LIC-048
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: dev, priority P0, estimate 1.5 days"
+HC-MVP2-006,"Deploy in AWS ap-south-1 with backups, monitoring, no patient data",MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F01,Licence server,ops,P0,3,LSRV-005,Production environment live,PILOT,"MVP2,MVP2,ops,P0",To do,"Deploy in AWS ap-south-1 with backups, monitoring, no patient data
+
+Done when: Production environment live
+Requirements: LSRV-005
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: ops, priority P0, estimate 3 days"
+HC-MVP2-007,"Purchase portal with phone OTP and Razorpay Checkout (UPI Intent, QR, cards)",MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F02,Automated purchase,dev,P0,4,"PAY-001, PAY-002",Test payment succeeds end to end,PILOT,"MVP2,MVP2,dev,P0",To do,"Purchase portal with phone OTP and Razorpay Checkout (UPI Intent, QR, cards)
+
+Done when: Test payment succeeds end to end
+Requirements: PAY-001, PAY-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P0, estimate 4 days"
+HC-MVP2-008,"Webhook-only payment confirmation, idempotent",MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F02,Automated purchase,dev,P0,2,PAY-003,Replayed webhook issues one licence,PILOT,"MVP2,MVP2,dev,P0",To do,"Webhook-only payment confirmation, idempotent
+
+Done when: Replayed webhook issues one licence
+Requirements: PAY-003
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P0, estimate 2 days"
+HC-MVP2-009,Automatic licence and GST invoice delivery by email and SMS,MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F02,Automated purchase,dev,P0,2,"PAY-004, PAY-005",Licence delivered within 1 minute,PILOT,"MVP2,MVP2,dev,P0",To do,"Automatic licence and GST invoice delivery by email and SMS
+
+Done when: Licence delivered within 1 minute
+Requirements: PAY-004, PAY-005
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P0, estimate 2 days"
+HC-MVP2-010,UPI AutoPay subscriptions,MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F02,Automated purchase,dev,P1,3,PAY-006,Renewal auto-extends licence,PILOT,"MVP2,MVP2,dev,P1",To do,"UPI AutoPay subscriptions
+
+Done when: Renewal auto-extends licence
+Requirements: PAY-006
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P1, estimate 3 days"
+HC-MVP2-011,Referral discounts,MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F02,Automated purchase,dev,P1,2,PAY-007,Both doctors get extra month,PILOT,"MVP2,MVP2,dev,P1",To do,"Referral discounts
+
+Done when: Both doctors get extra month
+Requirements: PAY-007
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P1, estimate 2 days"
+HC-MVP2-012,Dealer portal,MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F02,Automated purchase,dev,P1,3,PAY-008,Dealer buys and assigns keys,PILOT,"MVP2,MVP2,dev,P1",To do,"Dealer portal
+
+Done when: Dealer buys and assigns keys
+Requirements: PAY-008
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P1, estimate 3 days"
+HC-MVP2-013,Refunds and revocation,MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F02,Automated purchase,dev,P0,1,PAY-009,Refunded licence revoked on next refresh,PILOT,"MVP2,MVP2,dev,P0",To do,"Refunds and revocation
+
+Done when: Refunded licence revoked on next refresh
+Requirements: PAY-009
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P0, estimate 1 days"
+HC-MVP2-014,Online activation and silent weekly refresh,MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F03,App-side online licensing,dev,P0,2,"LIC-010, LIC-014",Offline operation unaffected,PILOT,"MVP2,MVP2,dev,P0",To do,"Online activation and silent weekly refresh
+
+Done when: Offline operation unaffected
+Requirements: LIC-010, LIC-014
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F03 App-side online licensing
+Type: dev, priority P0, estimate 2 days"
+HC-MVP2-015,Device fingerprint binding and transfer (if Q13 changes),MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F03,App-side online licensing,dev,P1,2,"LIC-003, LIC-012",2 of 3 component match tested,PILOT,"MVP2,MVP2,dev,P1",To do,"Device fingerprint binding and transfer (if Q13 changes)
+
+Done when: 2 of 3 component match tested
+Requirements: LIC-003, LIC-012
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F03 App-side online licensing
+Type: dev, priority P1, estimate 2 days"
+HC-MVP2-016,Perpetual licence with updates_until,MVP2,HC-MVP2-E01,Hosted licence and payments,MVP2,HC-MVP2-E01-F03,App-side online licensing,dev,P1,1,LIC-022,Newer updates refused with clear message,PILOT,"MVP2,MVP2,dev,P1",To do,"Perpetual licence with updates_until
+
+Done when: Newer updates refused with clear message
+Requirements: LIC-022
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F03 App-side online licensing
+Type: dev, priority P1, estimate 1 days"
+HC-MVP2-017,Client-side encrypted incremental and full backups,MVP2,HC-MVP2-E02,Cloud backup,MVP2,HC-MVP2-E02-F01,Zero-knowledge backup,dev,P0,3,"CLD-001, CLD-002",Server stores only ciphertext,MVP2,"MVP2,MVP2,dev,P0",To do,"Client-side encrypted incremental and full backups
+
+Done when: Server stores only ciphertext
+Requirements: CLD-001, CLD-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E02 Cloud backup (milestone MVP2)
+Feature: HC-MVP2-E02-F01 Zero-knowledge backup
+Type: dev, priority P0, estimate 3 days"
+HC-MVP2-018,Resumable chunked upload for slow networks,MVP2,HC-MVP2-E02,Cloud backup,MVP2,HC-MVP2-E02-F01,Zero-knowledge backup,dev,P0,3,CLD-002,Upload resumes after disconnect,MVP2,"MVP2,MVP2,dev,P0",To do,"Resumable chunked upload for slow networks
+
+Done when: Upload resumes after disconnect
+Requirements: CLD-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E02 Cloud backup (milestone MVP2)
+Feature: HC-MVP2-E02-F01 Zero-knowledge backup
+Type: dev, priority P0, estimate 3 days"
+HC-MVP2-019,Restore from cloud to new PC with recovery key,MVP2,HC-MVP2-E02,Cloud backup,MVP2,HC-MVP2-E02-F01,Zero-knowledge backup,dev,P0,2,CLD-003,Restore tested on clean PC,MVP2,"MVP2,MVP2,dev,P0",To do,"Restore from cloud to new PC with recovery key
+
+Done when: Restore tested on clean PC
+Requirements: CLD-003
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E02 Cloud backup (milestone MVP2)
+Feature: HC-MVP2-E02-F01 Zero-knowledge backup
+Type: dev, priority P0, estimate 2 days"
+HC-MVP2-020,S3-compatible storage in India region with per-customer prefix,MVP2,HC-MVP2-E02,Cloud backup,MVP2,HC-MVP2-E02-F01,Zero-knowledge backup,ops,P0,1,CLD-004,Bucket policies reviewed,MVP2,"MVP2,MVP2,ops,P0",To do,"S3-compatible storage in India region with per-customer prefix
+
+Done when: Bucket policies reviewed
+Requirements: CLD-004
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E02 Cloud backup (milestone MVP2)
+Feature: HC-MVP2-E02-F01 Zero-knowledge backup
+Type: ops, priority P0, estimate 1 days"
+HC-MVP2-021,Backup status widget,MVP2,HC-MVP2-E02,Cloud backup,MVP2,HC-MVP2-E02-F01,Zero-knowledge backup,dev,P1,0.5,CLD-005,Last backup time shown,MVP2,"MVP2,MVP2,dev,P1",To do,"Backup status widget
+
+Done when: Last backup time shown
+Requirements: CLD-005
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E02 Cloud backup (milestone MVP2)
+Feature: HC-MVP2-E02-F01 Zero-knowledge backup
+Type: dev, priority P1, estimate 0.5 days"
+HC-MVP2-022,Main computer LAN server exposing hc-app commands over TLS with device tokens,MVP2,HC-MVP2-E03,LAN multi-user and roles,MVP2,HC-MVP2-E03-F01,LAN server and roles,dev,P0,5,"USR-001, USR-002",Client PC works against main PC,MVP2,"MVP2,MVP2,dev,P0",To do,"Main computer LAN server exposing hc-app commands over TLS with device tokens
+
+Done when: Client PC works against main PC
+Requirements: USR-001, USR-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E03 LAN multi-user and roles (milestone MVP2)
+Feature: HC-MVP2-E03-F01 LAN server and roles
+Type: dev, priority P0, estimate 5 days"
+HC-MVP2-023,mDNS discovery and 6-digit pairing,MVP2,HC-MVP2-E03,LAN multi-user and roles,MVP2,HC-MVP2-E03-F01,LAN server and roles,dev,P0,2,USR-001,Pairing under 1 minute,MVP2,"MVP2,MVP2,dev,P0",To do,"mDNS discovery and 6-digit pairing
+
+Done when: Pairing under 1 minute
+Requirements: USR-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E03 LAN multi-user and roles (milestone MVP2)
+Feature: HC-MVP2-E03-F01 LAN server and roles
+Type: dev, priority P0, estimate 2 days"
+HC-MVP2-024,"Roles and permissions (doctor, assistant, receptionist, dispenser)",MVP2,HC-MVP2-E03,LAN multi-user and roles,MVP2,HC-MVP2-E03-F01,LAN server and roles,dev,P0,3,USR-003,Receptionist cannot see case notes,MVP2,"MVP2,MVP2,dev,P0",To do,"Roles and permissions (doctor, assistant, receptionist, dispenser)
+
+Done when: Receptionist cannot see case notes
+Requirements: USR-003
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E03 LAN multi-user and roles (milestone MVP2)
+Feature: HC-MVP2-E03-F01 LAN server and roles
+Type: dev, priority P0, estimate 3 days"
+HC-MVP2-025,Per-user PIN login and audit by user,MVP2,HC-MVP2-E03,LAN multi-user and roles,MVP2,HC-MVP2-E03-F01,LAN server and roles,dev,P0,1,USR-004,Audit shows user per change,MVP2,"MVP2,MVP2,dev,P0",To do,"Per-user PIN login and audit by user
+
+Done when: Audit shows user per change
+Requirements: USR-004
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E03 LAN multi-user and roles (milestone MVP2)
+Feature: HC-MVP2-E03-F01 LAN server and roles
+Type: dev, priority P0, estimate 1 days"
+HC-MVP2-026,Seat counting in licence,MVP2,HC-MVP2-E03,LAN multi-user and roles,MVP2,HC-MVP2-E03-F01,LAN server and roles,dev,P0,1,USR-005,Extra client refused beyond seats,MVP2,"MVP2,MVP2,dev,P0",To do,"Seat counting in licence
+
+Done when: Extra client refused beyond seats
+Requirements: USR-005
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E03 LAN multi-user and roles (milestone MVP2)
+Feature: HC-MVP2-E03-F01 LAN server and roles
+Type: dev, priority P0, estimate 1 days"
+HC-MVP2-027,"Inventory with batch, expiry, prices",MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F01,Dispensary and stock,dev,P0,3,STK-001,Stock list and edits work,MVP2,"MVP2,MVP2,dev,P0",To do,"Inventory with batch, expiry, prices
+
+Done when: Stock list and edits work
+Requirements: STK-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F01 Dispensary and stock
+Type: dev, priority P0, estimate 3 days"
+HC-MVP2-028,Auto-deduct on dispense and alerts,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F01,Dispensary and stock,dev,P0,2,STK-002,Low-stock alert in test,MVP2,"MVP2,MVP2,dev,P0",To do,"Auto-deduct on dispense and alerts
+
+Done when: Low-stock alert in test
+Requirements: STK-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F01 Dispensary and stock
+Type: dev, priority P0, estimate 2 days"
+HC-MVP2-029,Purchases and supplier ledger,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F01,Dispensary and stock,dev,P1,2,STK-003,Ledger balances,MVP2,"MVP2,MVP2,dev,P1",To do,"Purchases and supplier ledger
+
+Done when: Ledger balances
+Requirements: STK-003
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F01 Dispensary and stock
+Type: dev, priority P1, estimate 2 days"
+HC-MVP2-030,In-stock filter in repertory results,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F01,Dispensary and stock,dev,P1,0.5,"STK-004, REP-040",Filter applied,MVP2,"MVP2,MVP2,dev,P1",To do,"In-stock filter in repertory results
+
+Done when: Filter applied
+Requirements: STK-004, REP-040
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F01 Dispensary and stock
+Type: dev, priority P1, estimate 0.5 days"
+HC-MVP2-031,WhatsApp Business API and SMS (DLT templates) with offline queue,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F02,Messaging,dev,P0,4,COM-001,Reminders delivered in test,MVP2,"MVP2,MVP2,dev,P0",To do,"WhatsApp Business API and SMS (DLT templates) with offline queue
+
+Done when: Reminders delivered in test
+Requirements: COM-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F02 Messaging
+Type: dev, priority P0, estimate 4 days"
+HC-MVP2-032,Opt-in greeting campaigns,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F02,Messaging,dev,P1,2,COM-002,Only opted-in patients receive,MVP2,"MVP2,MVP2,dev,P1",To do,"Opt-in greeting campaigns
+
+Done when: Only opted-in patients receive
+Requirements: COM-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F02 Messaging
+Type: dev, priority P1, estimate 2 days"
+HC-MVP2-033,"Patient, revenue and remedy statistics",MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F03,Reports,dev,P0,3,RPT-001,Reports match seeded data,MVP2,"MVP2,MVP2,dev,P0",To do,"Patient, revenue and remedy statistics
+
+Done when: Reports match seeded data
+Requirements: RPT-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F03 Reports
+Type: dev, priority P0, estimate 3 days"
+HC-MVP2-034,Remedy outcome summary,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F03,Reports,dev,P1,2,RPT-002,Percent better per remedy correct,MVP2,"MVP2,MVP2,dev,P1",To do,"Remedy outcome summary
+
+Done when: Percent better per remedy correct
+Requirements: RPT-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F03 Reports
+Type: dev, priority P1, estimate 2 days"
+HC-MVP2-035,Translate UI strings to 8 Indian languages,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F04,Languages,content,P0,10,I18N-001,Each language reviewed by a native speaker,MVP2,"MVP2,MVP2,content,P0",To do,"Translate UI strings to 8 Indian languages
+
+Done when: Each language reviewed by a native speaker
+Requirements: I18N-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F04 Languages
+Type: content, priority P0, estimate 10 days"
+HC-MVP2-036,Hindi and Hinglish synonym mappings for rubric search,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F04,Languages,content,P1,5,REP-016,"""sir dard"" finds HEAD - PAIN",MVP2,"MVP2,MVP2,content,P1",To do,"Hindi and Hinglish synonym mappings for rubric search
+
+Done when: ""sir dard"" finds HEAD - PAIN
+Requirements: REP-016
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F04 Languages
+Type: content, priority P1, estimate 5 days"
+HC-MVP2-037,Paid pack encryption with per-licence wrapped keys,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F05,Paid and additional content,dev,P0,3,"LIC-031, TAM-009",Copied paid pack fails on other licence,MVP2,"MVP2,MVP2,dev,P0",To do,"Paid pack encryption with per-licence wrapped keys
+
+Done when: Copied paid pack fails on other licence
+Requirements: LIC-031, TAM-009
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F05 Paid and additional content
+Type: dev, priority P0, estimate 3 days"
+HC-MVP2-038,Pack entitlements in licence,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F05,Paid and additional content,dev,P0,1,"LIC-030, PACK-004",Unentitled pack refused,MVP2,"MVP2,MVP2,dev,P0",To do,"Pack entitlements in licence
+
+Done when: Unentitled pack refused
+Requirements: LIC-030, PACK-004
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F05 Paid and additional content
+Type: dev, priority P0, estimate 1 days"
+HC-MVP2-039,Online pack catalogue,MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F05,Paid and additional content,dev,P1,3,PACK-010,Download and install from catalogue,MVP2,"MVP2,MVP2,dev,P1",To do,"Online pack catalogue
+
+Done when: Download and install from catalogue
+Requirements: PACK-010
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F05 Paid and additional content
+Type: dev, priority P1, estimate 3 days"
+HC-MVP2-040,"Additional public packs (Boger-Boenninghausen, Clarke MM) and first licensed paid pack",MVP2,HC-MVP2-E04,"Dispensary, messaging, reports, languages, content",MVP2,HC-MVP2-E04-F05,Paid and additional content,content,P1,15,CPK-001,Packs built and proofread,MVP2,"MVP2,MVP2,content,P1",To do,"Additional public packs (Boger-Boenninghausen, Clarke MM) and first licensed paid pack
+
+Done when: Packs built and proofread
+Requirements: CPK-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F05 Paid and additional content
+Type: content, priority P1, estimate 15 days"

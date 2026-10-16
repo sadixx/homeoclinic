@@ -1,0 +1,23 @@
+@startuml
+title Legacy "Doctor Clinic" (2017-2018) as found
+node "Clinic PC" {
+  component "Doctor Clinic.jar (33 MB)\nJava Swing + JTattoo\n~66 classes, default package" as jar
+  component "JRE (separately installed)" as jre
+  database "MySQL server\n(separately installed)\n19 tables, latin1" as my
+  folder "Prints/ Reports/\nJasper .jrxml + PDFs" as pr
+  folder "Patient Photos/\n(OpenCV webcam)" as ph
+  folder "Backup/backup.sql" as bk
+  folder "CONF/ Shivaji fonts\n(non-Unicode Marathi)" as cf
+}
+jar --> jre
+jar --> my : JDBC, string SQL\n(53 syntax errors,\n13 connection drops in logs)
+jar --> pr : JasperReports + iText
+jar --> ph
+jar --> bk : manual dump
+jar --> cf
+note bottom of my
+  No repertory; rubrics typed as free text
+  Licence = one EndDate row (editable)
+  Money stored as double
+end note
+@enduml

@@ -1,0 +1,81 @@
+ID,Title,Stage,Epic ID,Epic,Milestone,Feature ID,Feature,Type,Priority,Estimate (days),Requirements,Done when,Epic depends on,Labels,Status,Description
+HC-MVP3-001,Tauri 2 mobile builds for Android 8+ and iOS 15+ with mobile layouts,MVP3,HC-MVP3-E01,Mobile apps and sync,MVP3,HC-MVP3-E01-F01,Mobile shell,dev,P0,5,MOB-001,Apps run on test devices,MVP2,"MVP3,MVP3,dev,P0",To do,"Tauri 2 mobile builds for Android 8+ and iOS 15+ with mobile layouts
+
+Done when: Apps run on test devices
+Requirements: MOB-001
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F01 Mobile shell
+Type: dev, priority P0, estimate 5 days"
+HC-MVP3-002,"Play Store and App Store accounts, signing, privacy labels",MVP3,HC-MVP3-E01,Mobile apps and sync,MVP3,HC-MVP3-E01-F01,Mobile shell,ops,P0,3,MOB-001,Internal test track live,MVP2,"MVP3,MVP3,ops,P0",To do,"Play Store and App Store accounts, signing, privacy labels
+
+Done when: Internal test track live
+Requirements: MOB-001
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F01 Mobile shell
+Type: ops, priority P0, estimate 3 days"
+HC-MVP3-003,Change-log table with hybrid logical clocks and device ids,MVP3,HC-MVP3-E01,Mobile apps and sync,MVP3,HC-MVP3-E01-F02,Sync,dev,P0,8,MOB-002,Two devices converge in tests,MVP2,"MVP3,MVP3,dev,P0",To do,"Change-log table with hybrid logical clocks and device ids
+
+Done when: Two devices converge in tests
+Requirements: MOB-002
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F02 Sync
+Type: dev, priority P0, estimate 8 days"
+HC-MVP3-004,End-to-end encrypted cloud relay,MVP3,HC-MVP3-E01,Mobile apps and sync,MVP3,HC-MVP3-E01-F02,Sync,dev,P0,5,MOB-002,Relay sees only ciphertext,MVP2,"MVP3,MVP3,dev,P0",To do,"End-to-end encrypted cloud relay
+
+Done when: Relay sees only ciphertext
+Requirements: MOB-002
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F02 Sync
+Type: dev, priority P0, estimate 5 days"
+HC-MVP3-005,Conflict and offline-merge test suite,MVP3,HC-MVP3-E01,Mobile apps and sync,MVP3,HC-MVP3-E01-F02,Sync,test,P0,3,MOB-002,All conflict scenarios pass,MVP2,"MVP3,MVP3,test,P0",To do,"Conflict and offline-merge test suite
+
+Done when: All conflict scenarios pass
+Requirements: MOB-002
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F02 Sync
+Type: test, priority P0, estimate 3 days"
+HC-MVP3-006,Offline packs and 6-month patient cache,MVP3,HC-MVP3-E01,Mobile apps and sync,MVP3,HC-MVP3-E01-F03,Mobile features,dev,P0,3,MOB-003,Works in airplane mode,MVP2,"MVP3,MVP3,dev,P0",To do,"Offline packs and 6-month patient cache
+
+Done when: Works in airplane mode
+Requirements: MOB-003
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F03 Mobile features
+Type: dev, priority P0, estimate 3 days"
+HC-MVP3-007,"Lookup, history, quick visit, repertorise, prescribe, share, Today, biometric lock",MVP3,HC-MVP3-E01,Mobile apps and sync,MVP3,HC-MVP3-E01-F03,Mobile features,dev,P0,5,MOB-004,Doctor completes a visit on phone,MVP2,"MVP3,MVP3,dev,P0",To do,"Lookup, history, quick visit, repertorise, prescribe, share, Today, biometric lock
+
+Done when: Doctor completes a visit on phone
+Requirements: MOB-004
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F03 Mobile features
+Type: dev, priority P0, estimate 5 days"
+HC-MVP3-008,Remote revoke and wipe,MVP3,HC-MVP3-E01,Mobile apps and sync,MVP3,HC-MVP3-E01-F03,Mobile features,dev,P0,2,MOB-007,Revoked phone wiped on next contact,MVP2,"MVP3,MVP3,dev,P0",To do,"Remote revoke and wipe
+
+Done when: Revoked phone wiped on next contact
+Requirements: MOB-007
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F03 Mobile features
+Type: dev, priority P0, estimate 2 days"
+HC-MVP3-009,Online booking link feeding appointment book,MVP3,HC-MVP3-E01,Mobile apps and sync,MVP3,HC-MVP3-E01-F04,Patient-facing,dev,P1,4,MOB-005,Booking appears after sync,MVP2,"MVP3,MVP3,dev,P1",To do,"Online booking link feeding appointment book
+
+Done when: Booking appears after sync
+Requirements: MOB-005
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F04 Patient-facing
+Type: dev, priority P1, estimate 4 days"
+HC-MVP3-010,Teleconsult notes and Rx per Telemedicine Guidelines 2020,MVP3,HC-MVP3-E01,Mobile apps and sync,MVP3,HC-MVP3-E01-F04,Patient-facing,dev,P1,3,MOB-006,Checklist of guideline fields satisfied,MVP2,"MVP3,MVP3,dev,P1",To do,"Teleconsult notes and Rx per Telemedicine Guidelines 2020
+
+Done when: Checklist of guideline fields satisfied
+Requirements: MOB-006
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F04 Patient-facing
+Type: dev, priority P1, estimate 3 days"

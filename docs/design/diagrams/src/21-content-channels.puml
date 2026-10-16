@@ -1,0 +1,25 @@
+@startuml
+title Content channels: plug-and-play packs, internal-eval never ships (CONT-001..010)
+left to right direction
+folder "content-sources/" {
+  file "REGISTRY.md\n(one row per source)" as reg
+  folder "internal-eval/\n(OOREP dump: publicum,\nkent-de, Boericke, remedies)" as eval
+  folder "public/\n(our public-domain packs,\nstarter sample, synonyms)" as pub
+}
+rectangle "content-builder\n(refuses sources\nwithout a registry row)" as cb
+artifact "eval-*.hcpack\nsigned with EVAL key" as ep
+artifact "public *.hcpack\nsigned with PUBLIC key" as pp
+node "Internal build\n(embeds PUBLIC + EVAL keys,\nEVALUATION banner on prints)" as ib
+node "Public build\n(embeds PUBLIC key only)" as pb
+rectangle "Release gate (CONT-005)\nfails if any eval pack, eval key\nor internal-eval file is present" as gate
+reg --> cb
+eval --> cb
+pub --> cb
+cb --> ep
+cb --> pp
+ep --> ib : bundled
+pp --> ib : bundled
+pp --> pb : bundled
+ep ..> pb : copied in by hand:\nsignature check fails
+pb --> gate
+@enduml

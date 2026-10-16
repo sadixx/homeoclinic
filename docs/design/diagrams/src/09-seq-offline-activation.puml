@@ -1,0 +1,24 @@
+@startuml
+title Offline licence activation - MVP2 automated (LIC-011); MVP1 manual flow in figure 19
+actor Doctor
+participant "Desktop app\n(no internet)" as APP
+participant "Doctor's phone" as PH
+participant "Portal" as POR
+participant "Licence API" as API
+participant "KMS" as KMS
+Doctor -> APP : Activate -> "No internet"
+APP -> APP : fingerprint (3 components)\nbuild Activation Request code
+APP --> Doctor : request code + QR
+Doctor -> PH : scan QR
+PH -> POR : open /activate?req=CODE
+POR -> Doctor : OTP login or buy (UPI)
+POR -> API : POST /v1/activate/offline(req)
+API -> API : check key, seats, rate limit
+API -> KMS : sign compact licence
+KMS --> API : Ed25519 signature
+API --> POR : response code
+POR --> PH : response QR + text
+Doctor -> APP : scan with webcam or type code
+APP -> APP : CRC check per group\nverify signature (embedded pubkey)\nmatch fingerprint (2 of 3)
+APP --> Doctor : Activated until <date>
+@enduml

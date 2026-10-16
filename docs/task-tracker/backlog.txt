@@ -1,0 +1,467 @@
+# HomeoClinic backlog: single source of truth for all task-tracker exports.
+# Edit this file, then run: python3 generate.py
+#
+# Line formats (fields separated by " | "):
+#   STAGE <code> | <name> | <goal>
+#   EPIC <milestone> | <name> | <depends on, comma separated or ->
+#   FEAT <name> | <requirement ids or ->
+#   TASK <type> | <priority> | <estimate days> | <title> | <requirement ids or -> | <done when>
+# Types: biz, legal, decision, content, design, dev, test, ops, doc
+# Priority: P0 must, P1 should, P2 could (within its stage)
+# Estimates are rough ideal person-days for one person, for planning only.
+# Lines starting with # are comments.
+
+STAGE PREP | Preparation and decisions | Everything that blocks or must run alongside MVP1 but is not code
+
+EPIC PREP | Business setup | -
+FEAT Legal entity and money | -
+TASK biz | P0 | 2 | Choose and register business entity (sole proprietorship, LLP or Pvt Ltd) | - | Registration certificate and PAN available
+TASK biz | P0 | 1 | Open current account in business name | - | Account active, cheque book and net banking working
+TASK biz | P0 | 1 | Set up business UPI ID (PhonePe Business, Paytm for Business, BharatPe or bank merchant UPI) with dashboard showing UTRs | PAY-011, LIC-041 | Test payment of Rs 1 visible in dashboard with UTR and note
+TASK biz | P0 | 1 | Consult CA on GST registration need and tax invoice format for software licences | LIC-045 | Written CA advice saved; invoice template fields agreed
+TASK biz | P1 | 1 | Decide refund policy and write it for website and invoice | LIC-043 | Policy text approved
+FEAT Support channels | -
+TASK biz | P0 | 1 | Get WhatsApp Business number, profile, business hours and quick-reply templates (payment received, balance due, licence sent) | PAY-013, LIC-049 | Number active; 3 quick replies saved
+TASK biz | P0 | 0.5 | Create business email for licence delivery and support | LIC-045 | Mailbox working; SPF and DKIM set so licence mails do not land in spam
+TASK decision | P0 | 0.5 | Confirm support hours and licence turnaround promise (Q15) | LIC-049, PAY-016 | Hours written in 03-licensing-upi.md and app strings
+
+EPIC PREP | Product decisions | -
+FEAT Open questions from design review | -
+TASK decision | P0 | 0.5 | Final product name and logo brief | - | Name chosen; domain availability checked
+TASK decision | P0 | 0.5 | Final prices for 6-month and 1-year plans, UPI only or also cards (Q14) | PAY-010, PAY-011 | Prices written in requirements 03 section 1
+TASK decision | P0 | 0.5 | Confirm Q11 (certificate PDF without password) | LIC-045 | Decision recorded in design/06-review-questions.md
+TASK decision | P0 | 0.5 | Confirm Q12 (licensed name and reg no locked on prints, one doctor per licence) | LIC-006, LIC-007 | Decision recorded
+TASK decision | P0 | 0.5 | Confirm Q13 (no PC limit) | LIC-064 | Decision recorded
+TASK decision | P0 | 0.5 | Decide Q1: legacy prints in MVP1 (certificate, referral letter, envelope, declaration, birthday list) | - | If yes, DOC requirements added to 01-mvp1-requirements.md
+TASK decision | P0 | 0.5 | Decide Q3: Marathi advice and diet print in MVP1 | RX-007 | If yes, requirement added to 01-mvp1-requirements.md
+TASK decision | P0 | 0.5 | Decide Q17: who receives internal evaluation builds | CONT-003, CONT-004 | Decision recorded
+TASK decision | P1 | 0.5 | Decide Q10: EV code-signing certificate budget and optional commercial obfuscator | TAM-006, TAM-008 | Budget approved
+
+EPIC PREP | Legal and compliance | -
+FEAT Content licensing | -
+TASK legal | P0 | 2 | IP lawyer opinion on public-domain status of Kent 1897, Boericke 1906, Boenninghausen TPB 1891, Allen Keynotes in India | REP-001 | Written opinion stored with registry
+TASK legal | P0 | 1 | GPL v3 review: may OOREP publicum and kent-de be used in internal evaluation builds given to pilot doctors | CONT-003, CONT-006 | Written opinion; registry permission status updated
+TASK content | P0 | 0.5 | Email OOREP author (Andreas Bauer) asking permission to use English Kent, Boger, Boenninghausen and Boericke conversions in a closed-source product (Q16) | CONT-008 | Reply received and stored; registry updated
+FEAT Privacy and terms | -
+TASK legal | P0 | 2 | Privacy policy and consent text compliant with DPDP Act 2023 | PAT-012, PAY-010 | Text approved and placed in app strings and website
+TASK legal | P0 | 1 | End-user licence agreement and terms of sale | LIC-001 | EULA shown in installer and Buy screen
+TASK legal | P0 | 0.5 | Medical disclaimer for repertorisation results (suggestion only) | REP-033 | Disclaimer text shown in result panel and help
+
+EPIC PREP | Signing keys and certificates | -
+FEAT Keys | TAM-006, LIC-047, CONT-002
+TASK ops | P0 | 1 | Buy 2 hardware security keys (primary and backup) supporting Ed25519 | LIC-047 | Keys received and tested
+TASK ops | P0 | 1 | Generate keys: licence signing, offer-code signing, public content, eval content, update manifest; record key ids | LIC-001, PAY-012, CONT-002, NFR-042 | 5 public keys exported for embedding; private keys only on hardware or offline media
+TASK ops | P0 | 0.5 | Sealed paper backup of private keys stored in a safe place | LIC-047 | Backup envelope stored; recovery tested once
+TASK ops | P0 | 2 | Buy EV code-signing certificate (Windows Authenticode) | TAM-006, SUX-009 | Certificate on token; test signature verifies on Windows
+
+EPIC PREP | Pilot recruitment | -
+FEAT Pilot doctors | NFR-031
+TASK biz | P0 | 3 | Recruit 20 pilot doctors across at least 3 cities and 2 languages | NFR-031 | Signed-up list with contact, PC specs and preferred language
+TASK legal | P0 | 1 | Pilot evaluation agreement (free use, feedback, data stays on their PC, evaluation content not for redistribution) | CONT-004 | Agreement template signed by each pilot doctor
+TASK biz | P1 | 1 | Collect sample paper prescriptions, case papers and letterheads from pilot doctors | RX-005 | At least 10 samples to guide print layouts
+
+STAGE MVP1 | MVP1: complete offline desktop | Offline Windows and Linux clinic app with integrated repertory, offline licence and UPI purchase, no hosted servers
+
+EPIC HANDOFF | Coding-agent handoff pack | PREP
+FEAT Close design gaps before coding | -
+TASK design | P0 | 0.5 | Unify code layout: one crate list in requirements/06 and design/02 | - | Both documents name the same crates and folders
+TASK design | P0 | 4 | Wireframes for Today, registration, patient dashboard, case form, follow-up, prescription, billing, backup, settings and licence screens | NFR-030, NFR-034 | 10 wireframes in design/diagrams with field lists
+TASK design | P0 | 2 | Case template JSON schema plus 3 default templates (chronic detailed, acute quick, child) | CASE-001, CASE-004 | Schema file and 3 template files validate
+TASK design | P0 | 2 | Print layout specs: Rx A4, A5, letterhead margins, receipt, case paper; based on legacy Jasper templates and pilot samples | RX-005, BILL-003, CASE-009 | Layout spec with field positions and sample PDFs
+TASK design | P0 | 0.5 | Settings file with placeholders: business UPI ID, payee name, WhatsApp number, prices, support hours, public keys | PAY-011, PAY-013, PAY-015 | Single config file referenced by build
+TASK doc | P0 | 3 | One self-contained brief per milestone M0 to M10 (scope, requirement ids, tests that must pass, out-of-scope) | - | 11 brief files in handoff folder
+TASK doc | P0 | 1 | Development environment and CI guide including Windows build runner | NFR-040, NFR-041 | New developer builds Win and Linux artifacts from the guide
+
+EPIC M0 | Foundation: repo, shell, CI | HANDOFF
+FEAT Monorepo and toolchain | -
+TASK dev | P0 | 1 | Create monorepo with apps/desktop, crates, tools, content-sources, docs | - | Layout matches handoff spec; README explains folders
+TASK dev | P0 | 1 | Tauri 2 shell with React 18, TypeScript strict, Vite, Tailwind, shadcn/ui | - | App window opens on Windows and Linux
+TASK dev | P0 | 1 | Rust workspace with domain, storage, search, repertory, licence, docs, app crates (empty, compiling) | - | cargo build and cargo test pass
+TASK dev | P0 | 1 | Typed Tauri commands with tauri-specta; generated TS types checked in CI | - | One sample command callable from UI with generated types
+TASK dev | P0 | 0.5 | Tauri capability allowlist and webview Content Security Policy (no shell, no arbitrary FS) | NFR-022, NFR-023 | Security config reviewed; forbidden API call fails
+FEAT CI and quality gates | NFR-024
+TASK ops | P0 | 2 | CI pipeline (GitHub Actions or Forgejo Actions) building Windows and Linux artifacts on every main commit | NFR-040, NFR-041 | Artifacts downloadable from CI
+TASK ops | P0 | 0.5 | Lint and format gates: clippy -D warnings, eslint, prettier, TS strict | - | CI fails on any lint error
+TASK ops | P0 | 0.5 | Dependency pinning and audit (Cargo.lock, package-lock, cargo audit, npm audit) | NFR-024 | CI fails on known vulnerable dependency
+FEAT Cross-cutting basics | -
+TASK dev | P0 | 0.5 | i18n scaffold with locales/en.json; no hard-coded UI strings | I18N-001 | Lint rule flags literal strings in JSX
+TASK dev | P0 | 0.5 | Structured logging with rotation, no patient identifiers | NFR-013 | Log file rotates at 10 MB x 5; test proves names are not logged
+TASK dev | P0 | 0.5 | Error mapping to friendly messages with suggested action | NFR-033 | No stack trace reaches UI in tests
+TASK doc | P0 | 0.5 | ADR folder with ADR-001 to ADR-011 copied from design | - | docs/adr contains 11 records
+
+EPIC M1 | Storage, encryption, backup | M0
+FEAT Encrypted database | NFR-010, NFR-020
+TASK dev | P0 | 2 | SQLCipher pool: 1 writer and 4 reader connections, WAL, foreign keys, tuned pragmas | NFR-010 | Concurrent read during write test passes
+TASK dev | P0 | 2 | Key hierarchy: random DEK wrapped by PIN-derived KEK (Argon2id), OS store (DPAPI or Secret Service) and recovery code | NFR-020, SET-004 | Unlock works by PIN; recovery code restores access in test
+TASK dev | P0 | 1.5 | Forward-only migrations with user_version and automatic pre-migration backup | NFR-011 | Migration test from empty and from previous schema passes
+TASK test | P0 | 1 | Crash-safety test: kill process during writes in a loop, DB never corrupt | NFR-010, NFR-012 | 1,000 kill cycles with integrity_check ok
+TASK dev | P0 | 1.5 | Encrypted attachment store (AES-256-GCM blobs in files/) | NFR-021 | Attachment round trip test; file on disk unreadable
+TASK dev | P0 | 1 | Audit log writer used by every write command | ADM-002 | Create, update, delete each produce an audit row with diff
+FEAT First run and app lock | SET-001, SET-002, SET-003, SET-004, SET-005, SET-006
+TASK dev | P0 | 2 | First-run wizard: language, doctor profile, clinic profile, licence (trial or import) | SET-001, SET-002, SET-003 | Wizard completes in under 3 minutes (flow 1)
+TASK dev | P0 | 1 | PIN set, unlock screen, idle auto-lock, printed recovery code | SET-004 | Auto-lock after configured minutes; recovery path tested
+TASK dev | P1 | 0.5 | Global font size setting | SET-005 | Normal, Large, Extra large applied app-wide
+TASK dev | P1 | 0.5 | Data folder location chooser | SET-006 | Data moved safely to chosen folder
+FEAT Backup and restore | BAK-001, BAK-002, BAK-003, BAK-004, BAK-005
+TASK dev | P0 | 2 | .hcbak format: header, Argon2id key, AES-256-GCM chunked stream of DB snapshots and files | BAK-002 | Round-trip test; header readable without decrypting body
+TASK dev | P0 | 1.5 | Automatic daily backup with 14 daily, 8 weekly, 12 monthly rotation using SQLite online backup | BAK-001, SUX-011 | Rotation test over simulated 400 days; no password prompt
+TASK dev | P0 | 1 | Manual backup to any folder or USB | BAK-002 | Backup to USB works on Win and Linux
+TASK dev | P0 | 2 | Restore wizard with preview, safety backup of current data, atomic swap, migration if older | BAK-003 | Restore on clean PC with all data and attachments (flow 9)
+TASK dev | P0 | 1 | Post-backup integrity check and banner if last good backup older than 7 days | BAK-004 | Banner appears in test after 8 simulated days
+TASK dev | P1 | 1 | Move to new computer guided flow (backup, restore, licence re-import) | BAK-005, LIC-064 | Guided flow tested end to end
+
+EPIC M2 | Patients and 50k search | M1
+FEAT Patient records | PAT-001, PAT-002, PAT-004, PAT-005, PAT-006, PAT-008, PAT-011
+TASK dev | P0 | 2 | Patient registration form with age or DOB, mobile, address, occupation, referred by | PAT-001 | All fields saved and validated
+TASK dev | P0 | 0.5 | Auto patient code with configurable prefix, never reused | PAT-002 | Codes unique across delete and restore
+TASK dev | P0 | 1 | Patient photo from webcam or file | PAT-001 | Photo captured on Win and Linux webcams
+TASK dev | P0 | 1 | Duplicate warning on name plus mobile or name plus DOB | PAT-004 | Warning shown in tests with Indian name variants
+TASK dev | P0 | 2 | Patient dashboard: banner, alerts, visit timeline, last Rx, dues, quick actions | PAT-005 | Opens in under 300 ms at 50k patients
+TASK dev | P0 | 1 | Family linking and quick switch | PAT-006 | Linked family visible on dashboard
+TASK dev | P0 | 1 | Soft delete, 30-day recycle bin, PIN-protected permanent delete | PAT-008 | Restore from bin works; permanent delete asks PIN
+TASK dev | P0 | 1 | Export single patient as PDF and JSON | PAT-011 | Export opens and contains all visits
+TASK dev | P1 | 0.5 | Patient tags with filter | PAT-007 | Tag filter works in list
+TASK dev | P1 | 1.5 | Attachments per patient and visit with thumbnail viewer | PAT-009 | Images and PDFs attach and preview
+TASK dev | P1 | 0.5 | Consent record and printable consent form | PAT-012 | Consent date stored and printable
+FEAT Patient search | PAT-003, PSR-001, PSR-002, PSR-003, PSR-004, PSR-005, PSR-006, PSR-007, PSR-011, PSR-012, PSR-013
+TASK dev | P0 | 2 | FTS5 tables (prefix and trigram) with triggers in the same transaction | PSR-012 | New patient findable immediately
+TASK dev | P0 | 2 | Indian-name phonetic key (Sharma/Sarma, Mohd/Mohammad, Lakshmi/Laxmi) | PSR-003 | Golden test of 200 name pairs passes
+TASK dev | P0 | 2 | Ranked UNION query (exact ID or mobile, name prefix, phonetic, other fields) with keyset paging | PSR-004 | Ranking golden tests pass
+TASK dev | P0 | 2 | Global search box (Ctrl+K, F2), debounce, cancel on keystroke, keyboard-only flow, recent patients | PSR-001, PSR-006, PSR-007 | Type, arrows, Enter opens patient
+TASK dev | P0 | 1 | Result rows with photo, code, age, last visit, dues; virtualised list | PSR-005 | Smooth scroll through 1,000 results
+TASK dev | P0 | 2 | Advanced filters: dates, follow-up due, age, sex, city, tags, diagnosis, remedy, potency, dues; CSV export | PSR-008, PSR-011 | Filter "overdue, given Sulphur" correct (flow 2)
+TASK dev | P0 | 0.5 | Search index rebuild tool with progress | PSR-013 | Rebuild at 50k under 60 s
+TASK dev | P1 | 1.5 | Full-text search in case notes with snippets | PSR-009 | Snippet links to the exact visit
+TASK dev | P1 | 0.5 | Saved filters on home screen | PSR-010 | Saved filter reopens with one click
+FEAT Scale testing | NFR-002, NFR-007
+TASK dev | P0 | 2 | Synthetic data generator tools/seed for 50k and 100k realistic Indian patients, visits, Rx, bills | NFR-007 | Both datasets generated in CI
+TASK test | P0 | 1 | Performance CI gate for search, dashboard, filter, Today list at 50k and 100k | NFR-002 | CI fails when a budget is missed
+
+EPIC M3 | Case taking, visits and Today screen | M2, HANDOFF
+FEAT Template-driven case form | CASE-001, CASE-002, CASE-003, CASE-004, CASE-005, CASE-009
+TASK dev | P0 | 3 | Form engine rendering case templates from JSON schema (text, long text, choice, number, date, scale) | CASE-001, CASE-004 | 3 default templates render and validate
+TASK dev | P0 | 1 | Collapsible and hideable sections per doctor; female and child sections shown conditionally | CASE-002 | Hidden sections stay hidden after restart
+TASK dev | P0 | 1 | Pick lists with free text (thermal, thirst, appetite and similar) | CASE-003 | Pick lists editable in settings
+TASK dev | P0 | 1 | Auto-save every 2 s and on blur with Saved indicator | CASE-005, NFR-012 | Kill app mid-typing; nothing lost (flow 3)
+TASK dev | P0 | 1 | Vitals with BMI auto-calc | CASE-001 | BMI correct in unit tests
+TASK dev | P0 | 1 | Printable case summary | CASE-009 | Prints on A4 per layout spec
+TASK dev | P0 | 0.5 | Send selected text to repertory hook | CASE-006 | Opens rubric search pre-filled
+TASK dev | P1 | 3 | Template editor (add, remove, reorder fields) | CASE-004 | Doctor builds a new template without help
+TASK dev | P1 | 1 | Voice dictation via OS input in text fields | CASE-007 | Windows dictation types into fields
+TASK dev | P1 | 2 | Body diagram annotation (front and back) | CASE-008 | Marks saved per visit
+FEAT Visits and follow-ups | VIS-001, VIS-002, VIS-003, VIS-004
+TASK dev | P0 | 1 | Visit model and types (first, follow-up, acute, tele) | VIS-001 | Visits listed on timeline
+TASK dev | P0 | 2 | Follow-up form pre-loading complaints with status and improvement slider | VIS-002 | Status per complaint saved (flow 7)
+TASK dev | P0 | 0.5 | Remedy response quick-pick | VIS-003 | Values stored and shown on timeline
+TASK dev | P0 | 0.5 | Next follow-up quick buttons | VIS-004 | Date stored; appears in Today list
+FEAT Today screen and appointments | VIS-005, VIS-006, VIS-007
+TASK dev | P0 | 2 | Today screen: due today, overdue, today's visits; default home | VIS-005 | Loads under 200 ms at 50k
+TASK dev | P1 | 3 | Appointment book day view, drag to reschedule, walk-in tokens | VIS-006 | Token printed and queue updates
+TASK dev | P1 | 2 | Progress charts per complaint and vitals | VIS-007 | Chart shows improvement across visits
+
+EPIC M4 | Content packs and channels | M1
+FEAT Pack format and loader | PACK-001, PACK-002, PACK-005, PACK-006, PACK-007, PACK-008, PACK-013
+TASK dev | P0 | 2 | Pack format: zip with manifest.json, content.db, signature; manifest schema incl. distribution and licence | PACK-001, PACK-002, CONT-001 | Schema validated in tests
+TASK dev | P0 | 2 | Pack verifier and installer (signature with build-profile keys, sha256, format_version, atomic install) | PACK-001, PACK-013, CONT-003 | Tampered and newer-format packs rejected
+TASK dev | P0 | 2 | Generic repertory schema with per-pack grade scale, display style, page refs, author codes | PACK-007 | Pack with 1-4 grade scale works without code change
+TASK dev | P0 | 1.5 | Remedy master mapping on install; unmapped remedies added and flagged | PACK-008, MM-001 | Two packs share remedy ids in one analysis
+TASK dev | P0 | 1 | Stable rubric ids across pack versions with id map | PACK-005 | Old analysis opens after pack update
+FEAT Build profiles and release gate | CONT-002, CONT-003, CONT-004, CONT-005
+TASK dev | P0 | 1.5 | Internal and public build profiles embedding different content keys | CONT-003 | Public build refuses eval pack copied in by hand
+TASK dev | P0 | 0.5 | Internal build banner and EVALUATION mark on every print | CONT-004 | Visible in all print templates
+TASK ops | P0 | 1 | Release gate: fail public build if eval pack, eval key or internal-eval file present | CONT-005 | Gate fails on a planted file in test
+TASK ops | P0 | 0.5 | Bundle the packs allowed for each build profile in the installer | PACK-003 | Internal installer has eval packs; public installer has only public packs
+FEAT content-builder tool | CONT-006, CONT-007, CONT-008, CONT-009, CONT-010
+TASK dev | P0 | 1 | Registry enforcement: refuse sources without REGISTRY.md row | CONT-006 | Build fails for unregistered source
+TASK dev | P0 | 3 | import-oorep: parse oorep.sql.gz into one pack per repertory and per MM; ignore user tables | CONT-009 | eval-publicum, eval-kent-de, eval-boericke-mm, eval-remedy-master built
+TASK dev | P0 | 1.5 | Generic CSV and Excel importer (chapter, rubric path, remedy, grade, citation) | CONT-009, PACK-011 | Sample CSV builds a valid pack
+TASK dev | P0 | 1 | Build FTS, top5_json, sign with channel key | CONT-002, REP-015 | Pack opens and searches in app
+TASK dev | P1 | 1 | Import report with counts, unmapped remedies, grade distribution, diff vs previous build | CONT-010 | Report generated for every build
+TASK dev | P1 | 1 | Promote pack from internal_eval to public by registry change and re-sign | CONT-008 | Ids unchanged after promotion
+FEAT Content creation | REP-012, REP-016
+TASK content | P0 | 1 | Starter sample pack (5 rubrics x 6 remedies) with hand-computed scoring fixtures | REP-033 | Fixtures used by M6 tests
+TASK content | P0 | 8 | Synonym and modern-language mapping table, 2,000 entries, language-tagged | REP-012, REP-016 | Synonym pack built; search golden tests use it
+TASK content | P1 | 5 | Glossary of 1,000 archaic terms in plain English | REP-012 | Glossary pack built
+TASK content | P1 | 3 | Remedy relationships table from public-domain sources | MM-005, RX-008 | Relationships pack built
+TASK content | P0 | 20 | Public repertory for release: OOREP permission (Q16) or OCR and proofreading of Kent 1897 | REP-001, CONT-008 | A public-channel Kent pack passes proofreading targets
+
+EPIC M5 | Rubric search, repertory browser, materia medica | M4
+FEAT Rubric search | REP-010, REP-011, REP-012, REP-013, REP-014, REP-015, REP-017
+TASK dev | P0 | 3 | Rubric search over all enabled packs with synonym and abbreviation expansion and ranking | REP-010, REP-011, REP-012, REP-013 | Golden queries return expected top rubrics
+TASK dev | P0 | 1 | Filters: repertory, chapter, minimum remedy count, contains remedy | REP-014 | Each filter covered by tests
+TASK dev | P0 | 1 | Result rows with full path, count, top 5 remedies, source | REP-015 | Rows render from top5_json
+TASK test | P0 | 1 | Performance test on publicum + kent-de: under 100 ms per keystroke | NFR-003 | CI perf test green
+TASK dev | P1 | 0.5 | Recent and favourite rubrics | REP-017 | Lists persist across restart
+FEAT Repertory browser | REP-020, REP-021, REP-022, REP-023, REP-024
+TASK dev | P0 | 2 | Book view: chapter list, rubric tree, breadcrumb, keyboard navigation | REP-020 | Navigate Kent tree with keyboard only
+TASK dev | P0 | 2 | Rubric detail with grade styling, counts, cross-references, parent and children | REP-021 | Matches repertory wireframe
+TASK dev | P0 | 1 | Remedy popup with keynotes and open-in-MM | REP-022 | Popup loads under 100 ms
+TASK dev | P1 | 1.5 | Compare same rubric across two repertories | REP-023 | Side-by-side view works
+FEAT Materia medica reader | MM-001, MM-002, MM-003, MM-004, MM-005
+TASK dev | P0 | 2 | MM reader with remedy list and sections | MM-002 | Boericke readable section by section
+TASK dev | P0 | 1 | Full-text search across MM books with highlight | MM-002 | Search hits highlighted
+TASK dev | P0 | 1 | Compare one remedy across books | MM-003 | Same section from each book side by side
+TASK dev | P1 | 1 | Bookmarks and notes on paragraphs | MM-004 | Notes saved in user_content.db
+FEAT Repertory manager | PACK-009, CONT-007, PACK-011, PACK-012
+TASK dev | P0 | 2 | Repertory manager: list, install from file, enable, disable, default, uninstall with saved-analysis guard | PACK-009, CONT-007 | Install from USB and uninstall work (flow 11)
+TASK dev | P1 | 3 | Doctor-built repertory in app and Excel import; export as unsigned pack | PACK-011 | Imported pack shows Unverified badge
+TASK doc | P1 | 2 | Publisher SDK: pack format spec, JSON schema, content-builder guide | PACK-012 | Spec published in docs
+
+EPIC M6 | Repertorisation and citations | M5, M3
+FEAT Repertorisation workspace | REP-030, REP-031, REP-032, REP-037, REP-038
+TASK dev | P0 | 2 | Case clipboard linked to visit, up to 10 named clipboards, combine | REP-030, REP-031 | Clipboard saved with visit
+TASK dev | P0 | 1 | Per-rubric weight, eliminative, causation, exclude; keyboard shortcuts | REP-032 | Settings change results live
+TASK dev | P0 | 0.5 | Prescribe from result pre-fills Rx | REP-037 | Rx form opens with remedy
+TASK dev | P0 | 1 | Save analysis snapshot with visit and reopen identically | REP-038 | Snapshot survives pack changes
+FEAT Scoring engine | REP-033, REP-036, NFR-004
+TASK dev | P0 | 3 | Bitset scoring engine with LRU cache | REP-036 | 30 rubrics recompute under 300 ms on reference PC
+TASK dev | P0 | 3 | Six analysis methods (sum, totality, Kent, Boenninghausen, elimination, small-rubric bonus) | REP-033 | Hand-computed fixtures pass for every method
+FEAT Results display | REP-034, REP-035, REP-039, REP-040, REP-041, REP-042
+TASK dev | P0 | 2 | Result grid (rubrics x remedies, grades, scores, coverage) | REP-034 | Matches wireframe; sortable
+TASK dev | P0 | 1.5 | Ranked list and bar graph views | REP-035 | Toggle grid, list, graph
+TASK dev | P1 | 2 | Remedy differentiation view | REP-039 | 2 to 5 remedies compared
+TASK dev | P1 | 1 | Kingdom and family filter | REP-040 | Filter applied to results
+TASK dev | P1 | 1 | Relationship hints on top results | REP-041 | Inimical warning shown when relevant
+TASK dev | P1 | 1 | Print repertorisation chart | REP-042 | Chart prints on A4
+TASK dev | P2 | 2 | Cross-repertorisation across multiple repertories with grade normalisation | REP-043 | Mixed-pack analysis matches fixtures
+FEAT Smart helpers | CASE-006
+TASK dev | P0 | 2 | Symptom-to-rubric helper under case form lines (FTS plus synonyms) | CASE-006 | 3 suggestions per line; one click adds
+TASK dev | P1 | 3 | Guided acute mode (fever, cold, cough, diarrhoea, injury) | REP-033 | 5 to 8 taps produce ranked remedies
+FEAT Citations and doctor additions | CIT-001, CIT-002, CIT-003, CIT-004, CIT-005, CIT-006, REP-024
+TASK dev | P0 | 2 | Source library and citation CRUD with all fields | CIT-002, CIT-003 | Sources reusable via autocomplete
+TASK dev | P0 | 1.5 | Citation links to rubric, rubric-remedy, user rubric, MM section, analysis rubric, prescription | CIT-001 | Each target type tested
+TASK dev | P0 | 1 | Clinical-experience citation linked to patient and visits | CIT-004 | Click opens the case
+TASK dev | P0 | 1.5 | My repertory layer: add remedy or rubric with citation, visually marked | REP-024, CIT-006 | Quick-add under 20 seconds
+TASK dev | P0 | 1 | Citation markers with hover details | CIT-005 | Marker visible in rubric detail and grid
+TASK dev | P1 | 1 | Include or exclude additions and confidence filter in analysis | CIT-008 | Results change only when toggled
+TASK dev | P1 | 1 | Citations list screen and CSV or PDF export | CIT-007 | Export opens in Excel
+TASK dev | P2 | 1 | Suggest-to-publisher export of confirmed additions | CIT-010 | Export file in documented format
+TASK test | P0 | 1 | Citations survive backup and restore | CIT-009 | Flow 11 citation steps pass
+
+EPIC M7 | Prescription and printing | M3
+FEAT Prescription | RX-001, RX-002, RX-003, RX-004, RX-007, RX-008
+TASK dev | P0 | 2 | Rx items with remedy autocomplete, potency, form, dose, frequency, duration, instructions | RX-001 | Abbreviations like sulph resolve
+TASK dev | P0 | 1 | Placebo entries and hide-remedy-name on print | RX-002 | Real remedy stored, hidden on print
+TASK dev | P0 | 1 | Favourites and saved Rx templates | RX-003 | Template inserted in one click
+TASK dev | P0 | 0.5 | Repeat last prescription | RX-004 | One click copies last Rx
+TASK dev | P1 | 1 | Advice library (diet, avoid list) multi-select | RX-007 | Advice prints on Rx
+TASK dev | P1 | 0.5 | Inimical remedy warning | RX-008 | Warning shown with source
+FEAT Print engine | RX-005, RX-006, LIC-006
+TASK dev | P0 | 3 | hc-docs: HTML templates to PDF via webview, Unicode fonts, Indian number format | RX-005 | Rx, receipt, case paper render to PDF
+TASK dev | P0 | 1.5 | Page setups A4, A5, letterhead with margin calibration | RX-005 | Prints correctly on a pilot doctor's letterhead
+TASK dev | P0 | 0.5 | Doctor identity on prints read from verified licence only | LIC-006, TAM-014 | Editing DB does not change printed name
+TASK dev | P0 | 1 | Save Rx PDF and WhatsApp share link | RX-006 | Flow 6 passes
+FEAT Legacy prints (pending decision Q1 and Q3) | -
+TASK dev | P1 | 2 | Medical certificate, referral letter, envelope, declaration print templates | - | Only if Q1 accepted
+TASK dev | P1 | 1 | Birthday list on Today screen | - | Only if Q1 accepted
+TASK dev | P1 | 1.5 | Marathi advice and diet sheet print with Noto Devanagari | - | Only if Q3 accepted
+
+EPIC M8 | Billing and reports | M7
+FEAT Billing | BILL-001, BILL-002, BILL-003, BILL-005, BILL-006
+TASK dev | P0 | 2 | Invoice with lines, discount, payments by mode, balance; money in paise | BILL-001 | No rounding errors in tests
+TASK dev | P0 | 0.5 | Running patient balance on dashboard | BILL-002 | Dues update after payment
+TASK dev | P0 | 1 | Receipt print with FY sequential number and amount in words | BILL-003 | Numbering restarts each April
+TASK dev | P1 | 1 | Clinic UPI QR for patient payments (doctor's own UPI ID) | BILL-005 | Patient scans and pays doctor; doctor marks paid
+TASK dev | P2 | 1 | GST invoice fields if GSTIN set | BILL-006 | GST fields print only when set
+FEAT Reports | BILL-004
+TASK dev | P0 | 1.5 | Daily collection by mode and monthly summary; Excel and CSV export | BILL-004 | Flow 8 totals correct
+
+EPIC M9 | Licensing and UPI purchase | M1, M7
+FEAT Licence core (hc-licence) | LIC-001, LIC-002, LIC-004, LIC-005, LIC-006, LIC-007
+TASK dev | P0 | 2 | Licence payload (CBOR), Ed25519 verify with 2 embedded keys, key_id | LIC-001, LIC-002 | Valid licence verifies; edited byte fails
+TASK dev | P0 | 1 | Licence storage in data folder and OS secure store | LIC-004 | Survives reinstall when data folder kept
+TASK dev | P0 | 1 | Clock-rollback guard | LIC-005 | Clock set back 1 year still expires
+TASK dev | P0 | 1.5 | Identity lock of name and reg no; one licensed doctor per install | LIC-006, LIC-007 | Settings fields locked after import
+TASK dev | P0 | 1.5 | Licence state machine (Unlicensed, Trial, Active, Grace, ReadOnly, Tampered) | LIC-020, LIC-063 | State diagram transitions tested
+TASK dev | P0 | 1 | Local 30-day trial from signed seed | LIC-063 | Trial starts offline at first run
+FEAT Buy screen (offline) | PAY-010, PAY-011, PAY-012, PAY-013, PAY-014, PAY-015, PAY-016
+TASK dev | P0 | 2 | Buy screen per wireframe: plan, details, consent, identity warning | PAY-010 | Matches diagram 20
+TASK dev | P0 | 1 | Offline UPI QR (upi://pay with UPI ID, payee, amount, note, tr) plus copy fallback | PAY-011 | GPay, PhonePe, Paytm, BHIM show correct payee, amount, note
+TASK dev | P0 | 1 | WhatsApp click-to-chat QR with pre-typed message plus copy fallback | PAY-013 | Message opens fully filled on Android and iPhone
+TASK dev | P0 | 1 | Signed offer codes changing QR amount | PAY-012 | Forged or expired code rejected
+TASK dev | P0 | 0.5 | install_id generation and display | PAY-014 | Id stable across restarts
+TASK dev | P0 | 0.5 | Encrypted constants for UPI ID, WhatsApp number, keys | PAY-015, TAM-003 | strings scan finds none
+FEAT Licence import | LIC-060, LIC-061, LIC-062, LIC-064
+TASK dev | P0 | 1 | Import .hclic by drag-drop, file picker and double-click file association | LIC-060 | All three paths work on Win and Linux
+TASK dev | P0 | 1.5 | Scan certificate QR with webcam | LIC-060 | Scans printed and on-screen PDF QR
+TASK dev | P0 | 1.5 | Typed licence key with per-group check and identity hash match | LIC-046, LIC-062 | Wrong group reported precisely
+TASK dev | P0 | 0.5 | Confirmation card and apply | LIC-061 | Card shows name, reg no, plan, expiry
+FEAT Expiry | LIC-020, LIC-021, SUX-008
+TASK dev | P0 | 1 | Grace period, read-only mode, ongoing visit can finish | LIC-020, SUX-008 | Flow 10 read-only checks pass
+TASK dev | P0 | 0.5 | Reminders at 30, 15, 7, 1 days with Renew opening Buy screen | LIC-021 | Reminder shown in clock tests
+FEAT Vendor Licence Tool (internal) | LIC-040, LIC-041, LIC-042, LIC-043, LIC-044, LIC-045, LIC-047, LIC-048, LIC-049, LIC-050
+TASK dev | P0 | 1 | WhatsApp message parser for the fixed message format | LIC-040 | All fields parsed from sample messages
+TASK dev | P0 | 1.5 | Register DB (SQLCipher) with unique UTR, customers, licences, invoices | LIC-042, LIC-048 | Duplicate UTR refused
+TASK dev | P0 | 1 | Plan from amount, under and over payment handling, renewal stacking | LIC-043, LIC-044 | Renewal extends from current expiry
+TASK dev | P0 | 2 | Signing on hardware key | LIC-047 | Licence verifies in app; key never leaves token
+TASK dev | P0 | 2 | Outputs: .hclic, certificate PDF with QR and key text, GST invoice, email draft, WhatsApp reply | LIC-045 | Operator sends a licence in under 5 minutes
+TASK dev | P0 | 0.5 | Register export to Excel and daily encrypted backup | LIC-048 | Export opens; backup restores
+TASK dev | P1 | 0.5 | Dealer tagging | LIC-050 | Licences filterable by dealer
+TASK test | P0 | 1 | End-to-end purchase with clinic PC offline in under 30 minutes | SUX-010 | 03 section 8 MVP1 tests pass
+
+EPIC M10 | Hardening, packaging and release | M9, M8, M6
+FEAT Tamper protection | TAM-001, TAM-002, TAM-003, TAM-004, TAM-005, TAM-006, TAM-007, TAM-008, TAM-010, TAM-012, TAM-013, TAM-014
+TASK dev | P0 | 2 | Encrypted embedded UI assets decrypted in memory | TAM-001 | No loose JS on disk; startup within budget
+TASK ops | P0 | 1 | Hardened release profile (fat LTO, strip, no devtools) | TAM-002 | Release scan finds no symbols or devtools
+TASK dev | P0 | 1 | Compile-time string encryption for sensitive constants | TAM-003 | strings scan clean
+TASK dev | P0 | 2 | Multi-site licence checks (startup, write commands, timer) | TAM-004 | Patching one check does not unlock writes
+TASK dev | P0 | 3 | Self-integrity manifest signed at build and verified in background | TAM-005, SUX-002 | One-byte patch leads to Repair then read-only
+TASK ops | P0 | 1 | Authenticode EV signing and GPG signing in CI | TAM-006, NFR-025 | Signatures verify; no SmartScreen warning
+TASK dev | P0 | 1 | Per-licence watermark | TAM-010 | Licence id traceable in test outputs
+TASK ops | P0 | 1 | Release scan job (symbols, devtools, secrets, signatures, eval content) | TAM-012, CONT-005 | Job blocks a bad build
+TASK dev | P1 | 2 | Anti-debug and anti-hook, silent | TAM-007 | Debugger disables paid paths without crash
+TASK dev | P1 | 2 | Targeted obfuscation of hc-licence | TAM-008 | No measurable slowdown elsewhere
+FEAT Security UX guardrails | SUX-001, SUX-002, SUX-003, SUX-004, SUX-005, SUX-006, SUX-007, SUX-008, SUX-009, SUX-011, SUX-012
+TASK dev | P0 | 1.5 | Two-check rule and self-repair before any restriction | SUX-005, SUX-006 | AV quarantine test triggers Repair
+TASK dev | P0 | 1 | Friendly restriction messages with one action button | SUX-007 | Copy reviewed by a pilot doctor
+TASK test | P0 | 1 | Run all perf budgets on the protected build | SUX-001 | Overhead within limits
+TASK test | P0 | 1.5 | Reference-PC perf suite: cold start under 4 s, Rx preview under 1 s, RAM under 300 MB, installer size | NFR-001, NFR-005, NFR-006 | Suite green on i3 4 GB HDD reference PC
+TASK test | P0 | 1 | Antivirus scan of every release (Defender and top 5 Indian AV) | SUX-009 | Zero detections
+TASK dev | P1 | 1 | Support health-check screen | SUX-012 | Support resolves a test case in one call
+FEAT Installers and updates | NFR-040, NFR-041, NFR-042, NFR-043
+TASK ops | P0 | 2 | Windows NSIS and MSI, per-user install, offline WebView2 bootstrapper | NFR-040 | Installs on Windows 10 without internet
+TASK ops | P0 | 1.5 | Linux AppImage and .deb | NFR-041 | Installs on Ubuntu 20.04 and Debian 11
+TASK dev | P0 | 1.5 | Install update from USB file with signature check; optional static manifest check | NFR-042, NFR-022 | Signed update installs offline; unsigned refused
+TASK dev | P0 | 0.5 | Uninstall keeps data unless ticked with PIN | NFR-043 | Data folder remains after uninstall
+FEAT Usability and polish | ADM-001, ADM-003, ADM-004, ADM-005, NFR-030, NFR-032, NFR-034, NFR-035
+TASK dev | P0 | 1 | Settings screens for profile, print layouts, fees, ID prefix, auto-lock | ADM-001 | All settings persist
+TASK dev | P0 | 2 | Bundled offline help pages and links to videos | ADM-004 | Help opens offline
+TASK dev | P0 | 0.5 | Diagnostic report zip without patient data | ADM-005 | Zip contains no patient names in test
+TASK dev | P1 | 0.5 | Keyboard shortcuts screen | ADM-003 | F1 to F8 and Ctrl+P documented and working
+TASK test | P0 | 1.5 | Accessibility pass: contrast, focus, screen-reader labels, 14 px minimum, 1366x768 | NFR-032, NFR-034 | Audit checklist passed
+TASK dev | P0 | 1 | Undo for destructive actions | NFR-035 | Undo works for clipboard and Rx lines
+FEAT Acceptance | NFR-031
+TASK test | P0 | 3 | Automate the 13 core flows with Playwright on Win and Linux, network disabled | - | All 13 flows green
+TASK test | P0 | 2 | Usability test with 5 doctors (task under 10 minutes, buy and activate under 3 minutes) | NFR-031, SUX-010 | Results recorded; blocking issues fixed
+
+EPIC PILOT | Pilot and public launch | M10
+FEAT Pilot | -
+TASK ops | P0 | 1 | Distribute internal builds to pilot doctors under agreement | CONT-004 | 20 doctors installed
+TASK biz | P0 | 20 | Four-week pilot with weekly check-ins and feedback log | - | Feedback log with priorities
+TASK dev | P0 | 10 | Fix pilot blockers and top usability issues | - | No open P0 pilot bugs
+FEAT Public release | CONT-005
+TASK ops | P0 | 1 | Build public release with only public-channel content | CONT-003, CONT-005 | Release gate green
+TASK ops | P0 | 2 | Static download website with signed installers, pricing, privacy policy, EULA, support contacts | - | Site live; downloads verify
+TASK biz | P0 | 2 | Launch: first paid licences issued through the MVP1 flow | LIC-040 | First 10 paying doctors activated
+
+EPIC RELEASES | Working release at every milestone (ADR 0002) | M0
+FEAT Release demos (one installable, usable build per milestone) | -
+TASK test | P0 | 1 | R0 walking skeleton: installer from CI opens on Windows and Linux, shell, nav, Today empty state, lock screen stub | NFR-040, NFR-041 | R0 demo script in docs/milestones/README.md passes as an E2E smoke run on both OS
+TASK test | P0 | 1 | R1 set up and protect: first-run wizard (trial-dev licence step), PIN unlock, backup now and restore from the UI | SET-001, SET-004, BAK-002, BAK-003 | R1 demo passes; R0 demo still passes
+TASK test | P0 | 1 | R2 patient register: register, search, open dashboard, edit, recycle bin | PAT-001, PSR-001, PAT-005 | R2 demo passes at 50k seeded patients; R1 data opens after upgrade install
+TASK test | P0 | 1 | R3 paper replacement: case form, follow-up visit, Today list with due and overdue | CASE-001, VIS-002, VIS-005 | R3 demo passes; R2 data opens after upgrade install
+TASK test | P0 | 1 | R4 consultation complete: prescription, print A5, PDF, WhatsApp share | RX-001, RX-005, RX-006 | R4 demo passes; R3 data opens after upgrade install
+TASK test | P0 | 1 | R5 clinic basics: bill, partial payment, dues, daily collection report | BILL-001, BILL-002, BILL-004 | R5 demo passes; acceptance flows 1, 2, 3, 6 (without repertory), 7, 8, 9 pass
+TASK test | P0 | 1 | R6 repertory reading: rubric search, browser, materia medica on internal-eval packs | REP-010, MM-001 | R6 demo passes on the internal build; public build refuses eval packs
+TASK test | P0 | 1 | R7 repertorisation: send symptoms, analyse, prescribe from result | REP-030, REP-037 | R7 demo passes; acceptance flows 4, 5, 11 pass
+TASK test | P0 | 1 | R8 licence and purchase: trial, Buy screen, import .hclic, expiry read-only | PAY-010, LIC-061, LIC-020 | R8 demo passes; acceptance flow 10 passes
+TASK test | P0 | 1 | R9 release candidate: hardened build, all 13 acceptance flows | TAM-012, SUX-001 | All 13 flows pass on the protected build
+FEAT Early pilot on Clinic Basics (R5) | CONT-004
+TASK ops | P0 | 1 | Ship R5 internal build to 3 to 5 pilot doctors under the pilot agreement (no repertory content included) | CONT-004 | 3 doctors use it for real consultations for 2 weeks
+TASK biz | P0 | 10 | Two-week early pilot with feedback log; feed findings into M4 to M10 | - | Feedback log triaged; P0 issues fixed before R6
+TASK dev | P0 | 1 | Upgrade path test harness: install release N over release N-1 with seeded data, verify data and backups open | NFR-011, NFR-042 | Runs in CI for every release tag
+
+STAGE MVP2 | MVP2: clinic grows and first servers | Hosted licence and payments, cloud backup, LAN multi-user, stock, messaging, reports, languages, paid content. Start only when MVP1 revenue covers hosting.
+
+EPIC MVP2 | Hosted licence and payments | PILOT
+FEAT Licence server | SRV-001, SRV-003, SRV-002, LSRV-001, LSRV-002, LSRV-003, LSRV-004, LSRV-005, LSRV-006
+TASK dev | P0 | 5 | Licence API (axum + PostgreSQL) with activate, offline activate, deactivate, refresh | LSRV-001 | API integration tests pass
+TASK dev | P0 | 4 | Admin dashboard behind SSO and 2FA | LSRV-002, LSRV-006 | Issue, extend, revoke from dashboard
+TASK ops | P0 | 2 | KMS or HSM signing, key rotation plan | LSRV-003 | Signing never exposes private key
+TASK dev | P0 | 2 | Rate limiting and abuse detection | LSRV-004, TAM-011 | Abuse scenarios blocked in tests
+TASK dev | P0 | 1.5 | Import Vendor Licence Tool register | SRV-002, LIC-048 | All MVP1 licences present and valid
+TASK ops | P0 | 3 | Deploy in AWS ap-south-1 with backups, monitoring, no patient data | LSRV-005 | Production environment live
+FEAT Automated purchase | PAY-001, PAY-002, PAY-003, PAY-004, PAY-005, PAY-006, PAY-007, PAY-008, PAY-009
+TASK dev | P0 | 4 | Purchase portal with phone OTP and Razorpay Checkout (UPI Intent, QR, cards) | PAY-001, PAY-002 | Test payment succeeds end to end
+TASK dev | P0 | 2 | Webhook-only payment confirmation, idempotent | PAY-003 | Replayed webhook issues one licence
+TASK dev | P0 | 2 | Automatic licence and GST invoice delivery by email and SMS | PAY-004, PAY-005 | Licence delivered within 1 minute
+TASK dev | P1 | 3 | UPI AutoPay subscriptions | PAY-006 | Renewal auto-extends licence
+TASK dev | P1 | 2 | Referral discounts | PAY-007 | Both doctors get extra month
+TASK dev | P1 | 3 | Dealer portal | PAY-008 | Dealer buys and assigns keys
+TASK dev | P0 | 1 | Refunds and revocation | PAY-009 | Refunded licence revoked on next refresh
+FEAT App-side online licensing | LIC-003, LIC-010, LIC-011, LIC-012, LIC-013, LIC-014, LIC-022
+TASK dev | P0 | 2 | Online activation and silent weekly refresh | LIC-010, LIC-014 | Offline operation unaffected
+TASK dev | P1 | 2 | Device fingerprint binding and transfer (if Q13 changes) | LIC-003, LIC-012 | 2 of 3 component match tested
+TASK dev | P1 | 1 | Perpetual licence with updates_until | LIC-022 | Newer updates refused with clear message
+
+EPIC MVP2 | Cloud backup | MVP2
+FEAT Zero-knowledge backup | CLD-001, CLD-002, CLD-003, CLD-004, CLD-005
+TASK dev | P0 | 3 | Client-side encrypted incremental and full backups | CLD-001, CLD-002 | Server stores only ciphertext
+TASK dev | P0 | 3 | Resumable chunked upload for slow networks | CLD-002 | Upload resumes after disconnect
+TASK dev | P0 | 2 | Restore from cloud to new PC with recovery key | CLD-003 | Restore tested on clean PC
+TASK ops | P0 | 1 | S3-compatible storage in India region with per-customer prefix | CLD-004 | Bucket policies reviewed
+TASK dev | P1 | 0.5 | Backup status widget | CLD-005 | Last backup time shown
+
+EPIC MVP2 | LAN multi-user and roles | MVP2
+FEAT LAN server and roles | USR-001, USR-002, USR-003, USR-004, USR-005
+TASK dev | P0 | 5 | Main computer LAN server exposing hc-app commands over TLS with device tokens | USR-001, USR-002 | Client PC works against main PC
+TASK dev | P0 | 2 | mDNS discovery and 6-digit pairing | USR-001 | Pairing under 1 minute
+TASK dev | P0 | 3 | Roles and permissions (doctor, assistant, receptionist, dispenser) | USR-003 | Receptionist cannot see case notes
+TASK dev | P0 | 1 | Per-user PIN login and audit by user | USR-004 | Audit shows user per change
+TASK dev | P0 | 1 | Seat counting in licence | USR-005 | Extra client refused beyond seats
+
+EPIC MVP2 | Dispensary, messaging, reports, languages, content | MVP2
+FEAT Dispensary and stock | STK-001, STK-002, STK-003, STK-004
+TASK dev | P0 | 3 | Inventory with batch, expiry, prices | STK-001 | Stock list and edits work
+TASK dev | P0 | 2 | Auto-deduct on dispense and alerts | STK-002 | Low-stock alert in test
+TASK dev | P1 | 2 | Purchases and supplier ledger | STK-003 | Ledger balances
+TASK dev | P1 | 0.5 | In-stock filter in repertory results | STK-004, REP-040 | Filter applied
+FEAT Messaging | COM-001, COM-002
+TASK dev | P0 | 4 | WhatsApp Business API and SMS (DLT templates) with offline queue | COM-001 | Reminders delivered in test
+TASK dev | P1 | 2 | Opt-in greeting campaigns | COM-002 | Only opted-in patients receive
+FEAT Reports | RPT-001, RPT-002
+TASK dev | P0 | 3 | Patient, revenue and remedy statistics | RPT-001 | Reports match seeded data
+TASK dev | P1 | 2 | Remedy outcome summary | RPT-002 | Percent better per remedy correct
+FEAT Languages | I18N-001, REP-016
+TASK content | P0 | 10 | Translate UI strings to 8 Indian languages | I18N-001 | Each language reviewed by a native speaker
+TASK content | P1 | 5 | Hindi and Hinglish synonym mappings for rubric search | REP-016 | "sir dard" finds HEAD - PAIN
+FEAT Paid and additional content | CPK-001, PACK-004, PACK-010, LIC-030, LIC-031, TAM-009
+TASK dev | P0 | 3 | Paid pack encryption with per-licence wrapped keys | LIC-031, TAM-009 | Copied paid pack fails on other licence
+TASK dev | P0 | 1 | Pack entitlements in licence | LIC-030, PACK-004 | Unentitled pack refused
+TASK dev | P1 | 3 | Online pack catalogue | PACK-010 | Download and install from catalogue
+TASK content | P1 | 15 | Additional public packs (Boger-Boenninghausen, Clarke MM) and first licensed paid pack | CPK-001 | Packs built and proofread
+
+STAGE MVP3 | MVP3: anywhere access (mobile) | Android and iOS apps with encrypted sync
+
+EPIC MVP3 | Mobile apps and sync | MVP2
+FEAT Mobile shell | MOB-001
+TASK dev | P0 | 5 | Tauri 2 mobile builds for Android 8+ and iOS 15+ with mobile layouts | MOB-001 | Apps run on test devices
+TASK ops | P0 | 3 | Play Store and App Store accounts, signing, privacy labels | MOB-001 | Internal test track live
+FEAT Sync | MOB-002
+TASK dev | P0 | 8 | Change-log table with hybrid logical clocks and device ids | MOB-002 | Two devices converge in tests
+TASK dev | P0 | 5 | End-to-end encrypted cloud relay | MOB-002 | Relay sees only ciphertext
+TASK test | P0 | 3 | Conflict and offline-merge test suite | MOB-002 | All conflict scenarios pass
+FEAT Mobile features | MOB-003, MOB-004, MOB-007
+TASK dev | P0 | 3 | Offline packs and 6-month patient cache | MOB-003 | Works in airplane mode
+TASK dev | P0 | 5 | Lookup, history, quick visit, repertorise, prescribe, share, Today, biometric lock | MOB-004 | Doctor completes a visit on phone
+TASK dev | P0 | 2 | Remote revoke and wipe | MOB-007 | Revoked phone wiped on next contact
+FEAT Patient-facing | MOB-005, MOB-006
+TASK dev | P1 | 4 | Online booking link feeding appointment book | MOB-005 | Booking appears after sync
+TASK dev | P1 | 3 | Teleconsult notes and Rx per Telemedicine Guidelines 2020 | MOB-006 | Checklist of guideline fields satisfied
+
+STAGE MVP4 | MVP4: smart assistant | On-device suggestions, similarity, voice, ABDM, marketplace
+
+EPIC MVP4 | Smart features | MVP3
+FEAT On-device intelligence | AI-001, AI-002, AI-003, AI-004
+TASK dev | P0 | 8 | Free-text to rubric suggestions with on-device embeddings and vector search | AI-001 | Top-5 accuracy measured on labelled cases
+TASK dev | P0 | 4 | Similar-case search from past rubric sets and outcomes | AI-002 | Doctor rates usefulness in pilot
+TASK dev | P1 | 5 | Voice case taking in English and Hindi on device | AI-003 | Word error rate measured on sample recordings
+TASK dev | P2 | 3 | Optional cloud LLM features with per-use opt-in and de-identification | AI-004 | No identifiers leave device in tests
+FEAT Integrations and marketplace | ABDM-001, MKT-001
+TASK dev | P1 | 8 | ABHA linking and record sharing per ABDM specs | ABDM-001 | ABDM sandbox certification passed
+TASK dev | P1 | 8 | Content marketplace with publisher revenue share | MKT-001 | First publisher pack sold
+
+STAGE MVP5 | MVP5: migration (de-prioritised) | Bring existing records from the legacy app and competitors
+
+EPIC MVP5 | Data migration | MVP4
+FEAT Legacy Doctor Clinic importer | IMP-002
+TASK dev | P0 | 2 | Read live MySQL or .sql dump without needing MySQL installed | IMP-002 | Sample dump parsed
+TASK dev | P0 | 3 | Map 19 legacy tables to new schema per design 05 section 6 | IMP-002 | Counts match source
+TASK dev | P0 | 2 | Shivaji-font Marathi to Unicode Devanagari conversion | IMP-002 | Sample diet sheets read correctly
+TASK dev | P0 | 1 | Photos and report files copied and encrypted | IMP-002 | Attachments open after import
+TASK dev | P0 | 1.5 | Dry-run report and single-transaction commit | IMP-002 | Dry run lists warnings; commit atomic
+FEAT Competitor and generic import | IMP-001, PAT-010
+TASK dev | P0 | 3 | CSV, Excel and Access import with column-mapping wizard | IMP-001, PAT-010 | Sample exports import cleanly
+TASK doc | P1 | 2 | Migration guides per competitor product | IMP-001 | Guides published
+FEAT Assisted migration | IMP-003
+TASK biz | P1 | 2 | Assisted migration service process and pricing | IMP-003 | First clinic migrated by support

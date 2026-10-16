@@ -1,0 +1,25 @@
+@startuml
+title Licence state machine (LIC-020..022, LIC-005)
+[*] --> Unlicensed
+Unlicensed --> Trial : start trial (30 days)
+Unlicensed --> Active : import .hclic / QR / key
+Trial --> Active : import licence
+Trial --> ReadOnly : trial ends
+Active --> Active : renew (import new .hclic)
+Active --> Grace : valid_until passed
+Grace --> Active : renew
+Grace --> ReadOnly : 15 days passed
+ReadOnly --> Active : renew / activate
+Active --> Revoked : MVP2 only: refresh says revoked
+Revoked --> ReadOnly
+state Tampered : signature or identity check\nfails twice (SUX-005)
+Active --> Tampered
+Tampered --> Active : Repair / re-import .hclic
+Tampered --> ReadOnly
+state ReadOnly : view, search, print, export ALLOWED\nnew visit / Rx / bill BLOCKED
+state Active : all entitled features
+note right of Active
+  Clock guard: expiry checked against
+  max(now, last_seen - 48h)
+end note
+@enduml

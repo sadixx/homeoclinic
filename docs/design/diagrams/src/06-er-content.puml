@@ -1,0 +1,87 @@
+@startuml
+title ER - content pack + user_content.db
+hide circle
+skinparam linetype ortho
+package "content pack (read-only, signed)" {
+  entity pack_meta {
+  key, value
+}
+  entity chapter {
+  *id
+  --
+  name, sort_order
+}
+  entity rubric {
+  *id
+  --
+  chapter_id, parent_id
+  text, full_path, depth
+  remedy_count, top5_json
+}
+  entity rubric_remedy {
+  *rubric_id, *remedy_id
+  --
+  grade
+}
+  entity rubric_xref {
+  rubric_id, target_rubric_id
+}
+  entity remedy {
+  *id
+  --
+  abbrev, name, kingdom
+}
+  entity grade_scale {
+  grade, normalised_grade, style
+}
+  entity mm_section {
+  *id
+  --
+  book_id, remedy_id, section, text
+}
+  entity synonym {
+  term, lang, maps_to
+}
+}
+package "user_content.db (encrypted)" {
+  entity user_rubric {
+  *id
+  --
+  base_pack_id, base_rubric_id
+  text, full_path
+}
+  entity user_rubric_remedy {
+  *id
+  --
+  rubric_id or user_rubric_id
+  remedy_id, grade, citation_id
+}
+  entity source {
+  *id
+  --
+  type, title, author, edition, pack_id
+}
+  entity citation {
+  *id
+  --
+  source_id, page_ref, quote
+  confidence, patient_id
+}
+  entity citation_link {
+  *id
+  --
+  citation_id, target_type, target_id
+}
+}
+chapter ||--o{ rubric
+rubric ||--o{ rubric
+rubric ||--o{ rubric_remedy
+remedy ||--o{ rubric_remedy
+rubric ||--o{ rubric_xref
+remedy ||--o{ mm_section
+rubric ||..o{ user_rubric_remedy : overlay
+user_rubric ||--o{ user_rubric_remedy
+source ||--o{ citation
+citation ||--o{ citation_link
+citation ||--o{ user_rubric_remedy
+@enduml

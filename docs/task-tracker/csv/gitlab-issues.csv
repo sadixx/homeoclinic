@@ -1,0 +1,3201 @@
+title,description
+"HC-PREP-001 Choose and register business entity (sole proprietorship, LLP or Pvt Ltd)","Choose and register business entity (sole proprietorship, LLP or Pvt Ltd)
+
+Done when: Registration certificate and PAN available
+Requirements: -
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F01 Legal entity and money
+Type: biz, priority P0, estimate 2 days
+
+/label ~""PREP"" ~""PREP"" ~""biz"" ~""P0"""
+HC-PREP-002 Open current account in business name,"Open current account in business name
+
+Done when: Account active, cheque book and net banking working
+Requirements: -
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F01 Legal entity and money
+Type: biz, priority P0, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""biz"" ~""P0"""
+"HC-PREP-003 Set up business UPI ID (PhonePe Business, Paytm for Business, BharatPe or bank merchant UPI) with dashboard showing UTRs","Set up business UPI ID (PhonePe Business, Paytm for Business, BharatPe or bank merchant UPI) with dashboard showing UTRs
+
+Done when: Test payment of Rs 1 visible in dashboard with UTR and note
+Requirements: PAY-011, LIC-041
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F01 Legal entity and money
+Type: biz, priority P0, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""biz"" ~""P0"""
+HC-PREP-004 Consult CA on GST registration need and tax invoice format for software licences,"Consult CA on GST registration need and tax invoice format for software licences
+
+Done when: Written CA advice saved; invoice template fields agreed
+Requirements: LIC-045
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F01 Legal entity and money
+Type: biz, priority P0, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""biz"" ~""P0"""
+HC-PREP-005 Decide refund policy and write it for website and invoice,"Decide refund policy and write it for website and invoice
+
+Done when: Policy text approved
+Requirements: LIC-043
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F01 Legal entity and money
+Type: biz, priority P1, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""biz"" ~""P1"""
+"HC-PREP-006 Get WhatsApp Business number, profile, business hours and quick-reply templates (payment received, balance due, licence sent)","Get WhatsApp Business number, profile, business hours and quick-reply templates (payment received, balance due, licence sent)
+
+Done when: Number active; 3 quick replies saved
+Requirements: PAY-013, LIC-049
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F02 Support channels
+Type: biz, priority P0, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""biz"" ~""P0"""
+HC-PREP-007 Create business email for licence delivery and support,"Create business email for licence delivery and support
+
+Done when: Mailbox working; SPF and DKIM set so licence mails do not land in spam
+Requirements: LIC-045
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F02 Support channels
+Type: biz, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""biz"" ~""P0"""
+HC-PREP-008 Confirm support hours and licence turnaround promise (Q15),"Confirm support hours and licence turnaround promise (Q15)
+
+Done when: Hours written in 03-licensing-upi.md and app strings
+Requirements: LIC-049, PAY-016
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F02 Support channels
+Type: decision, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""decision"" ~""P0"""
+HC-PREP-009 Final product name and logo brief,"Final product name and logo brief
+
+Done when: Name chosen; domain availability checked
+Requirements: -
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""decision"" ~""P0"""
+"HC-PREP-010 Final prices for 6-month and 1-year plans, UPI only or also cards (Q14)","Final prices for 6-month and 1-year plans, UPI only or also cards (Q14)
+
+Done when: Prices written in requirements 03 section 1
+Requirements: PAY-010, PAY-011
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""decision"" ~""P0"""
+HC-PREP-011 Confirm Q11 (certificate PDF without password),"Confirm Q11 (certificate PDF without password)
+
+Done when: Decision recorded in design/06-review-questions.md
+Requirements: LIC-045
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""decision"" ~""P0"""
+"HC-PREP-012 Confirm Q12 (licensed name and reg no locked on prints, one doctor per licence)","Confirm Q12 (licensed name and reg no locked on prints, one doctor per licence)
+
+Done when: Decision recorded
+Requirements: LIC-006, LIC-007
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""decision"" ~""P0"""
+HC-PREP-013 Confirm Q13 (no PC limit),"Confirm Q13 (no PC limit)
+
+Done when: Decision recorded
+Requirements: LIC-064
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""decision"" ~""P0"""
+"HC-PREP-014 Decide Q1: legacy prints in MVP1 (certificate, referral letter, envelope, declaration, birthday list)","Decide Q1: legacy prints in MVP1 (certificate, referral letter, envelope, declaration, birthday list)
+
+Done when: If yes, DOC requirements added to 01-mvp1-requirements.md
+Requirements: -
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""decision"" ~""P0"""
+HC-PREP-015 Decide Q3: Marathi advice and diet print in MVP1,"Decide Q3: Marathi advice and diet print in MVP1
+
+Done when: If yes, requirement added to 01-mvp1-requirements.md
+Requirements: RX-007
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""decision"" ~""P0"""
+HC-PREP-016 Decide Q17: who receives internal evaluation builds,"Decide Q17: who receives internal evaluation builds
+
+Done when: Decision recorded
+Requirements: CONT-003, CONT-004
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""decision"" ~""P0"""
+HC-PREP-017 Decide Q10: EV code-signing certificate budget and optional commercial obfuscator,"Decide Q10: EV code-signing certificate budget and optional commercial obfuscator
+
+Done when: Budget approved
+Requirements: TAM-006, TAM-008
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P1, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""decision"" ~""P1"""
+"HC-PREP-018 IP lawyer opinion on public-domain status of Kent 1897, Boericke 1906, Boenninghausen TPB 1891, Allen Keynotes in India","IP lawyer opinion on public-domain status of Kent 1897, Boericke 1906, Boenninghausen TPB 1891, Allen Keynotes in India
+
+Done when: Written opinion stored with registry
+Requirements: REP-001
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F01 Content licensing
+Type: legal, priority P0, estimate 2 days
+
+/label ~""PREP"" ~""PREP"" ~""legal"" ~""P0"""
+HC-PREP-019 GPL v3 review: may OOREP publicum and kent-de be used in internal evaluation builds given to pilot doctors,"GPL v3 review: may OOREP publicum and kent-de be used in internal evaluation builds given to pilot doctors
+
+Done when: Written opinion; registry permission status updated
+Requirements: CONT-003, CONT-006
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F01 Content licensing
+Type: legal, priority P0, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""legal"" ~""P0"""
+"HC-PREP-020 Email OOREP author (Andreas Bauer) asking permission to use English Kent, Boger, Boenninghausen and Boericke conversions in a closed-source product (Q16)","Email OOREP author (Andreas Bauer) asking permission to use English Kent, Boger, Boenninghausen and Boericke conversions in a closed-source product (Q16)
+
+Done when: Reply received and stored; registry updated
+Requirements: CONT-008
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F01 Content licensing
+Type: content, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""content"" ~""P0"""
+HC-PREP-021 Privacy policy and consent text compliant with DPDP Act 2023,"Privacy policy and consent text compliant with DPDP Act 2023
+
+Done when: Text approved and placed in app strings and website
+Requirements: PAT-012, PAY-010
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F02 Privacy and terms
+Type: legal, priority P0, estimate 2 days
+
+/label ~""PREP"" ~""PREP"" ~""legal"" ~""P0"""
+HC-PREP-022 End-user licence agreement and terms of sale,"End-user licence agreement and terms of sale
+
+Done when: EULA shown in installer and Buy screen
+Requirements: LIC-001
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F02 Privacy and terms
+Type: legal, priority P0, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""legal"" ~""P0"""
+HC-PREP-023 Medical disclaimer for repertorisation results (suggestion only),"Medical disclaimer for repertorisation results (suggestion only)
+
+Done when: Disclaimer text shown in result panel and help
+Requirements: REP-033
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F02 Privacy and terms
+Type: legal, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""legal"" ~""P0"""
+HC-PREP-024 Buy 2 hardware security keys (primary and backup) supporting Ed25519,"Buy 2 hardware security keys (primary and backup) supporting Ed25519
+
+Done when: Keys received and tested
+Requirements: LIC-047
+Stage: Preparation and decisions
+Epic: HC-PREP-E04 Signing keys and certificates (milestone PREP)
+Feature: HC-PREP-E04-F01 Keys
+Type: ops, priority P0, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""ops"" ~""P0"""
+"HC-PREP-025 Generate keys: licence signing, offer-code signing, public content, eval content, update manifest; record key ids","Generate keys: licence signing, offer-code signing, public content, eval content, update manifest; record key ids
+
+Done when: 5 public keys exported for embedding; private keys only on hardware or offline media
+Requirements: LIC-001, PAY-012, CONT-002, NFR-042
+Stage: Preparation and decisions
+Epic: HC-PREP-E04 Signing keys and certificates (milestone PREP)
+Feature: HC-PREP-E04-F01 Keys
+Type: ops, priority P0, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""ops"" ~""P0"""
+HC-PREP-026 Sealed paper backup of private keys stored in a safe place,"Sealed paper backup of private keys stored in a safe place
+
+Done when: Backup envelope stored; recovery tested once
+Requirements: LIC-047
+Stage: Preparation and decisions
+Epic: HC-PREP-E04 Signing keys and certificates (milestone PREP)
+Feature: HC-PREP-E04-F01 Keys
+Type: ops, priority P0, estimate 0.5 days
+
+/label ~""PREP"" ~""PREP"" ~""ops"" ~""P0"""
+HC-PREP-027 Buy EV code-signing certificate (Windows Authenticode),"Buy EV code-signing certificate (Windows Authenticode)
+
+Done when: Certificate on token; test signature verifies on Windows
+Requirements: TAM-006, SUX-009
+Stage: Preparation and decisions
+Epic: HC-PREP-E04 Signing keys and certificates (milestone PREP)
+Feature: HC-PREP-E04-F01 Keys
+Type: ops, priority P0, estimate 2 days
+
+/label ~""PREP"" ~""PREP"" ~""ops"" ~""P0"""
+HC-PREP-028 Recruit 20 pilot doctors across at least 3 cities and 2 languages,"Recruit 20 pilot doctors across at least 3 cities and 2 languages
+
+Done when: Signed-up list with contact, PC specs and preferred language
+Requirements: NFR-031
+Stage: Preparation and decisions
+Epic: HC-PREP-E05 Pilot recruitment (milestone PREP)
+Feature: HC-PREP-E05-F01 Pilot doctors
+Type: biz, priority P0, estimate 3 days
+
+/label ~""PREP"" ~""PREP"" ~""biz"" ~""P0"""
+"HC-PREP-029 Pilot evaluation agreement (free use, feedback, data stays on their PC, evaluation content not for redistribution)","Pilot evaluation agreement (free use, feedback, data stays on their PC, evaluation content not for redistribution)
+
+Done when: Agreement template signed by each pilot doctor
+Requirements: CONT-004
+Stage: Preparation and decisions
+Epic: HC-PREP-E05 Pilot recruitment (milestone PREP)
+Feature: HC-PREP-E05-F01 Pilot doctors
+Type: legal, priority P0, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""legal"" ~""P0"""
+"HC-PREP-030 Collect sample paper prescriptions, case papers and letterheads from pilot doctors","Collect sample paper prescriptions, case papers and letterheads from pilot doctors
+
+Done when: At least 10 samples to guide print layouts
+Requirements: RX-005
+Stage: Preparation and decisions
+Epic: HC-PREP-E05 Pilot recruitment (milestone PREP)
+Feature: HC-PREP-E05-F01 Pilot doctors
+Type: biz, priority P1, estimate 1 days
+
+/label ~""PREP"" ~""PREP"" ~""biz"" ~""P1"""
+HC-MVP1-001 Unify code layout: one crate list in requirements/06 and design/02,"Unify code layout: one crate list in requirements/06 and design/02
+
+Done when: Both documents name the same crates and folders
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E01 Coding-agent handoff pack (milestone HANDOFF)
+Feature: HC-MVP1-E01-F01 Close design gaps before coding
+Type: design, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""HANDOFF"" ~""design"" ~""P0"""
+"HC-MVP1-002 Wireframes for Today, registration, patient dashboard, case form, follow-up, prescription, billing, backup, settings and licence screens","Wireframes for Today, registration, patient dashboard, case form, follow-up, prescription, billing, backup, settings and licence screens
+
+Done when: 10 wireframes in design/diagrams with field lists
+Requirements: NFR-030, NFR-034
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E01 Coding-agent handoff pack (milestone HANDOFF)
+Feature: HC-MVP1-E01-F01 Close design gaps before coding
+Type: design, priority P0, estimate 4 days
+
+/label ~""MVP1"" ~""HANDOFF"" ~""design"" ~""P0"""
+"HC-MVP1-003 Case template JSON schema plus 3 default templates (chronic detailed, acute quick, child)","Case template JSON schema plus 3 default templates (chronic detailed, acute quick, child)
+
+Done when: Schema file and 3 template files validate
+Requirements: CASE-001, CASE-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E01 Coding-agent handoff pack (milestone HANDOFF)
+Feature: HC-MVP1-E01-F01 Close design gaps before coding
+Type: design, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""HANDOFF"" ~""design"" ~""P0"""
+"HC-MVP1-004 Print layout specs: Rx A4, A5, letterhead margins, receipt, case paper; based on legacy Jasper templates and pilot samples","Print layout specs: Rx A4, A5, letterhead margins, receipt, case paper; based on legacy Jasper templates and pilot samples
+
+Done when: Layout spec with field positions and sample PDFs
+Requirements: RX-005, BILL-003, CASE-009
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E01 Coding-agent handoff pack (milestone HANDOFF)
+Feature: HC-MVP1-E01-F01 Close design gaps before coding
+Type: design, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""HANDOFF"" ~""design"" ~""P0"""
+"HC-MVP1-005 Settings file with placeholders: business UPI ID, payee name, WhatsApp number, prices, support hours, public keys","Settings file with placeholders: business UPI ID, payee name, WhatsApp number, prices, support hours, public keys
+
+Done when: Single config file referenced by build
+Requirements: PAY-011, PAY-013, PAY-015
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E01 Coding-agent handoff pack (milestone HANDOFF)
+Feature: HC-MVP1-E01-F01 Close design gaps before coding
+Type: design, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""HANDOFF"" ~""design"" ~""P0"""
+"HC-MVP1-006 One self-contained brief per milestone M0 to M10 (scope, requirement ids, tests that must pass, out-of-scope)","One self-contained brief per milestone M0 to M10 (scope, requirement ids, tests that must pass, out-of-scope)
+
+Done when: 11 brief files in handoff folder
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E01 Coding-agent handoff pack (milestone HANDOFF)
+Feature: HC-MVP1-E01-F01 Close design gaps before coding
+Type: doc, priority P0, estimate 3 days
+
+/label ~""MVP1"" ~""HANDOFF"" ~""doc"" ~""P0"""
+HC-MVP1-007 Development environment and CI guide including Windows build runner,"Development environment and CI guide including Windows build runner
+
+Done when: New developer builds Win and Linux artifacts from the guide
+Requirements: NFR-040, NFR-041
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E01 Coding-agent handoff pack (milestone HANDOFF)
+Feature: HC-MVP1-E01-F01 Close design gaps before coding
+Type: doc, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""HANDOFF"" ~""doc"" ~""P0"""
+"HC-MVP1-008 Create monorepo with apps/desktop, crates, tools, content-sources, docs","Create monorepo with apps/desktop, crates, tools, content-sources, docs
+
+Done when: Layout matches handoff spec; README explains folders
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F01 Monorepo and toolchain
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M0"" ~""dev"" ~""P0"""
+"HC-MVP1-009 Tauri 2 shell with React 18, TypeScript strict, Vite, Tailwind, shadcn/ui","Tauri 2 shell with React 18, TypeScript strict, Vite, Tailwind, shadcn/ui
+
+Done when: App window opens on Windows and Linux
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F01 Monorepo and toolchain
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M0"" ~""dev"" ~""P0"""
+"HC-MVP1-010 Rust workspace with domain, storage, search, repertory, licence, docs, app crates (empty, compiling)","Rust workspace with domain, storage, search, repertory, licence, docs, app crates (empty, compiling)
+
+Done when: cargo build and cargo test pass
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F01 Monorepo and toolchain
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M0"" ~""dev"" ~""P0"""
+HC-MVP1-011 Typed Tauri commands with tauri-specta; generated TS types checked in CI,"Typed Tauri commands with tauri-specta; generated TS types checked in CI
+
+Done when: One sample command callable from UI with generated types
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F01 Monorepo and toolchain
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M0"" ~""dev"" ~""P0"""
+"HC-MVP1-012 Tauri capability allowlist and webview Content Security Policy (no shell, no arbitrary FS)","Tauri capability allowlist and webview Content Security Policy (no shell, no arbitrary FS)
+
+Done when: Security config reviewed; forbidden API call fails
+Requirements: NFR-022, NFR-023
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F01 Monorepo and toolchain
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M0"" ~""dev"" ~""P0"""
+HC-MVP1-013 CI pipeline (GitHub Actions or Forgejo Actions) building Windows and Linux artifacts on every main commit,"CI pipeline (GitHub Actions or Forgejo Actions) building Windows and Linux artifacts on every main commit
+
+Done when: Artifacts downloadable from CI
+Requirements: NFR-040, NFR-041
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F02 CI and quality gates
+Type: ops, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M0"" ~""ops"" ~""P0"""
+"HC-MVP1-014 Lint and format gates: clippy -D warnings, eslint, prettier, TS strict","Lint and format gates: clippy -D warnings, eslint, prettier, TS strict
+
+Done when: CI fails on any lint error
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F02 CI and quality gates
+Type: ops, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M0"" ~""ops"" ~""P0"""
+"HC-MVP1-015 Dependency pinning and audit (Cargo.lock, package-lock, cargo audit, npm audit)","Dependency pinning and audit (Cargo.lock, package-lock, cargo audit, npm audit)
+
+Done when: CI fails on known vulnerable dependency
+Requirements: NFR-024
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F02 CI and quality gates
+Type: ops, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M0"" ~""ops"" ~""P0"""
+HC-MVP1-016 i18n scaffold with locales/en.json; no hard-coded UI strings,"i18n scaffold with locales/en.json; no hard-coded UI strings
+
+Done when: Lint rule flags literal strings in JSX
+Requirements: I18N-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F03 Cross-cutting basics
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M0"" ~""dev"" ~""P0"""
+"HC-MVP1-017 Structured logging with rotation, no patient identifiers","Structured logging with rotation, no patient identifiers
+
+Done when: Log file rotates at 10 MB x 5; test proves names are not logged
+Requirements: NFR-013
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F03 Cross-cutting basics
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M0"" ~""dev"" ~""P0"""
+HC-MVP1-018 Error mapping to friendly messages with suggested action,"Error mapping to friendly messages with suggested action
+
+Done when: No stack trace reaches UI in tests
+Requirements: NFR-033
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F03 Cross-cutting basics
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M0"" ~""dev"" ~""P0"""
+HC-MVP1-019 ADR folder with ADR-001 to ADR-011 copied from design,"ADR folder with ADR-001 to ADR-011 copied from design
+
+Done when: docs/adr contains 11 records
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E02 Foundation: repo, shell, CI (milestone M0)
+Feature: HC-MVP1-E02-F03 Cross-cutting basics
+Type: doc, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M0"" ~""doc"" ~""P0"""
+"HC-MVP1-020 SQLCipher pool: 1 writer and 4 reader connections, WAL, foreign keys, tuned pragmas","SQLCipher pool: 1 writer and 4 reader connections, WAL, foreign keys, tuned pragmas
+
+Done when: Concurrent read during write test passes
+Requirements: NFR-010
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F01 Encrypted database
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+"HC-MVP1-021 Key hierarchy: random DEK wrapped by PIN-derived KEK (Argon2id), OS store (DPAPI or Secret Service) and recovery code","Key hierarchy: random DEK wrapped by PIN-derived KEK (Argon2id), OS store (DPAPI or Secret Service) and recovery code
+
+Done when: Unlock works by PIN; recovery code restores access in test
+Requirements: NFR-020, SET-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F01 Encrypted database
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+HC-MVP1-022 Forward-only migrations with user_version and automatic pre-migration backup,"Forward-only migrations with user_version and automatic pre-migration backup
+
+Done when: Migration test from empty and from previous schema passes
+Requirements: NFR-011
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F01 Encrypted database
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+"HC-MVP1-023 Crash-safety test: kill process during writes in a loop, DB never corrupt","Crash-safety test: kill process during writes in a loop, DB never corrupt
+
+Done when: 1,000 kill cycles with integrity_check ok
+Requirements: NFR-010, NFR-012
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F01 Encrypted database
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M1"" ~""test"" ~""P0"""
+HC-MVP1-024 Encrypted attachment store (AES-256-GCM blobs in files/),"Encrypted attachment store (AES-256-GCM blobs in files/)
+
+Done when: Attachment round trip test; file on disk unreadable
+Requirements: NFR-021
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F01 Encrypted database
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+HC-MVP1-025 Audit log writer used by every write command,"Audit log writer used by every write command
+
+Done when: Create, update, delete each produce an audit row with diff
+Requirements: ADM-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F01 Encrypted database
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+"HC-MVP1-026 First-run wizard: language, doctor profile, clinic profile, licence (trial or import)","First-run wizard: language, doctor profile, clinic profile, licence (trial or import)
+
+Done when: Wizard completes in under 3 minutes (flow 1)
+Requirements: SET-001, SET-002, SET-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F02 First run and app lock
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+"HC-MVP1-027 PIN set, unlock screen, idle auto-lock, printed recovery code","PIN set, unlock screen, idle auto-lock, printed recovery code
+
+Done when: Auto-lock after configured minutes; recovery path tested
+Requirements: SET-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F02 First run and app lock
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+HC-MVP1-028 Global font size setting,"Global font size setting
+
+Done when: Normal, Large, Extra large applied app-wide
+Requirements: SET-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F02 First run and app lock
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P1"""
+HC-MVP1-029 Data folder location chooser,"Data folder location chooser
+
+Done when: Data moved safely to chosen folder
+Requirements: SET-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F02 First run and app lock
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P1"""
+"HC-MVP1-030 .hcbak format: header, Argon2id key, AES-256-GCM chunked stream of DB snapshots and files",".hcbak format: header, Argon2id key, AES-256-GCM chunked stream of DB snapshots and files
+
+Done when: Round-trip test; header readable without decrypting body
+Requirements: BAK-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F03 Backup and restore
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+"HC-MVP1-031 Automatic daily backup with 14 daily, 8 weekly, 12 monthly rotation using SQLite online backup","Automatic daily backup with 14 daily, 8 weekly, 12 monthly rotation using SQLite online backup
+
+Done when: Rotation test over simulated 400 days; no password prompt
+Requirements: BAK-001, SUX-011
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F03 Backup and restore
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+HC-MVP1-032 Manual backup to any folder or USB,"Manual backup to any folder or USB
+
+Done when: Backup to USB works on Win and Linux
+Requirements: BAK-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F03 Backup and restore
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+"HC-MVP1-033 Restore wizard with preview, safety backup of current data, atomic swap, migration if older","Restore wizard with preview, safety backup of current data, atomic swap, migration if older
+
+Done when: Restore on clean PC with all data and attachments (flow 9)
+Requirements: BAK-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F03 Backup and restore
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+HC-MVP1-034 Post-backup integrity check and banner if last good backup older than 7 days,"Post-backup integrity check and banner if last good backup older than 7 days
+
+Done when: Banner appears in test after 8 simulated days
+Requirements: BAK-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F03 Backup and restore
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P0"""
+"HC-MVP1-035 Move to new computer guided flow (backup, restore, licence re-import)","Move to new computer guided flow (backup, restore, licence re-import)
+
+Done when: Guided flow tested end to end
+Requirements: BAK-005, LIC-064
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E03 Storage, encryption, backup (milestone M1)
+Feature: HC-MVP1-E03-F03 Backup and restore
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M1"" ~""dev"" ~""P1"""
+"HC-MVP1-036 Patient registration form with age or DOB, mobile, address, occupation, referred by","Patient registration form with age or DOB, mobile, address, occupation, referred by
+
+Done when: All fields saved and validated
+Requirements: PAT-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+"HC-MVP1-037 Auto patient code with configurable prefix, never reused","Auto patient code with configurable prefix, never reused
+
+Done when: Codes unique across delete and restore
+Requirements: PAT-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+HC-MVP1-038 Patient photo from webcam or file,"Patient photo from webcam or file
+
+Done when: Photo captured on Win and Linux webcams
+Requirements: PAT-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+HC-MVP1-039 Duplicate warning on name plus mobile or name plus DOB,"Duplicate warning on name plus mobile or name plus DOB
+
+Done when: Warning shown in tests with Indian name variants
+Requirements: PAT-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+"HC-MVP1-040 Patient dashboard: banner, alerts, visit timeline, last Rx, dues, quick actions","Patient dashboard: banner, alerts, visit timeline, last Rx, dues, quick actions
+
+Done when: Opens in under 300 ms at 50k patients
+Requirements: PAT-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+HC-MVP1-041 Family linking and quick switch,"Family linking and quick switch
+
+Done when: Linked family visible on dashboard
+Requirements: PAT-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+"HC-MVP1-042 Soft delete, 30-day recycle bin, PIN-protected permanent delete","Soft delete, 30-day recycle bin, PIN-protected permanent delete
+
+Done when: Restore from bin works; permanent delete asks PIN
+Requirements: PAT-008
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+HC-MVP1-043 Export single patient as PDF and JSON,"Export single patient as PDF and JSON
+
+Done when: Export opens and contains all visits
+Requirements: PAT-011
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+HC-MVP1-044 Patient tags with filter,"Patient tags with filter
+
+Done when: Tag filter works in list
+Requirements: PAT-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P1"""
+HC-MVP1-045 Attachments per patient and visit with thumbnail viewer,"Attachments per patient and visit with thumbnail viewer
+
+Done when: Images and PDFs attach and preview
+Requirements: PAT-009
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P1, estimate 1.5 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P1"""
+HC-MVP1-046 Consent record and printable consent form,"Consent record and printable consent form
+
+Done when: Consent date stored and printable
+Requirements: PAT-012
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F01 Patient records
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P1"""
+HC-MVP1-047 FTS5 tables (prefix and trigram) with triggers in the same transaction,"FTS5 tables (prefix and trigram) with triggers in the same transaction
+
+Done when: New patient findable immediately
+Requirements: PSR-012
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F02 Patient search
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+"HC-MVP1-048 Indian-name phonetic key (Sharma/Sarma, Mohd/Mohammad, Lakshmi/Laxmi)","Indian-name phonetic key (Sharma/Sarma, Mohd/Mohammad, Lakshmi/Laxmi)
+
+Done when: Golden test of 200 name pairs passes
+Requirements: PSR-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F02 Patient search
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+"HC-MVP1-049 Ranked UNION query (exact ID or mobile, name prefix, phonetic, other fields) with keyset paging","Ranked UNION query (exact ID or mobile, name prefix, phonetic, other fields) with keyset paging
+
+Done when: Ranking golden tests pass
+Requirements: PSR-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F02 Patient search
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+"HC-MVP1-050 Global search box (Ctrl+K, F2), debounce, cancel on keystroke, keyboard-only flow, recent patients","Global search box (Ctrl+K, F2), debounce, cancel on keystroke, keyboard-only flow, recent patients
+
+Done when: Type, arrows, Enter opens patient
+Requirements: PSR-001, PSR-006, PSR-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F02 Patient search
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+"HC-MVP1-051 Result rows with photo, code, age, last visit, dues; virtualised list","Result rows with photo, code, age, last visit, dues; virtualised list
+
+Done when: Smooth scroll through 1,000 results
+Requirements: PSR-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F02 Patient search
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+"HC-MVP1-052 Advanced filters: dates, follow-up due, age, sex, city, tags, diagnosis, remedy, potency, dues; CSV export","Advanced filters: dates, follow-up due, age, sex, city, tags, diagnosis, remedy, potency, dues; CSV export
+
+Done when: Filter ""overdue, given Sulphur"" correct (flow 2)
+Requirements: PSR-008, PSR-011
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F02 Patient search
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+HC-MVP1-053 Search index rebuild tool with progress,"Search index rebuild tool with progress
+
+Done when: Rebuild at 50k under 60 s
+Requirements: PSR-013
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F02 Patient search
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+HC-MVP1-054 Full-text search in case notes with snippets,"Full-text search in case notes with snippets
+
+Done when: Snippet links to the exact visit
+Requirements: PSR-009
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F02 Patient search
+Type: dev, priority P1, estimate 1.5 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P1"""
+HC-MVP1-055 Saved filters on home screen,"Saved filters on home screen
+
+Done when: Saved filter reopens with one click
+Requirements: PSR-010
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F02 Patient search
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P1"""
+"HC-MVP1-056 Synthetic data generator tools/seed for 50k and 100k realistic Indian patients, visits, Rx, bills","Synthetic data generator tools/seed for 50k and 100k realistic Indian patients, visits, Rx, bills
+
+Done when: Both datasets generated in CI
+Requirements: NFR-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F03 Scale testing
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M2"" ~""dev"" ~""P0"""
+"HC-MVP1-057 Performance CI gate for search, dashboard, filter, Today list at 50k and 100k","Performance CI gate for search, dashboard, filter, Today list at 50k and 100k
+
+Done when: CI fails when a budget is missed
+Requirements: NFR-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E04 Patients and 50k search (milestone M2)
+Feature: HC-MVP1-E04-F03 Scale testing
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M2"" ~""test"" ~""P0"""
+"HC-MVP1-058 Form engine rendering case templates from JSON schema (text, long text, choice, number, date, scale)","Form engine rendering case templates from JSON schema (text, long text, choice, number, date, scale)
+
+Done when: 3 default templates render and validate
+Requirements: CASE-001, CASE-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F01 Template-driven case form
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+HC-MVP1-059 Collapsible and hideable sections per doctor; female and child sections shown conditionally,"Collapsible and hideable sections per doctor; female and child sections shown conditionally
+
+Done when: Hidden sections stay hidden after restart
+Requirements: CASE-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F01 Template-driven case form
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+"HC-MVP1-060 Pick lists with free text (thermal, thirst, appetite and similar)","Pick lists with free text (thermal, thirst, appetite and similar)
+
+Done when: Pick lists editable in settings
+Requirements: CASE-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F01 Template-driven case form
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+HC-MVP1-061 Auto-save every 2 s and on blur with Saved indicator,"Auto-save every 2 s and on blur with Saved indicator
+
+Done when: Kill app mid-typing; nothing lost (flow 3)
+Requirements: CASE-005, NFR-012
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F01 Template-driven case form
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+HC-MVP1-062 Vitals with BMI auto-calc,"Vitals with BMI auto-calc
+
+Done when: BMI correct in unit tests
+Requirements: CASE-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F01 Template-driven case form
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+HC-MVP1-063 Printable case summary,"Printable case summary
+
+Done when: Prints on A4 per layout spec
+Requirements: CASE-009
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F01 Template-driven case form
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+HC-MVP1-064 Send selected text to repertory hook,"Send selected text to repertory hook
+
+Done when: Opens rubric search pre-filled
+Requirements: CASE-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F01 Template-driven case form
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+"HC-MVP1-065 Template editor (add, remove, reorder fields)","Template editor (add, remove, reorder fields)
+
+Done when: Doctor builds a new template without help
+Requirements: CASE-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F01 Template-driven case form
+Type: dev, priority P1, estimate 3 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P1"""
+HC-MVP1-066 Voice dictation via OS input in text fields,"Voice dictation via OS input in text fields
+
+Done when: Windows dictation types into fields
+Requirements: CASE-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F01 Template-driven case form
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P1"""
+HC-MVP1-067 Body diagram annotation (front and back),"Body diagram annotation (front and back)
+
+Done when: Marks saved per visit
+Requirements: CASE-008
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F01 Template-driven case form
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P1"""
+"HC-MVP1-068 Visit model and types (first, follow-up, acute, tele)","Visit model and types (first, follow-up, acute, tele)
+
+Done when: Visits listed on timeline
+Requirements: VIS-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F02 Visits and follow-ups
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+HC-MVP1-069 Follow-up form pre-loading complaints with status and improvement slider,"Follow-up form pre-loading complaints with status and improvement slider
+
+Done when: Status per complaint saved (flow 7)
+Requirements: VIS-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F02 Visits and follow-ups
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+HC-MVP1-070 Remedy response quick-pick,"Remedy response quick-pick
+
+Done when: Values stored and shown on timeline
+Requirements: VIS-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F02 Visits and follow-ups
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+HC-MVP1-071 Next follow-up quick buttons,"Next follow-up quick buttons
+
+Done when: Date stored; appears in Today list
+Requirements: VIS-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F02 Visits and follow-ups
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+"HC-MVP1-072 Today screen: due today, overdue, today's visits; default home","Today screen: due today, overdue, today's visits; default home
+
+Done when: Loads under 200 ms at 50k
+Requirements: VIS-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F03 Today screen and appointments
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P0"""
+"HC-MVP1-073 Appointment book day view, drag to reschedule, walk-in tokens","Appointment book day view, drag to reschedule, walk-in tokens
+
+Done when: Token printed and queue updates
+Requirements: VIS-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F03 Today screen and appointments
+Type: dev, priority P1, estimate 3 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P1"""
+HC-MVP1-074 Progress charts per complaint and vitals,"Progress charts per complaint and vitals
+
+Done when: Chart shows improvement across visits
+Requirements: VIS-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E05 Case taking, visits and Today screen (milestone M3)
+Feature: HC-MVP1-E05-F03 Today screen and appointments
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP1"" ~""M3"" ~""dev"" ~""P1"""
+"HC-MVP1-075 Pack format: zip with manifest.json, content.db, signature; manifest schema incl. distribution and licence","Pack format: zip with manifest.json, content.db, signature; manifest schema incl. distribution and licence
+
+Done when: Schema validated in tests
+Requirements: PACK-001, PACK-002, CONT-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F01 Pack format and loader
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+"HC-MVP1-076 Pack verifier and installer (signature with build-profile keys, sha256, format_version, atomic install)","Pack verifier and installer (signature with build-profile keys, sha256, format_version, atomic install)
+
+Done when: Tampered and newer-format packs rejected
+Requirements: PACK-001, PACK-013, CONT-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F01 Pack format and loader
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+"HC-MVP1-077 Generic repertory schema with per-pack grade scale, display style, page refs, author codes","Generic repertory schema with per-pack grade scale, display style, page refs, author codes
+
+Done when: Pack with 1-4 grade scale works without code change
+Requirements: PACK-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F01 Pack format and loader
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+HC-MVP1-078 Remedy master mapping on install; unmapped remedies added and flagged,"Remedy master mapping on install; unmapped remedies added and flagged
+
+Done when: Two packs share remedy ids in one analysis
+Requirements: PACK-008, MM-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F01 Pack format and loader
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+HC-MVP1-079 Stable rubric ids across pack versions with id map,"Stable rubric ids across pack versions with id map
+
+Done when: Old analysis opens after pack update
+Requirements: PACK-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F01 Pack format and loader
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+HC-MVP1-080 Internal and public build profiles embedding different content keys,"Internal and public build profiles embedding different content keys
+
+Done when: Public build refuses eval pack copied in by hand
+Requirements: CONT-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F02 Build profiles and release gate
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+HC-MVP1-081 Internal build banner and EVALUATION mark on every print,"Internal build banner and EVALUATION mark on every print
+
+Done when: Visible in all print templates
+Requirements: CONT-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F02 Build profiles and release gate
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+"HC-MVP1-082 Release gate: fail public build if eval pack, eval key or internal-eval file present","Release gate: fail public build if eval pack, eval key or internal-eval file present
+
+Done when: Gate fails on a planted file in test
+Requirements: CONT-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F02 Build profiles and release gate
+Type: ops, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M4"" ~""ops"" ~""P0"""
+HC-MVP1-083 Bundle the packs allowed for each build profile in the installer,"Bundle the packs allowed for each build profile in the installer
+
+Done when: Internal installer has eval packs; public installer has only public packs
+Requirements: PACK-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F02 Build profiles and release gate
+Type: ops, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M4"" ~""ops"" ~""P0"""
+HC-MVP1-084 Registry enforcement: refuse sources without REGISTRY.md row,"Registry enforcement: refuse sources without REGISTRY.md row
+
+Done when: Build fails for unregistered source
+Requirements: CONT-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F03 content-builder tool
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+HC-MVP1-085 import-oorep: parse oorep.sql.gz into one pack per repertory and per MM; ignore user tables,"import-oorep: parse oorep.sql.gz into one pack per repertory and per MM; ignore user tables
+
+Done when: eval-publicum, eval-kent-de, eval-boericke-mm, eval-remedy-master built
+Requirements: CONT-009
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F03 content-builder tool
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+"HC-MVP1-086 Generic CSV and Excel importer (chapter, rubric path, remedy, grade, citation)","Generic CSV and Excel importer (chapter, rubric path, remedy, grade, citation)
+
+Done when: Sample CSV builds a valid pack
+Requirements: CONT-009, PACK-011
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F03 content-builder tool
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+"HC-MVP1-087 Build FTS, top5_json, sign with channel key","Build FTS, top5_json, sign with channel key
+
+Done when: Pack opens and searches in app
+Requirements: CONT-002, REP-015
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F03 content-builder tool
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P0"""
+"HC-MVP1-088 Import report with counts, unmapped remedies, grade distribution, diff vs previous build","Import report with counts, unmapped remedies, grade distribution, diff vs previous build
+
+Done when: Report generated for every build
+Requirements: CONT-010
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F03 content-builder tool
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P1"""
+HC-MVP1-089 Promote pack from internal_eval to public by registry change and re-sign,"Promote pack from internal_eval to public by registry change and re-sign
+
+Done when: Ids unchanged after promotion
+Requirements: CONT-008
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F03 content-builder tool
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M4"" ~""dev"" ~""P1"""
+HC-MVP1-090 Starter sample pack (5 rubrics x 6 remedies) with hand-computed scoring fixtures,"Starter sample pack (5 rubrics x 6 remedies) with hand-computed scoring fixtures
+
+Done when: Fixtures used by M6 tests
+Requirements: REP-033
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F04 Content creation
+Type: content, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M4"" ~""content"" ~""P0"""
+"HC-MVP1-091 Synonym and modern-language mapping table, 2,000 entries, language-tagged","Synonym and modern-language mapping table, 2,000 entries, language-tagged
+
+Done when: Synonym pack built; search golden tests use it
+Requirements: REP-012, REP-016
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F04 Content creation
+Type: content, priority P0, estimate 8 days
+
+/label ~""MVP1"" ~""M4"" ~""content"" ~""P0"""
+"HC-MVP1-092 Glossary of 1,000 archaic terms in plain English","Glossary of 1,000 archaic terms in plain English
+
+Done when: Glossary pack built
+Requirements: REP-012
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F04 Content creation
+Type: content, priority P1, estimate 5 days
+
+/label ~""MVP1"" ~""M4"" ~""content"" ~""P1"""
+HC-MVP1-093 Remedy relationships table from public-domain sources,"Remedy relationships table from public-domain sources
+
+Done when: Relationships pack built
+Requirements: MM-005, RX-008
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F04 Content creation
+Type: content, priority P1, estimate 3 days
+
+/label ~""MVP1"" ~""M4"" ~""content"" ~""P1"""
+HC-MVP1-094 Public repertory for release: OOREP permission (Q16) or OCR and proofreading of Kent 1897,"Public repertory for release: OOREP permission (Q16) or OCR and proofreading of Kent 1897
+
+Done when: A public-channel Kent pack passes proofreading targets
+Requirements: REP-001, CONT-008
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E06 Content packs and channels (milestone M4)
+Feature: HC-MVP1-E06-F04 Content creation
+Type: content, priority P0, estimate 20 days
+
+/label ~""MVP1"" ~""M4"" ~""content"" ~""P0"""
+HC-MVP1-095 Rubric search over all enabled packs with synonym and abbreviation expansion and ranking,"Rubric search over all enabled packs with synonym and abbreviation expansion and ranking
+
+Done when: Golden queries return expected top rubrics
+Requirements: REP-010, REP-011, REP-012, REP-013
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F01 Rubric search
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P0"""
+"HC-MVP1-096 Filters: repertory, chapter, minimum remedy count, contains remedy","Filters: repertory, chapter, minimum remedy count, contains remedy
+
+Done when: Each filter covered by tests
+Requirements: REP-014
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F01 Rubric search
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P0"""
+"HC-MVP1-097 Result rows with full path, count, top 5 remedies, source","Result rows with full path, count, top 5 remedies, source
+
+Done when: Rows render from top5_json
+Requirements: REP-015
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F01 Rubric search
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P0"""
+HC-MVP1-098 Performance test on publicum + kent-de: under 100 ms per keystroke,"Performance test on publicum + kent-de: under 100 ms per keystroke
+
+Done when: CI perf test green
+Requirements: NFR-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F01 Rubric search
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M5"" ~""test"" ~""P0"""
+HC-MVP1-099 Recent and favourite rubrics,"Recent and favourite rubrics
+
+Done when: Lists persist across restart
+Requirements: REP-017
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F01 Rubric search
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P1"""
+"HC-MVP1-100 Book view: chapter list, rubric tree, breadcrumb, keyboard navigation","Book view: chapter list, rubric tree, breadcrumb, keyboard navigation
+
+Done when: Navigate Kent tree with keyboard only
+Requirements: REP-020
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F02 Repertory browser
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P0"""
+"HC-MVP1-101 Rubric detail with grade styling, counts, cross-references, parent and children","Rubric detail with grade styling, counts, cross-references, parent and children
+
+Done when: Matches repertory wireframe
+Requirements: REP-021
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F02 Repertory browser
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P0"""
+HC-MVP1-102 Remedy popup with keynotes and open-in-MM,"Remedy popup with keynotes and open-in-MM
+
+Done when: Popup loads under 100 ms
+Requirements: REP-022
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F02 Repertory browser
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P0"""
+HC-MVP1-103 Compare same rubric across two repertories,"Compare same rubric across two repertories
+
+Done when: Side-by-side view works
+Requirements: REP-023
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F02 Repertory browser
+Type: dev, priority P1, estimate 1.5 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P1"""
+HC-MVP1-104 MM reader with remedy list and sections,"MM reader with remedy list and sections
+
+Done when: Boericke readable section by section
+Requirements: MM-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F03 Materia medica reader
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P0"""
+HC-MVP1-105 Full-text search across MM books with highlight,"Full-text search across MM books with highlight
+
+Done when: Search hits highlighted
+Requirements: MM-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F03 Materia medica reader
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P0"""
+HC-MVP1-106 Compare one remedy across books,"Compare one remedy across books
+
+Done when: Same section from each book side by side
+Requirements: MM-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F03 Materia medica reader
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P0"""
+HC-MVP1-107 Bookmarks and notes on paragraphs,"Bookmarks and notes on paragraphs
+
+Done when: Notes saved in user_content.db
+Requirements: MM-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F03 Materia medica reader
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P1"""
+"HC-MVP1-108 Repertory manager: list, install from file, enable, disable, default, uninstall with saved-analysis guard","Repertory manager: list, install from file, enable, disable, default, uninstall with saved-analysis guard
+
+Done when: Install from USB and uninstall work (flow 11)
+Requirements: PACK-009, CONT-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F04 Repertory manager
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P0"""
+HC-MVP1-109 Doctor-built repertory in app and Excel import; export as unsigned pack,"Doctor-built repertory in app and Excel import; export as unsigned pack
+
+Done when: Imported pack shows Unverified badge
+Requirements: PACK-011
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F04 Repertory manager
+Type: dev, priority P1, estimate 3 days
+
+/label ~""MVP1"" ~""M5"" ~""dev"" ~""P1"""
+"HC-MVP1-110 Publisher SDK: pack format spec, JSON schema, content-builder guide","Publisher SDK: pack format spec, JSON schema, content-builder guide
+
+Done when: Spec published in docs
+Requirements: PACK-012
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E07 Rubric search, repertory browser, materia medica (milestone M5)
+Feature: HC-MVP1-E07-F04 Repertory manager
+Type: doc, priority P1, estimate 2 days
+
+/label ~""MVP1"" ~""M5"" ~""doc"" ~""P1"""
+"HC-MVP1-111 Case clipboard linked to visit, up to 10 named clipboards, combine","Case clipboard linked to visit, up to 10 named clipboards, combine
+
+Done when: Clipboard saved with visit
+Requirements: REP-030, REP-031
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F01 Repertorisation workspace
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+"HC-MVP1-112 Per-rubric weight, eliminative, causation, exclude; keyboard shortcuts","Per-rubric weight, eliminative, causation, exclude; keyboard shortcuts
+
+Done when: Settings change results live
+Requirements: REP-032
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F01 Repertorisation workspace
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+HC-MVP1-113 Prescribe from result pre-fills Rx,"Prescribe from result pre-fills Rx
+
+Done when: Rx form opens with remedy
+Requirements: REP-037
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F01 Repertorisation workspace
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+HC-MVP1-114 Save analysis snapshot with visit and reopen identically,"Save analysis snapshot with visit and reopen identically
+
+Done when: Snapshot survives pack changes
+Requirements: REP-038
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F01 Repertorisation workspace
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+HC-MVP1-115 Bitset scoring engine with LRU cache,"Bitset scoring engine with LRU cache
+
+Done when: 30 rubrics recompute under 300 ms on reference PC
+Requirements: REP-036
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F02 Scoring engine
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+"HC-MVP1-116 Six analysis methods (sum, totality, Kent, Boenninghausen, elimination, small-rubric bonus)","Six analysis methods (sum, totality, Kent, Boenninghausen, elimination, small-rubric bonus)
+
+Done when: Hand-computed fixtures pass for every method
+Requirements: REP-033
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F02 Scoring engine
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+"HC-MVP1-117 Result grid (rubrics x remedies, grades, scores, coverage)","Result grid (rubrics x remedies, grades, scores, coverage)
+
+Done when: Matches wireframe; sortable
+Requirements: REP-034
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F03 Results display
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+HC-MVP1-118 Ranked list and bar graph views,"Ranked list and bar graph views
+
+Done when: Toggle grid, list, graph
+Requirements: REP-035
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F03 Results display
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+HC-MVP1-119 Remedy differentiation view,"Remedy differentiation view
+
+Done when: 2 to 5 remedies compared
+Requirements: REP-039
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F03 Results display
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P1"""
+HC-MVP1-120 Kingdom and family filter,"Kingdom and family filter
+
+Done when: Filter applied to results
+Requirements: REP-040
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F03 Results display
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P1"""
+HC-MVP1-121 Relationship hints on top results,"Relationship hints on top results
+
+Done when: Inimical warning shown when relevant
+Requirements: REP-041
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F03 Results display
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P1"""
+HC-MVP1-122 Print repertorisation chart,"Print repertorisation chart
+
+Done when: Chart prints on A4
+Requirements: REP-042
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F03 Results display
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P1"""
+HC-MVP1-123 Cross-repertorisation across multiple repertories with grade normalisation,"Cross-repertorisation across multiple repertories with grade normalisation
+
+Done when: Mixed-pack analysis matches fixtures
+Requirements: REP-043
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F03 Results display
+Type: dev, priority P2, estimate 2 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P2"""
+HC-MVP1-124 Symptom-to-rubric helper under case form lines (FTS plus synonyms),"Symptom-to-rubric helper under case form lines (FTS plus synonyms)
+
+Done when: 3 suggestions per line; one click adds
+Requirements: CASE-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F04 Smart helpers
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+"HC-MVP1-125 Guided acute mode (fever, cold, cough, diarrhoea, injury)","Guided acute mode (fever, cold, cough, diarrhoea, injury)
+
+Done when: 5 to 8 taps produce ranked remedies
+Requirements: REP-033
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F04 Smart helpers
+Type: dev, priority P1, estimate 3 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P1"""
+HC-MVP1-126 Source library and citation CRUD with all fields,"Source library and citation CRUD with all fields
+
+Done when: Sources reusable via autocomplete
+Requirements: CIT-002, CIT-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F05 Citations and doctor additions
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+"HC-MVP1-127 Citation links to rubric, rubric-remedy, user rubric, MM section, analysis rubric, prescription","Citation links to rubric, rubric-remedy, user rubric, MM section, analysis rubric, prescription
+
+Done when: Each target type tested
+Requirements: CIT-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F05 Citations and doctor additions
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+HC-MVP1-128 Clinical-experience citation linked to patient and visits,"Clinical-experience citation linked to patient and visits
+
+Done when: Click opens the case
+Requirements: CIT-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F05 Citations and doctor additions
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+"HC-MVP1-129 My repertory layer: add remedy or rubric with citation, visually marked","My repertory layer: add remedy or rubric with citation, visually marked
+
+Done when: Quick-add under 20 seconds
+Requirements: REP-024, CIT-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F05 Citations and doctor additions
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+HC-MVP1-130 Citation markers with hover details,"Citation markers with hover details
+
+Done when: Marker visible in rubric detail and grid
+Requirements: CIT-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F05 Citations and doctor additions
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P0"""
+HC-MVP1-131 Include or exclude additions and confidence filter in analysis,"Include or exclude additions and confidence filter in analysis
+
+Done when: Results change only when toggled
+Requirements: CIT-008
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F05 Citations and doctor additions
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P1"""
+HC-MVP1-132 Citations list screen and CSV or PDF export,"Citations list screen and CSV or PDF export
+
+Done when: Export opens in Excel
+Requirements: CIT-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F05 Citations and doctor additions
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P1"""
+HC-MVP1-133 Suggest-to-publisher export of confirmed additions,"Suggest-to-publisher export of confirmed additions
+
+Done when: Export file in documented format
+Requirements: CIT-010
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F05 Citations and doctor additions
+Type: dev, priority P2, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""dev"" ~""P2"""
+HC-MVP1-134 Citations survive backup and restore,"Citations survive backup and restore
+
+Done when: Flow 11 citation steps pass
+Requirements: CIT-009
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E08 Repertorisation and citations (milestone M6)
+Feature: HC-MVP1-E08-F05 Citations and doctor additions
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M6"" ~""test"" ~""P0"""
+"HC-MVP1-135 Rx items with remedy autocomplete, potency, form, dose, frequency, duration, instructions","Rx items with remedy autocomplete, potency, form, dose, frequency, duration, instructions
+
+Done when: Abbreviations like sulph resolve
+Requirements: RX-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F01 Prescription
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P0"""
+HC-MVP1-136 Placebo entries and hide-remedy-name on print,"Placebo entries and hide-remedy-name on print
+
+Done when: Real remedy stored, hidden on print
+Requirements: RX-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F01 Prescription
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P0"""
+HC-MVP1-137 Favourites and saved Rx templates,"Favourites and saved Rx templates
+
+Done when: Template inserted in one click
+Requirements: RX-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F01 Prescription
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P0"""
+HC-MVP1-138 Repeat last prescription,"Repeat last prescription
+
+Done when: One click copies last Rx
+Requirements: RX-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F01 Prescription
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P0"""
+"HC-MVP1-139 Advice library (diet, avoid list) multi-select","Advice library (diet, avoid list) multi-select
+
+Done when: Advice prints on Rx
+Requirements: RX-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F01 Prescription
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P1"""
+HC-MVP1-140 Inimical remedy warning,"Inimical remedy warning
+
+Done when: Warning shown with source
+Requirements: RX-008
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F01 Prescription
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P1"""
+"HC-MVP1-141 hc-docs: HTML templates to PDF via webview, Unicode fonts, Indian number format","hc-docs: HTML templates to PDF via webview, Unicode fonts, Indian number format
+
+Done when: Rx, receipt, case paper render to PDF
+Requirements: RX-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F02 Print engine
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P0"""
+"HC-MVP1-142 Page setups A4, A5, letterhead with margin calibration","Page setups A4, A5, letterhead with margin calibration
+
+Done when: Prints correctly on a pilot doctor's letterhead
+Requirements: RX-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F02 Print engine
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P0"""
+HC-MVP1-143 Doctor identity on prints read from verified licence only,"Doctor identity on prints read from verified licence only
+
+Done when: Editing DB does not change printed name
+Requirements: LIC-006, TAM-014
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F02 Print engine
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P0"""
+HC-MVP1-144 Save Rx PDF and WhatsApp share link,"Save Rx PDF and WhatsApp share link
+
+Done when: Flow 6 passes
+Requirements: RX-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F02 Print engine
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P0"""
+"HC-MVP1-145 Medical certificate, referral letter, envelope, declaration print templates","Medical certificate, referral letter, envelope, declaration print templates
+
+Done when: Only if Q1 accepted
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F03 Legacy prints (pending decision Q1 and Q3)
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P1"""
+HC-MVP1-146 Birthday list on Today screen,"Birthday list on Today screen
+
+Done when: Only if Q1 accepted
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F03 Legacy prints (pending decision Q1 and Q3)
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P1"""
+HC-MVP1-147 Marathi advice and diet sheet print with Noto Devanagari,"Marathi advice and diet sheet print with Noto Devanagari
+
+Done when: Only if Q3 accepted
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E09 Prescription and printing (milestone M7)
+Feature: HC-MVP1-E09-F03 Legacy prints (pending decision Q1 and Q3)
+Type: dev, priority P1, estimate 1.5 days
+
+/label ~""MVP1"" ~""M7"" ~""dev"" ~""P1"""
+"HC-MVP1-148 Invoice with lines, discount, payments by mode, balance; money in paise","Invoice with lines, discount, payments by mode, balance; money in paise
+
+Done when: No rounding errors in tests
+Requirements: BILL-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E10 Billing and reports (milestone M8)
+Feature: HC-MVP1-E10-F01 Billing
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M8"" ~""dev"" ~""P0"""
+HC-MVP1-149 Running patient balance on dashboard,"Running patient balance on dashboard
+
+Done when: Dues update after payment
+Requirements: BILL-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E10 Billing and reports (milestone M8)
+Feature: HC-MVP1-E10-F01 Billing
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M8"" ~""dev"" ~""P0"""
+HC-MVP1-150 Receipt print with FY sequential number and amount in words,"Receipt print with FY sequential number and amount in words
+
+Done when: Numbering restarts each April
+Requirements: BILL-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E10 Billing and reports (milestone M8)
+Feature: HC-MVP1-E10-F01 Billing
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M8"" ~""dev"" ~""P0"""
+HC-MVP1-151 Clinic UPI QR for patient payments (doctor's own UPI ID),"Clinic UPI QR for patient payments (doctor's own UPI ID)
+
+Done when: Patient scans and pays doctor; doctor marks paid
+Requirements: BILL-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E10 Billing and reports (milestone M8)
+Feature: HC-MVP1-E10-F01 Billing
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M8"" ~""dev"" ~""P1"""
+HC-MVP1-152 GST invoice fields if GSTIN set,"GST invoice fields if GSTIN set
+
+Done when: GST fields print only when set
+Requirements: BILL-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E10 Billing and reports (milestone M8)
+Feature: HC-MVP1-E10-F01 Billing
+Type: dev, priority P2, estimate 1 days
+
+/label ~""MVP1"" ~""M8"" ~""dev"" ~""P2"""
+HC-MVP1-153 Daily collection by mode and monthly summary; Excel and CSV export,"Daily collection by mode and monthly summary; Excel and CSV export
+
+Done when: Flow 8 totals correct
+Requirements: BILL-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E10 Billing and reports (milestone M8)
+Feature: HC-MVP1-E10-F02 Reports
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M8"" ~""dev"" ~""P0"""
+"HC-MVP1-154 Licence payload (CBOR), Ed25519 verify with 2 embedded keys, key_id","Licence payload (CBOR), Ed25519 verify with 2 embedded keys, key_id
+
+Done when: Valid licence verifies; edited byte fails
+Requirements: LIC-001, LIC-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F01 Licence core (hc-licence)
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-155 Licence storage in data folder and OS secure store,"Licence storage in data folder and OS secure store
+
+Done when: Survives reinstall when data folder kept
+Requirements: LIC-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F01 Licence core (hc-licence)
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-156 Clock-rollback guard,"Clock-rollback guard
+
+Done when: Clock set back 1 year still expires
+Requirements: LIC-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F01 Licence core (hc-licence)
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-157 Identity lock of name and reg no; one licensed doctor per install,"Identity lock of name and reg no; one licensed doctor per install
+
+Done when: Settings fields locked after import
+Requirements: LIC-006, LIC-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F01 Licence core (hc-licence)
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+"HC-MVP1-158 Licence state machine (Unlicensed, Trial, Active, Grace, ReadOnly, Tampered)","Licence state machine (Unlicensed, Trial, Active, Grace, ReadOnly, Tampered)
+
+Done when: State diagram transitions tested
+Requirements: LIC-020, LIC-063
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F01 Licence core (hc-licence)
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-159 Local 30-day trial from signed seed,"Local 30-day trial from signed seed
+
+Done when: Trial starts offline at first run
+Requirements: LIC-063
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F01 Licence core (hc-licence)
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+"HC-MVP1-160 Buy screen per wireframe: plan, details, consent, identity warning","Buy screen per wireframe: plan, details, consent, identity warning
+
+Done when: Matches diagram 20
+Requirements: PAY-010
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F02 Buy screen (offline)
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+"HC-MVP1-161 Offline UPI QR (upi://pay with UPI ID, payee, amount, note, tr) plus copy fallback","Offline UPI QR (upi://pay with UPI ID, payee, amount, note, tr) plus copy fallback
+
+Done when: GPay, PhonePe, Paytm, BHIM show correct payee, amount, note
+Requirements: PAY-011
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F02 Buy screen (offline)
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-162 WhatsApp click-to-chat QR with pre-typed message plus copy fallback,"WhatsApp click-to-chat QR with pre-typed message plus copy fallback
+
+Done when: Message opens fully filled on Android and iPhone
+Requirements: PAY-013
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F02 Buy screen (offline)
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-163 Signed offer codes changing QR amount,"Signed offer codes changing QR amount
+
+Done when: Forged or expired code rejected
+Requirements: PAY-012
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F02 Buy screen (offline)
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-164 install_id generation and display,"install_id generation and display
+
+Done when: Id stable across restarts
+Requirements: PAY-014
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F02 Buy screen (offline)
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+"HC-MVP1-165 Encrypted constants for UPI ID, WhatsApp number, keys","Encrypted constants for UPI ID, WhatsApp number, keys
+
+Done when: strings scan finds none
+Requirements: PAY-015, TAM-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F02 Buy screen (offline)
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+"HC-MVP1-166 Import .hclic by drag-drop, file picker and double-click file association","Import .hclic by drag-drop, file picker and double-click file association
+
+Done when: All three paths work on Win and Linux
+Requirements: LIC-060
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F03 Licence import
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-167 Scan certificate QR with webcam,"Scan certificate QR with webcam
+
+Done when: Scans printed and on-screen PDF QR
+Requirements: LIC-060
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F03 Licence import
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-168 Typed licence key with per-group check and identity hash match,"Typed licence key with per-group check and identity hash match
+
+Done when: Wrong group reported precisely
+Requirements: LIC-046, LIC-062
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F03 Licence import
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-169 Confirmation card and apply,"Confirmation card and apply
+
+Done when: Card shows name, reg no, plan, expiry
+Requirements: LIC-061
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F03 Licence import
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+"HC-MVP1-170 Grace period, read-only mode, ongoing visit can finish","Grace period, read-only mode, ongoing visit can finish
+
+Done when: Flow 10 read-only checks pass
+Requirements: LIC-020, SUX-008
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F04 Expiry
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+"HC-MVP1-171 Reminders at 30, 15, 7, 1 days with Renew opening Buy screen","Reminders at 30, 15, 7, 1 days with Renew opening Buy screen
+
+Done when: Reminder shown in clock tests
+Requirements: LIC-021
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F04 Expiry
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-172 WhatsApp message parser for the fixed message format,"WhatsApp message parser for the fixed message format
+
+Done when: All fields parsed from sample messages
+Requirements: LIC-040
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F05 Vendor Licence Tool (internal)
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+"HC-MVP1-173 Register DB (SQLCipher) with unique UTR, customers, licences, invoices","Register DB (SQLCipher) with unique UTR, customers, licences, invoices
+
+Done when: Duplicate UTR refused
+Requirements: LIC-042, LIC-048
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F05 Vendor Licence Tool (internal)
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+"HC-MVP1-174 Plan from amount, under and over payment handling, renewal stacking","Plan from amount, under and over payment handling, renewal stacking
+
+Done when: Renewal extends from current expiry
+Requirements: LIC-043, LIC-044
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F05 Vendor Licence Tool (internal)
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-175 Signing on hardware key,"Signing on hardware key
+
+Done when: Licence verifies in app; key never leaves token
+Requirements: LIC-047
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F05 Vendor Licence Tool (internal)
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+"HC-MVP1-176 Outputs: .hclic, certificate PDF with QR and key text, GST invoice, email draft, WhatsApp reply","Outputs: .hclic, certificate PDF with QR and key text, GST invoice, email draft, WhatsApp reply
+
+Done when: Operator sends a licence in under 5 minutes
+Requirements: LIC-045
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F05 Vendor Licence Tool (internal)
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-177 Register export to Excel and daily encrypted backup,"Register export to Excel and daily encrypted backup
+
+Done when: Export opens; backup restores
+Requirements: LIC-048
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F05 Vendor Licence Tool (internal)
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P0"""
+HC-MVP1-178 Dealer tagging,"Dealer tagging
+
+Done when: Licences filterable by dealer
+Requirements: LIC-050
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F05 Vendor Licence Tool (internal)
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP1"" ~""M9"" ~""dev"" ~""P1"""
+HC-MVP1-179 End-to-end purchase with clinic PC offline in under 30 minutes,"End-to-end purchase with clinic PC offline in under 30 minutes
+
+Done when: 03 section 8 MVP1 tests pass
+Requirements: SUX-010
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E11 Licensing and UPI purchase (milestone M9)
+Feature: HC-MVP1-E11-F05 Vendor Licence Tool (internal)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M9"" ~""test"" ~""P0"""
+HC-MVP1-180 Encrypted embedded UI assets decrypted in memory,"Encrypted embedded UI assets decrypted in memory
+
+Done when: No loose JS on disk; startup within budget
+Requirements: TAM-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F01 Tamper protection
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+"HC-MVP1-181 Hardened release profile (fat LTO, strip, no devtools)","Hardened release profile (fat LTO, strip, no devtools)
+
+Done when: Release scan finds no symbols or devtools
+Requirements: TAM-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F01 Tamper protection
+Type: ops, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""ops"" ~""P0"""
+HC-MVP1-182 Compile-time string encryption for sensitive constants,"Compile-time string encryption for sensitive constants
+
+Done when: strings scan clean
+Requirements: TAM-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F01 Tamper protection
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+"HC-MVP1-183 Multi-site licence checks (startup, write commands, timer)","Multi-site licence checks (startup, write commands, timer)
+
+Done when: Patching one check does not unlock writes
+Requirements: TAM-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F01 Tamper protection
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+HC-MVP1-184 Self-integrity manifest signed at build and verified in background,"Self-integrity manifest signed at build and verified in background
+
+Done when: One-byte patch leads to Repair then read-only
+Requirements: TAM-005, SUX-002
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F01 Tamper protection
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+HC-MVP1-185 Authenticode EV signing and GPG signing in CI,"Authenticode EV signing and GPG signing in CI
+
+Done when: Signatures verify; no SmartScreen warning
+Requirements: TAM-006, NFR-025
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F01 Tamper protection
+Type: ops, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""ops"" ~""P0"""
+HC-MVP1-186 Per-licence watermark,"Per-licence watermark
+
+Done when: Licence id traceable in test outputs
+Requirements: TAM-010
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F01 Tamper protection
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+"HC-MVP1-187 Release scan job (symbols, devtools, secrets, signatures, eval content)","Release scan job (symbols, devtools, secrets, signatures, eval content)
+
+Done when: Job blocks a bad build
+Requirements: TAM-012, CONT-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F01 Tamper protection
+Type: ops, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""ops"" ~""P0"""
+"HC-MVP1-188 Anti-debug and anti-hook, silent","Anti-debug and anti-hook, silent
+
+Done when: Debugger disables paid paths without crash
+Requirements: TAM-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F01 Tamper protection
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P1"""
+HC-MVP1-189 Targeted obfuscation of hc-licence,"Targeted obfuscation of hc-licence
+
+Done when: No measurable slowdown elsewhere
+Requirements: TAM-008
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F01 Tamper protection
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P1"""
+HC-MVP1-190 Two-check rule and self-repair before any restriction,"Two-check rule and self-repair before any restriction
+
+Done when: AV quarantine test triggers Repair
+Requirements: SUX-005, SUX-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F02 Security UX guardrails
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+HC-MVP1-191 Friendly restriction messages with one action button,"Friendly restriction messages with one action button
+
+Done when: Copy reviewed by a pilot doctor
+Requirements: SUX-007
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F02 Security UX guardrails
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+HC-MVP1-192 Run all perf budgets on the protected build,"Run all perf budgets on the protected build
+
+Done when: Overhead within limits
+Requirements: SUX-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F02 Security UX guardrails
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""test"" ~""P0"""
+"HC-MVP1-193 Reference-PC perf suite: cold start under 4 s, Rx preview under 1 s, RAM under 300 MB, installer size","Reference-PC perf suite: cold start under 4 s, Rx preview under 1 s, RAM under 300 MB, installer size
+
+Done when: Suite green on i3 4 GB HDD reference PC
+Requirements: NFR-001, NFR-005, NFR-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F02 Security UX guardrails
+Type: test, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M10"" ~""test"" ~""P0"""
+HC-MVP1-194 Antivirus scan of every release (Defender and top 5 Indian AV),"Antivirus scan of every release (Defender and top 5 Indian AV)
+
+Done when: Zero detections
+Requirements: SUX-009
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F02 Security UX guardrails
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""test"" ~""P0"""
+HC-MVP1-195 Support health-check screen,"Support health-check screen
+
+Done when: Support resolves a test case in one call
+Requirements: SUX-012
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F02 Security UX guardrails
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P1"""
+"HC-MVP1-196 Windows NSIS and MSI, per-user install, offline WebView2 bootstrapper","Windows NSIS and MSI, per-user install, offline WebView2 bootstrapper
+
+Done when: Installs on Windows 10 without internet
+Requirements: NFR-040
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F03 Installers and updates
+Type: ops, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M10"" ~""ops"" ~""P0"""
+HC-MVP1-197 Linux AppImage and .deb,"Linux AppImage and .deb
+
+Done when: Installs on Ubuntu 20.04 and Debian 11
+Requirements: NFR-041
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F03 Installers and updates
+Type: ops, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M10"" ~""ops"" ~""P0"""
+HC-MVP1-198 Install update from USB file with signature check; optional static manifest check,"Install update from USB file with signature check; optional static manifest check
+
+Done when: Signed update installs offline; unsigned refused
+Requirements: NFR-042, NFR-022
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F03 Installers and updates
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+HC-MVP1-199 Uninstall keeps data unless ticked with PIN,"Uninstall keeps data unless ticked with PIN
+
+Done when: Data folder remains after uninstall
+Requirements: NFR-043
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F03 Installers and updates
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+"HC-MVP1-200 Settings screens for profile, print layouts, fees, ID prefix, auto-lock","Settings screens for profile, print layouts, fees, ID prefix, auto-lock
+
+Done when: All settings persist
+Requirements: ADM-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F04 Usability and polish
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+HC-MVP1-201 Bundled offline help pages and links to videos,"Bundled offline help pages and links to videos
+
+Done when: Help opens offline
+Requirements: ADM-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F04 Usability and polish
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+HC-MVP1-202 Diagnostic report zip without patient data,"Diagnostic report zip without patient data
+
+Done when: Zip contains no patient names in test
+Requirements: ADM-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F04 Usability and polish
+Type: dev, priority P0, estimate 0.5 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+HC-MVP1-203 Keyboard shortcuts screen,"Keyboard shortcuts screen
+
+Done when: F1 to F8 and Ctrl+P documented and working
+Requirements: ADM-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F04 Usability and polish
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P1"""
+"HC-MVP1-204 Accessibility pass: contrast, focus, screen-reader labels, 14 px minimum, 1366x768","Accessibility pass: contrast, focus, screen-reader labels, 14 px minimum, 1366x768
+
+Done when: Audit checklist passed
+Requirements: NFR-032, NFR-034
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F04 Usability and polish
+Type: test, priority P0, estimate 1.5 days
+
+/label ~""MVP1"" ~""M10"" ~""test"" ~""P0"""
+HC-MVP1-205 Undo for destructive actions,"Undo for destructive actions
+
+Done when: Undo works for clipboard and Rx lines
+Requirements: NFR-035
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F04 Usability and polish
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""M10"" ~""dev"" ~""P0"""
+"HC-MVP1-206 Automate the 13 core flows with Playwright on Win and Linux, network disabled","Automate the 13 core flows with Playwright on Win and Linux, network disabled
+
+Done when: All 13 flows green
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F05 Acceptance
+Type: test, priority P0, estimate 3 days
+
+/label ~""MVP1"" ~""M10"" ~""test"" ~""P0"""
+"HC-MVP1-207 Usability test with 5 doctors (task under 10 minutes, buy and activate under 3 minutes)","Usability test with 5 doctors (task under 10 minutes, buy and activate under 3 minutes)
+
+Done when: Results recorded; blocking issues fixed
+Requirements: NFR-031, SUX-010
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E12 Hardening, packaging and release (milestone M10)
+Feature: HC-MVP1-E12-F05 Acceptance
+Type: test, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""M10"" ~""test"" ~""P0"""
+HC-MVP1-208 Distribute internal builds to pilot doctors under agreement,"Distribute internal builds to pilot doctors under agreement
+
+Done when: 20 doctors installed
+Requirements: CONT-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E13 Pilot and public launch (milestone PILOT)
+Feature: HC-MVP1-E13-F01 Pilot
+Type: ops, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""PILOT"" ~""ops"" ~""P0"""
+HC-MVP1-209 Four-week pilot with weekly check-ins and feedback log,"Four-week pilot with weekly check-ins and feedback log
+
+Done when: Feedback log with priorities
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E13 Pilot and public launch (milestone PILOT)
+Feature: HC-MVP1-E13-F01 Pilot
+Type: biz, priority P0, estimate 20 days
+
+/label ~""MVP1"" ~""PILOT"" ~""biz"" ~""P0"""
+HC-MVP1-210 Fix pilot blockers and top usability issues,"Fix pilot blockers and top usability issues
+
+Done when: No open P0 pilot bugs
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E13 Pilot and public launch (milestone PILOT)
+Feature: HC-MVP1-E13-F01 Pilot
+Type: dev, priority P0, estimate 10 days
+
+/label ~""MVP1"" ~""PILOT"" ~""dev"" ~""P0"""
+HC-MVP1-211 Build public release with only public-channel content,"Build public release with only public-channel content
+
+Done when: Release gate green
+Requirements: CONT-003, CONT-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E13 Pilot and public launch (milestone PILOT)
+Feature: HC-MVP1-E13-F02 Public release
+Type: ops, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""PILOT"" ~""ops"" ~""P0"""
+"HC-MVP1-212 Static download website with signed installers, pricing, privacy policy, EULA, support contacts","Static download website with signed installers, pricing, privacy policy, EULA, support contacts
+
+Done when: Site live; downloads verify
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E13 Pilot and public launch (milestone PILOT)
+Feature: HC-MVP1-E13-F02 Public release
+Type: ops, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""PILOT"" ~""ops"" ~""P0"""
+HC-MVP1-213 Launch: first paid licences issued through the MVP1 flow,"Launch: first paid licences issued through the MVP1 flow
+
+Done when: First 10 paying doctors activated
+Requirements: LIC-040
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E13 Pilot and public launch (milestone PILOT)
+Feature: HC-MVP1-E13-F02 Public release
+Type: biz, priority P0, estimate 2 days
+
+/label ~""MVP1"" ~""PILOT"" ~""biz"" ~""P0"""
+"HC-MVP1-214 R0 walking skeleton: installer from CI opens on Windows and Linux, shell, nav, Today empty state, lock screen stub","R0 walking skeleton: installer from CI opens on Windows and Linux, shell, nav, Today empty state, lock screen stub
+
+Done when: R0 demo script in docs/milestones/README.md passes as an E2E smoke run on both OS
+Requirements: NFR-040, NFR-041
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F01 Release demos (one installable, usable build per milestone)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""test"" ~""P0"""
+"HC-MVP1-215 R1 set up and protect: first-run wizard (trial-dev licence step), PIN unlock, backup now and restore from the UI","R1 set up and protect: first-run wizard (trial-dev licence step), PIN unlock, backup now and restore from the UI
+
+Done when: R1 demo passes; R0 demo still passes
+Requirements: SET-001, SET-004, BAK-002, BAK-003
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F01 Release demos (one installable, usable build per milestone)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""test"" ~""P0"""
+"HC-MVP1-216 R2 patient register: register, search, open dashboard, edit, recycle bin","R2 patient register: register, search, open dashboard, edit, recycle bin
+
+Done when: R2 demo passes at 50k seeded patients; R1 data opens after upgrade install
+Requirements: PAT-001, PSR-001, PAT-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F01 Release demos (one installable, usable build per milestone)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""test"" ~""P0"""
+"HC-MVP1-217 R3 paper replacement: case form, follow-up visit, Today list with due and overdue","R3 paper replacement: case form, follow-up visit, Today list with due and overdue
+
+Done when: R3 demo passes; R2 data opens after upgrade install
+Requirements: CASE-001, VIS-002, VIS-005
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F01 Release demos (one installable, usable build per milestone)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""test"" ~""P0"""
+"HC-MVP1-218 R4 consultation complete: prescription, print A5, PDF, WhatsApp share","R4 consultation complete: prescription, print A5, PDF, WhatsApp share
+
+Done when: R4 demo passes; R3 data opens after upgrade install
+Requirements: RX-001, RX-005, RX-006
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F01 Release demos (one installable, usable build per milestone)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""test"" ~""P0"""
+"HC-MVP1-219 R5 clinic basics: bill, partial payment, dues, daily collection report","R5 clinic basics: bill, partial payment, dues, daily collection report
+
+Done when: R5 demo passes; acceptance flows 1, 2, 3, 6 (without repertory), 7, 8, 9 pass
+Requirements: BILL-001, BILL-002, BILL-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F01 Release demos (one installable, usable build per milestone)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""test"" ~""P0"""
+"HC-MVP1-220 R6 repertory reading: rubric search, browser, materia medica on internal-eval packs","R6 repertory reading: rubric search, browser, materia medica on internal-eval packs
+
+Done when: R6 demo passes on the internal build; public build refuses eval packs
+Requirements: REP-010, MM-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F01 Release demos (one installable, usable build per milestone)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""test"" ~""P0"""
+"HC-MVP1-221 R7 repertorisation: send symptoms, analyse, prescribe from result","R7 repertorisation: send symptoms, analyse, prescribe from result
+
+Done when: R7 demo passes; acceptance flows 4, 5, 11 pass
+Requirements: REP-030, REP-037
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F01 Release demos (one installable, usable build per milestone)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""test"" ~""P0"""
+"HC-MVP1-222 R8 licence and purchase: trial, Buy screen, import .hclic, expiry read-only","R8 licence and purchase: trial, Buy screen, import .hclic, expiry read-only
+
+Done when: R8 demo passes; acceptance flow 10 passes
+Requirements: PAY-010, LIC-061, LIC-020
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F01 Release demos (one installable, usable build per milestone)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""test"" ~""P0"""
+"HC-MVP1-223 R9 release candidate: hardened build, all 13 acceptance flows","R9 release candidate: hardened build, all 13 acceptance flows
+
+Done when: All 13 flows pass on the protected build
+Requirements: TAM-012, SUX-001
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F01 Release demos (one installable, usable build per milestone)
+Type: test, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""test"" ~""P0"""
+HC-MVP1-224 Ship R5 internal build to 3 to 5 pilot doctors under the pilot agreement (no repertory content included),"Ship R5 internal build to 3 to 5 pilot doctors under the pilot agreement (no repertory content included)
+
+Done when: 3 doctors use it for real consultations for 2 weeks
+Requirements: CONT-004
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F02 Early pilot on Clinic Basics (R5)
+Type: ops, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""ops"" ~""P0"""
+HC-MVP1-225 Two-week early pilot with feedback log; feed findings into M4 to M10,"Two-week early pilot with feedback log; feed findings into M4 to M10
+
+Done when: Feedback log triaged; P0 issues fixed before R6
+Requirements: -
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F02 Early pilot on Clinic Basics (R5)
+Type: biz, priority P0, estimate 10 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""biz"" ~""P0"""
+"HC-MVP1-226 Upgrade path test harness: install release N over release N-1 with seeded data, verify data and backups open","Upgrade path test harness: install release N over release N-1 with seeded data, verify data and backups open
+
+Done when: Runs in CI for every release tag
+Requirements: NFR-011, NFR-042
+Stage: MVP1: complete offline desktop
+Epic: HC-MVP1-E14 Working release at every milestone (ADR 0002) (milestone RELEASES)
+Feature: HC-MVP1-E14-F02 Early pilot on Clinic Basics (R5)
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP1"" ~""RELEASES"" ~""dev"" ~""P0"""
+"HC-MVP2-001 Licence API (axum + PostgreSQL) with activate, offline activate, deactivate, refresh","Licence API (axum + PostgreSQL) with activate, offline activate, deactivate, refresh
+
+Done when: API integration tests pass
+Requirements: LSRV-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: dev, priority P0, estimate 5 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-002 Admin dashboard behind SSO and 2FA,"Admin dashboard behind SSO and 2FA
+
+Done when: Issue, extend, revoke from dashboard
+Requirements: LSRV-002, LSRV-006
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: dev, priority P0, estimate 4 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+"HC-MVP2-003 KMS or HSM signing, key rotation plan","KMS or HSM signing, key rotation plan
+
+Done when: Signing never exposes private key
+Requirements: LSRV-003
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: ops, priority P0, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""ops"" ~""P0"""
+HC-MVP2-004 Rate limiting and abuse detection,"Rate limiting and abuse detection
+
+Done when: Abuse scenarios blocked in tests
+Requirements: LSRV-004, TAM-011
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-005 Import Vendor Licence Tool register,"Import Vendor Licence Tool register
+
+Done when: All MVP1 licences present and valid
+Requirements: SRV-002, LIC-048
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+"HC-MVP2-006 Deploy in AWS ap-south-1 with backups, monitoring, no patient data","Deploy in AWS ap-south-1 with backups, monitoring, no patient data
+
+Done when: Production environment live
+Requirements: LSRV-005
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F01 Licence server
+Type: ops, priority P0, estimate 3 days
+
+/label ~""MVP2"" ~""MVP2"" ~""ops"" ~""P0"""
+"HC-MVP2-007 Purchase portal with phone OTP and Razorpay Checkout (UPI Intent, QR, cards)","Purchase portal with phone OTP and Razorpay Checkout (UPI Intent, QR, cards)
+
+Done when: Test payment succeeds end to end
+Requirements: PAY-001, PAY-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P0, estimate 4 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+"HC-MVP2-008 Webhook-only payment confirmation, idempotent","Webhook-only payment confirmation, idempotent
+
+Done when: Replayed webhook issues one licence
+Requirements: PAY-003
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-009 Automatic licence and GST invoice delivery by email and SMS,"Automatic licence and GST invoice delivery by email and SMS
+
+Done when: Licence delivered within 1 minute
+Requirements: PAY-004, PAY-005
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-010 UPI AutoPay subscriptions,"UPI AutoPay subscriptions
+
+Done when: Renewal auto-extends licence
+Requirements: PAY-006
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P1, estimate 3 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+HC-MVP2-011 Referral discounts,"Referral discounts
+
+Done when: Both doctors get extra month
+Requirements: PAY-007
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+HC-MVP2-012 Dealer portal,"Dealer portal
+
+Done when: Dealer buys and assigns keys
+Requirements: PAY-008
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P1, estimate 3 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+HC-MVP2-013 Refunds and revocation,"Refunds and revocation
+
+Done when: Refunded licence revoked on next refresh
+Requirements: PAY-009
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F02 Automated purchase
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-014 Online activation and silent weekly refresh,"Online activation and silent weekly refresh
+
+Done when: Offline operation unaffected
+Requirements: LIC-010, LIC-014
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F03 App-side online licensing
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-015 Device fingerprint binding and transfer (if Q13 changes),"Device fingerprint binding and transfer (if Q13 changes)
+
+Done when: 2 of 3 component match tested
+Requirements: LIC-003, LIC-012
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F03 App-side online licensing
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+HC-MVP2-016 Perpetual licence with updates_until,"Perpetual licence with updates_until
+
+Done when: Newer updates refused with clear message
+Requirements: LIC-022
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E01 Hosted licence and payments (milestone MVP2)
+Feature: HC-MVP2-E01-F03 App-side online licensing
+Type: dev, priority P1, estimate 1 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+HC-MVP2-017 Client-side encrypted incremental and full backups,"Client-side encrypted incremental and full backups
+
+Done when: Server stores only ciphertext
+Requirements: CLD-001, CLD-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E02 Cloud backup (milestone MVP2)
+Feature: HC-MVP2-E02-F01 Zero-knowledge backup
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-018 Resumable chunked upload for slow networks,"Resumable chunked upload for slow networks
+
+Done when: Upload resumes after disconnect
+Requirements: CLD-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E02 Cloud backup (milestone MVP2)
+Feature: HC-MVP2-E02-F01 Zero-knowledge backup
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-019 Restore from cloud to new PC with recovery key,"Restore from cloud to new PC with recovery key
+
+Done when: Restore tested on clean PC
+Requirements: CLD-003
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E02 Cloud backup (milestone MVP2)
+Feature: HC-MVP2-E02-F01 Zero-knowledge backup
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-020 S3-compatible storage in India region with per-customer prefix,"S3-compatible storage in India region with per-customer prefix
+
+Done when: Bucket policies reviewed
+Requirements: CLD-004
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E02 Cloud backup (milestone MVP2)
+Feature: HC-MVP2-E02-F01 Zero-knowledge backup
+Type: ops, priority P0, estimate 1 days
+
+/label ~""MVP2"" ~""MVP2"" ~""ops"" ~""P0"""
+HC-MVP2-021 Backup status widget,"Backup status widget
+
+Done when: Last backup time shown
+Requirements: CLD-005
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E02 Cloud backup (milestone MVP2)
+Feature: HC-MVP2-E02-F01 Zero-knowledge backup
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+HC-MVP2-022 Main computer LAN server exposing hc-app commands over TLS with device tokens,"Main computer LAN server exposing hc-app commands over TLS with device tokens
+
+Done when: Client PC works against main PC
+Requirements: USR-001, USR-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E03 LAN multi-user and roles (milestone MVP2)
+Feature: HC-MVP2-E03-F01 LAN server and roles
+Type: dev, priority P0, estimate 5 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-023 mDNS discovery and 6-digit pairing,"mDNS discovery and 6-digit pairing
+
+Done when: Pairing under 1 minute
+Requirements: USR-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E03 LAN multi-user and roles (milestone MVP2)
+Feature: HC-MVP2-E03-F01 LAN server and roles
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+"HC-MVP2-024 Roles and permissions (doctor, assistant, receptionist, dispenser)","Roles and permissions (doctor, assistant, receptionist, dispenser)
+
+Done when: Receptionist cannot see case notes
+Requirements: USR-003
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E03 LAN multi-user and roles (milestone MVP2)
+Feature: HC-MVP2-E03-F01 LAN server and roles
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-025 Per-user PIN login and audit by user,"Per-user PIN login and audit by user
+
+Done when: Audit shows user per change
+Requirements: USR-004
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E03 LAN multi-user and roles (milestone MVP2)
+Feature: HC-MVP2-E03-F01 LAN server and roles
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-026 Seat counting in licence,"Seat counting in licence
+
+Done when: Extra client refused beyond seats
+Requirements: USR-005
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E03 LAN multi-user and roles (milestone MVP2)
+Feature: HC-MVP2-E03-F01 LAN server and roles
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+"HC-MVP2-027 Inventory with batch, expiry, prices","Inventory with batch, expiry, prices
+
+Done when: Stock list and edits work
+Requirements: STK-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F01 Dispensary and stock
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-028 Auto-deduct on dispense and alerts,"Auto-deduct on dispense and alerts
+
+Done when: Low-stock alert in test
+Requirements: STK-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F01 Dispensary and stock
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-029 Purchases and supplier ledger,"Purchases and supplier ledger
+
+Done when: Ledger balances
+Requirements: STK-003
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F01 Dispensary and stock
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+HC-MVP2-030 In-stock filter in repertory results,"In-stock filter in repertory results
+
+Done when: Filter applied
+Requirements: STK-004, REP-040
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F01 Dispensary and stock
+Type: dev, priority P1, estimate 0.5 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+HC-MVP2-031 WhatsApp Business API and SMS (DLT templates) with offline queue,"WhatsApp Business API and SMS (DLT templates) with offline queue
+
+Done when: Reminders delivered in test
+Requirements: COM-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F02 Messaging
+Type: dev, priority P0, estimate 4 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-032 Opt-in greeting campaigns,"Opt-in greeting campaigns
+
+Done when: Only opted-in patients receive
+Requirements: COM-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F02 Messaging
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+"HC-MVP2-033 Patient, revenue and remedy statistics","Patient, revenue and remedy statistics
+
+Done when: Reports match seeded data
+Requirements: RPT-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F03 Reports
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-034 Remedy outcome summary,"Remedy outcome summary
+
+Done when: Percent better per remedy correct
+Requirements: RPT-002
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F03 Reports
+Type: dev, priority P1, estimate 2 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+HC-MVP2-035 Translate UI strings to 8 Indian languages,"Translate UI strings to 8 Indian languages
+
+Done when: Each language reviewed by a native speaker
+Requirements: I18N-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F04 Languages
+Type: content, priority P0, estimate 10 days
+
+/label ~""MVP2"" ~""MVP2"" ~""content"" ~""P0"""
+HC-MVP2-036 Hindi and Hinglish synonym mappings for rubric search,"Hindi and Hinglish synonym mappings for rubric search
+
+Done when: ""sir dard"" finds HEAD - PAIN
+Requirements: REP-016
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F04 Languages
+Type: content, priority P1, estimate 5 days
+
+/label ~""MVP2"" ~""MVP2"" ~""content"" ~""P1"""
+HC-MVP2-037 Paid pack encryption with per-licence wrapped keys,"Paid pack encryption with per-licence wrapped keys
+
+Done when: Copied paid pack fails on other licence
+Requirements: LIC-031, TAM-009
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F05 Paid and additional content
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-038 Pack entitlements in licence,"Pack entitlements in licence
+
+Done when: Unentitled pack refused
+Requirements: LIC-030, PACK-004
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F05 Paid and additional content
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P0"""
+HC-MVP2-039 Online pack catalogue,"Online pack catalogue
+
+Done when: Download and install from catalogue
+Requirements: PACK-010
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F05 Paid and additional content
+Type: dev, priority P1, estimate 3 days
+
+/label ~""MVP2"" ~""MVP2"" ~""dev"" ~""P1"""
+"HC-MVP2-040 Additional public packs (Boger-Boenninghausen, Clarke MM) and first licensed paid pack","Additional public packs (Boger-Boenninghausen, Clarke MM) and first licensed paid pack
+
+Done when: Packs built and proofread
+Requirements: CPK-001
+Stage: MVP2: clinic grows and first servers
+Epic: HC-MVP2-E04 Dispensary, messaging, reports, languages, content (milestone MVP2)
+Feature: HC-MVP2-E04-F05 Paid and additional content
+Type: content, priority P1, estimate 15 days
+
+/label ~""MVP2"" ~""MVP2"" ~""content"" ~""P1"""
+HC-MVP3-001 Tauri 2 mobile builds for Android 8+ and iOS 15+ with mobile layouts,"Tauri 2 mobile builds for Android 8+ and iOS 15+ with mobile layouts
+
+Done when: Apps run on test devices
+Requirements: MOB-001
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F01 Mobile shell
+Type: dev, priority P0, estimate 5 days
+
+/label ~""MVP3"" ~""MVP3"" ~""dev"" ~""P0"""
+"HC-MVP3-002 Play Store and App Store accounts, signing, privacy labels","Play Store and App Store accounts, signing, privacy labels
+
+Done when: Internal test track live
+Requirements: MOB-001
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F01 Mobile shell
+Type: ops, priority P0, estimate 3 days
+
+/label ~""MVP3"" ~""MVP3"" ~""ops"" ~""P0"""
+HC-MVP3-003 Change-log table with hybrid logical clocks and device ids,"Change-log table with hybrid logical clocks and device ids
+
+Done when: Two devices converge in tests
+Requirements: MOB-002
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F02 Sync
+Type: dev, priority P0, estimate 8 days
+
+/label ~""MVP3"" ~""MVP3"" ~""dev"" ~""P0"""
+HC-MVP3-004 End-to-end encrypted cloud relay,"End-to-end encrypted cloud relay
+
+Done when: Relay sees only ciphertext
+Requirements: MOB-002
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F02 Sync
+Type: dev, priority P0, estimate 5 days
+
+/label ~""MVP3"" ~""MVP3"" ~""dev"" ~""P0"""
+HC-MVP3-005 Conflict and offline-merge test suite,"Conflict and offline-merge test suite
+
+Done when: All conflict scenarios pass
+Requirements: MOB-002
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F02 Sync
+Type: test, priority P0, estimate 3 days
+
+/label ~""MVP3"" ~""MVP3"" ~""test"" ~""P0"""
+HC-MVP3-006 Offline packs and 6-month patient cache,"Offline packs and 6-month patient cache
+
+Done when: Works in airplane mode
+Requirements: MOB-003
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F03 Mobile features
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP3"" ~""MVP3"" ~""dev"" ~""P0"""
+"HC-MVP3-007 Lookup, history, quick visit, repertorise, prescribe, share, Today, biometric lock","Lookup, history, quick visit, repertorise, prescribe, share, Today, biometric lock
+
+Done when: Doctor completes a visit on phone
+Requirements: MOB-004
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F03 Mobile features
+Type: dev, priority P0, estimate 5 days
+
+/label ~""MVP3"" ~""MVP3"" ~""dev"" ~""P0"""
+HC-MVP3-008 Remote revoke and wipe,"Remote revoke and wipe
+
+Done when: Revoked phone wiped on next contact
+Requirements: MOB-007
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F03 Mobile features
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP3"" ~""MVP3"" ~""dev"" ~""P0"""
+HC-MVP3-009 Online booking link feeding appointment book,"Online booking link feeding appointment book
+
+Done when: Booking appears after sync
+Requirements: MOB-005
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F04 Patient-facing
+Type: dev, priority P1, estimate 4 days
+
+/label ~""MVP3"" ~""MVP3"" ~""dev"" ~""P1"""
+HC-MVP3-010 Teleconsult notes and Rx per Telemedicine Guidelines 2020,"Teleconsult notes and Rx per Telemedicine Guidelines 2020
+
+Done when: Checklist of guideline fields satisfied
+Requirements: MOB-006
+Stage: MVP3: anywhere access (mobile)
+Epic: HC-MVP3-E01 Mobile apps and sync (milestone MVP3)
+Feature: HC-MVP3-E01-F04 Patient-facing
+Type: dev, priority P1, estimate 3 days
+
+/label ~""MVP3"" ~""MVP3"" ~""dev"" ~""P1"""
+HC-MVP4-001 Free-text to rubric suggestions with on-device embeddings and vector search,"Free-text to rubric suggestions with on-device embeddings and vector search
+
+Done when: Top-5 accuracy measured on labelled cases
+Requirements: AI-001
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F01 On-device intelligence
+Type: dev, priority P0, estimate 8 days
+
+/label ~""MVP4"" ~""MVP4"" ~""dev"" ~""P0"""
+HC-MVP4-002 Similar-case search from past rubric sets and outcomes,"Similar-case search from past rubric sets and outcomes
+
+Done when: Doctor rates usefulness in pilot
+Requirements: AI-002
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F01 On-device intelligence
+Type: dev, priority P0, estimate 4 days
+
+/label ~""MVP4"" ~""MVP4"" ~""dev"" ~""P0"""
+HC-MVP4-003 Voice case taking in English and Hindi on device,"Voice case taking in English and Hindi on device
+
+Done when: Word error rate measured on sample recordings
+Requirements: AI-003
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F01 On-device intelligence
+Type: dev, priority P1, estimate 5 days
+
+/label ~""MVP4"" ~""MVP4"" ~""dev"" ~""P1"""
+HC-MVP4-004 Optional cloud LLM features with per-use opt-in and de-identification,"Optional cloud LLM features with per-use opt-in and de-identification
+
+Done when: No identifiers leave device in tests
+Requirements: AI-004
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F01 On-device intelligence
+Type: dev, priority P2, estimate 3 days
+
+/label ~""MVP4"" ~""MVP4"" ~""dev"" ~""P2"""
+HC-MVP4-005 ABHA linking and record sharing per ABDM specs,"ABHA linking and record sharing per ABDM specs
+
+Done when: ABDM sandbox certification passed
+Requirements: ABDM-001
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F02 Integrations and marketplace
+Type: dev, priority P1, estimate 8 days
+
+/label ~""MVP4"" ~""MVP4"" ~""dev"" ~""P1"""
+HC-MVP4-006 Content marketplace with publisher revenue share,"Content marketplace with publisher revenue share
+
+Done when: First publisher pack sold
+Requirements: MKT-001
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F02 Integrations and marketplace
+Type: dev, priority P1, estimate 8 days
+
+/label ~""MVP4"" ~""MVP4"" ~""dev"" ~""P1"""
+HC-MVP5-001 Read live MySQL or .sql dump without needing MySQL installed,"Read live MySQL or .sql dump without needing MySQL installed
+
+Done when: Sample dump parsed
+Requirements: IMP-002
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F01 Legacy Doctor Clinic importer
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP5"" ~""MVP5"" ~""dev"" ~""P0"""
+HC-MVP5-002 Map 19 legacy tables to new schema per design 05 section 6,"Map 19 legacy tables to new schema per design 05 section 6
+
+Done when: Counts match source
+Requirements: IMP-002
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F01 Legacy Doctor Clinic importer
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP5"" ~""MVP5"" ~""dev"" ~""P0"""
+HC-MVP5-003 Shivaji-font Marathi to Unicode Devanagari conversion,"Shivaji-font Marathi to Unicode Devanagari conversion
+
+Done when: Sample diet sheets read correctly
+Requirements: IMP-002
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F01 Legacy Doctor Clinic importer
+Type: dev, priority P0, estimate 2 days
+
+/label ~""MVP5"" ~""MVP5"" ~""dev"" ~""P0"""
+HC-MVP5-004 Photos and report files copied and encrypted,"Photos and report files copied and encrypted
+
+Done when: Attachments open after import
+Requirements: IMP-002
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F01 Legacy Doctor Clinic importer
+Type: dev, priority P0, estimate 1 days
+
+/label ~""MVP5"" ~""MVP5"" ~""dev"" ~""P0"""
+HC-MVP5-005 Dry-run report and single-transaction commit,"Dry-run report and single-transaction commit
+
+Done when: Dry run lists warnings; commit atomic
+Requirements: IMP-002
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F01 Legacy Doctor Clinic importer
+Type: dev, priority P0, estimate 1.5 days
+
+/label ~""MVP5"" ~""MVP5"" ~""dev"" ~""P0"""
+"HC-MVP5-006 CSV, Excel and Access import with column-mapping wizard","CSV, Excel and Access import with column-mapping wizard
+
+Done when: Sample exports import cleanly
+Requirements: IMP-001, PAT-010
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F02 Competitor and generic import
+Type: dev, priority P0, estimate 3 days
+
+/label ~""MVP5"" ~""MVP5"" ~""dev"" ~""P0"""
+HC-MVP5-007 Migration guides per competitor product,"Migration guides per competitor product
+
+Done when: Guides published
+Requirements: IMP-001
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F02 Competitor and generic import
+Type: doc, priority P1, estimate 2 days
+
+/label ~""MVP5"" ~""MVP5"" ~""doc"" ~""P1"""
+HC-MVP5-008 Assisted migration service process and pricing,"Assisted migration service process and pricing
+
+Done when: First clinic migrated by support
+Requirements: IMP-003
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F03 Assisted migration
+Type: biz, priority P1, estimate 2 days
+
+/label ~""MVP5"" ~""MVP5"" ~""biz"" ~""P1"""

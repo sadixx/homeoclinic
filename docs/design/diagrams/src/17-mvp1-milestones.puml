@@ -1,0 +1,27 @@
+@startgantt
+title MVP1 build plan (indicative, 1 team of 3 dev + 1 content)
+printscale weekly
+Project starts 2026-11-02
+[M0 Repo, CI, Tauri shell] lasts 10 days
+[M1 Storage, encryption, backup] lasts 15 days
+[M1 Storage, encryption, backup] starts at [M0 Repo, CI, Tauri shell]'s end
+[M2 Patients + search (50k)] lasts 15 days
+[M2 Patients + search (50k)] starts at [M1 Storage, encryption, backup]'s end
+[M3 Case, visits, Today] lasts 20 days
+[M3 Case, visits, Today] starts at [M2 Patients + search (50k)]'s end
+[M4 Content builder + Kent pack] lasts 40 days
+[M4 Content builder + Kent pack] starts at [M0 Repo, CI, Tauri shell]'s end
+[M5 Rubric search, browser, MM, repertory manager] lasts 20 days
+[M5 Rubric search, browser, MM, repertory manager] starts at [M4 Content builder + Kent pack]'s end
+[M6 Repertorisation + citations] lasts 20 days
+[M6 Repertorisation + citations] starts at [M5 Rubric search, browser, MM, repertory manager]'s end
+[M7 Prescription + printing] lasts 10 days
+[M7 Prescription + printing] starts at [M3 Case, visits, Today]'s end
+[M8 Billing + reports] lasts 10 days
+[M8 Billing + reports] starts at [M7 Prescription + printing]'s end
+[M9 Licence, Buy screen, Vendor Licence Tool] lasts 15 days
+[M9 Licence, Buy screen, Vendor Licence Tool] starts at [M2 Patients + search (50k)]'s end
+[M10 Polish, installers, usability test] lasts 20 days
+[M10 Polish, installers, usability test] starts at [M6 Repertorisation + citations]'s end
+[Pilot with 20 doctors] happens at [M10 Polish, installers, usability test]'s end
+@endgantt

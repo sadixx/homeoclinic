@@ -1,0 +1,241 @@
+ID,Title,Stage,Epic ID,Epic,Milestone,Feature ID,Feature,Type,Priority,Estimate (days),Requirements,Done when,Epic depends on,Labels,Status,Description
+HC-PREP-001,"Choose and register business entity (sole proprietorship, LLP or Pvt Ltd)",PREP,HC-PREP-E01,Business setup,PREP,HC-PREP-E01-F01,Legal entity and money,biz,P0,2,,Registration certificate and PAN available,,"PREP,PREP,biz,P0",To do,"Choose and register business entity (sole proprietorship, LLP or Pvt Ltd)
+
+Done when: Registration certificate and PAN available
+Requirements: -
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F01 Legal entity and money
+Type: biz, priority P0, estimate 2 days"
+HC-PREP-002,Open current account in business name,PREP,HC-PREP-E01,Business setup,PREP,HC-PREP-E01-F01,Legal entity and money,biz,P0,1,,"Account active, cheque book and net banking working",,"PREP,PREP,biz,P0",To do,"Open current account in business name
+
+Done when: Account active, cheque book and net banking working
+Requirements: -
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F01 Legal entity and money
+Type: biz, priority P0, estimate 1 days"
+HC-PREP-003,"Set up business UPI ID (PhonePe Business, Paytm for Business, BharatPe or bank merchant UPI) with dashboard showing UTRs",PREP,HC-PREP-E01,Business setup,PREP,HC-PREP-E01-F01,Legal entity and money,biz,P0,1,"PAY-011, LIC-041",Test payment of Rs 1 visible in dashboard with UTR and note,,"PREP,PREP,biz,P0",To do,"Set up business UPI ID (PhonePe Business, Paytm for Business, BharatPe or bank merchant UPI) with dashboard showing UTRs
+
+Done when: Test payment of Rs 1 visible in dashboard with UTR and note
+Requirements: PAY-011, LIC-041
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F01 Legal entity and money
+Type: biz, priority P0, estimate 1 days"
+HC-PREP-004,Consult CA on GST registration need and tax invoice format for software licences,PREP,HC-PREP-E01,Business setup,PREP,HC-PREP-E01-F01,Legal entity and money,biz,P0,1,LIC-045,Written CA advice saved; invoice template fields agreed,,"PREP,PREP,biz,P0",To do,"Consult CA on GST registration need and tax invoice format for software licences
+
+Done when: Written CA advice saved; invoice template fields agreed
+Requirements: LIC-045
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F01 Legal entity and money
+Type: biz, priority P0, estimate 1 days"
+HC-PREP-005,Decide refund policy and write it for website and invoice,PREP,HC-PREP-E01,Business setup,PREP,HC-PREP-E01-F01,Legal entity and money,biz,P1,1,LIC-043,Policy text approved,,"PREP,PREP,biz,P1",To do,"Decide refund policy and write it for website and invoice
+
+Done when: Policy text approved
+Requirements: LIC-043
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F01 Legal entity and money
+Type: biz, priority P1, estimate 1 days"
+HC-PREP-006,"Get WhatsApp Business number, profile, business hours and quick-reply templates (payment received, balance due, licence sent)",PREP,HC-PREP-E01,Business setup,PREP,HC-PREP-E01-F02,Support channels,biz,P0,1,"PAY-013, LIC-049",Number active; 3 quick replies saved,,"PREP,PREP,biz,P0",To do,"Get WhatsApp Business number, profile, business hours and quick-reply templates (payment received, balance due, licence sent)
+
+Done when: Number active; 3 quick replies saved
+Requirements: PAY-013, LIC-049
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F02 Support channels
+Type: biz, priority P0, estimate 1 days"
+HC-PREP-007,Create business email for licence delivery and support,PREP,HC-PREP-E01,Business setup,PREP,HC-PREP-E01-F02,Support channels,biz,P0,0.5,LIC-045,Mailbox working; SPF and DKIM set so licence mails do not land in spam,,"PREP,PREP,biz,P0",To do,"Create business email for licence delivery and support
+
+Done when: Mailbox working; SPF and DKIM set so licence mails do not land in spam
+Requirements: LIC-045
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F02 Support channels
+Type: biz, priority P0, estimate 0.5 days"
+HC-PREP-008,Confirm support hours and licence turnaround promise (Q15),PREP,HC-PREP-E01,Business setup,PREP,HC-PREP-E01-F02,Support channels,decision,P0,0.5,"LIC-049, PAY-016",Hours written in 03-licensing-upi.md and app strings,,"PREP,PREP,decision,P0",To do,"Confirm support hours and licence turnaround promise (Q15)
+
+Done when: Hours written in 03-licensing-upi.md and app strings
+Requirements: LIC-049, PAY-016
+Stage: Preparation and decisions
+Epic: HC-PREP-E01 Business setup (milestone PREP)
+Feature: HC-PREP-E01-F02 Support channels
+Type: decision, priority P0, estimate 0.5 days"
+HC-PREP-009,Final product name and logo brief,PREP,HC-PREP-E02,Product decisions,PREP,HC-PREP-E02-F01,Open questions from design review,decision,P0,0.5,,Name chosen; domain availability checked,,"PREP,PREP,decision,P0",To do,"Final product name and logo brief
+
+Done when: Name chosen; domain availability checked
+Requirements: -
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days"
+HC-PREP-010,"Final prices for 6-month and 1-year plans, UPI only or also cards (Q14)",PREP,HC-PREP-E02,Product decisions,PREP,HC-PREP-E02-F01,Open questions from design review,decision,P0,0.5,"PAY-010, PAY-011",Prices written in requirements 03 section 1,,"PREP,PREP,decision,P0",To do,"Final prices for 6-month and 1-year plans, UPI only or also cards (Q14)
+
+Done when: Prices written in requirements 03 section 1
+Requirements: PAY-010, PAY-011
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days"
+HC-PREP-011,Confirm Q11 (certificate PDF without password),PREP,HC-PREP-E02,Product decisions,PREP,HC-PREP-E02-F01,Open questions from design review,decision,P0,0.5,LIC-045,Decision recorded in design/06-review-questions.md,,"PREP,PREP,decision,P0",To do,"Confirm Q11 (certificate PDF without password)
+
+Done when: Decision recorded in design/06-review-questions.md
+Requirements: LIC-045
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days"
+HC-PREP-012,"Confirm Q12 (licensed name and reg no locked on prints, one doctor per licence)",PREP,HC-PREP-E02,Product decisions,PREP,HC-PREP-E02-F01,Open questions from design review,decision,P0,0.5,"LIC-006, LIC-007",Decision recorded,,"PREP,PREP,decision,P0",To do,"Confirm Q12 (licensed name and reg no locked on prints, one doctor per licence)
+
+Done when: Decision recorded
+Requirements: LIC-006, LIC-007
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days"
+HC-PREP-013,Confirm Q13 (no PC limit),PREP,HC-PREP-E02,Product decisions,PREP,HC-PREP-E02-F01,Open questions from design review,decision,P0,0.5,LIC-064,Decision recorded,,"PREP,PREP,decision,P0",To do,"Confirm Q13 (no PC limit)
+
+Done when: Decision recorded
+Requirements: LIC-064
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days"
+HC-PREP-014,"Decide Q1: legacy prints in MVP1 (certificate, referral letter, envelope, declaration, birthday list)",PREP,HC-PREP-E02,Product decisions,PREP,HC-PREP-E02-F01,Open questions from design review,decision,P0,0.5,,"If yes, DOC requirements added to 01-mvp1-requirements.md",,"PREP,PREP,decision,P0",To do,"Decide Q1: legacy prints in MVP1 (certificate, referral letter, envelope, declaration, birthday list)
+
+Done when: If yes, DOC requirements added to 01-mvp1-requirements.md
+Requirements: -
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days"
+HC-PREP-015,Decide Q3: Marathi advice and diet print in MVP1,PREP,HC-PREP-E02,Product decisions,PREP,HC-PREP-E02-F01,Open questions from design review,decision,P0,0.5,RX-007,"If yes, requirement added to 01-mvp1-requirements.md",,"PREP,PREP,decision,P0",To do,"Decide Q3: Marathi advice and diet print in MVP1
+
+Done when: If yes, requirement added to 01-mvp1-requirements.md
+Requirements: RX-007
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days"
+HC-PREP-016,Decide Q17: who receives internal evaluation builds,PREP,HC-PREP-E02,Product decisions,PREP,HC-PREP-E02-F01,Open questions from design review,decision,P0,0.5,"CONT-003, CONT-004",Decision recorded,,"PREP,PREP,decision,P0",To do,"Decide Q17: who receives internal evaluation builds
+
+Done when: Decision recorded
+Requirements: CONT-003, CONT-004
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P0, estimate 0.5 days"
+HC-PREP-017,Decide Q10: EV code-signing certificate budget and optional commercial obfuscator,PREP,HC-PREP-E02,Product decisions,PREP,HC-PREP-E02-F01,Open questions from design review,decision,P1,0.5,"TAM-006, TAM-008",Budget approved,,"PREP,PREP,decision,P1",To do,"Decide Q10: EV code-signing certificate budget and optional commercial obfuscator
+
+Done when: Budget approved
+Requirements: TAM-006, TAM-008
+Stage: Preparation and decisions
+Epic: HC-PREP-E02 Product decisions (milestone PREP)
+Feature: HC-PREP-E02-F01 Open questions from design review
+Type: decision, priority P1, estimate 0.5 days"
+HC-PREP-018,"IP lawyer opinion on public-domain status of Kent 1897, Boericke 1906, Boenninghausen TPB 1891, Allen Keynotes in India",PREP,HC-PREP-E03,Legal and compliance,PREP,HC-PREP-E03-F01,Content licensing,legal,P0,2,REP-001,Written opinion stored with registry,,"PREP,PREP,legal,P0",To do,"IP lawyer opinion on public-domain status of Kent 1897, Boericke 1906, Boenninghausen TPB 1891, Allen Keynotes in India
+
+Done when: Written opinion stored with registry
+Requirements: REP-001
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F01 Content licensing
+Type: legal, priority P0, estimate 2 days"
+HC-PREP-019,GPL v3 review: may OOREP publicum and kent-de be used in internal evaluation builds given to pilot doctors,PREP,HC-PREP-E03,Legal and compliance,PREP,HC-PREP-E03-F01,Content licensing,legal,P0,1,"CONT-003, CONT-006",Written opinion; registry permission status updated,,"PREP,PREP,legal,P0",To do,"GPL v3 review: may OOREP publicum and kent-de be used in internal evaluation builds given to pilot doctors
+
+Done when: Written opinion; registry permission status updated
+Requirements: CONT-003, CONT-006
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F01 Content licensing
+Type: legal, priority P0, estimate 1 days"
+HC-PREP-020,"Email OOREP author (Andreas Bauer) asking permission to use English Kent, Boger, Boenninghausen and Boericke conversions in a closed-source product (Q16)",PREP,HC-PREP-E03,Legal and compliance,PREP,HC-PREP-E03-F01,Content licensing,content,P0,0.5,CONT-008,Reply received and stored; registry updated,,"PREP,PREP,content,P0",To do,"Email OOREP author (Andreas Bauer) asking permission to use English Kent, Boger, Boenninghausen and Boericke conversions in a closed-source product (Q16)
+
+Done when: Reply received and stored; registry updated
+Requirements: CONT-008
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F01 Content licensing
+Type: content, priority P0, estimate 0.5 days"
+HC-PREP-021,Privacy policy and consent text compliant with DPDP Act 2023,PREP,HC-PREP-E03,Legal and compliance,PREP,HC-PREP-E03-F02,Privacy and terms,legal,P0,2,"PAT-012, PAY-010",Text approved and placed in app strings and website,,"PREP,PREP,legal,P0",To do,"Privacy policy and consent text compliant with DPDP Act 2023
+
+Done when: Text approved and placed in app strings and website
+Requirements: PAT-012, PAY-010
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F02 Privacy and terms
+Type: legal, priority P0, estimate 2 days"
+HC-PREP-022,End-user licence agreement and terms of sale,PREP,HC-PREP-E03,Legal and compliance,PREP,HC-PREP-E03-F02,Privacy and terms,legal,P0,1,LIC-001,EULA shown in installer and Buy screen,,"PREP,PREP,legal,P0",To do,"End-user licence agreement and terms of sale
+
+Done when: EULA shown in installer and Buy screen
+Requirements: LIC-001
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F02 Privacy and terms
+Type: legal, priority P0, estimate 1 days"
+HC-PREP-023,Medical disclaimer for repertorisation results (suggestion only),PREP,HC-PREP-E03,Legal and compliance,PREP,HC-PREP-E03-F02,Privacy and terms,legal,P0,0.5,REP-033,Disclaimer text shown in result panel and help,,"PREP,PREP,legal,P0",To do,"Medical disclaimer for repertorisation results (suggestion only)
+
+Done when: Disclaimer text shown in result panel and help
+Requirements: REP-033
+Stage: Preparation and decisions
+Epic: HC-PREP-E03 Legal and compliance (milestone PREP)
+Feature: HC-PREP-E03-F02 Privacy and terms
+Type: legal, priority P0, estimate 0.5 days"
+HC-PREP-024,Buy 2 hardware security keys (primary and backup) supporting Ed25519,PREP,HC-PREP-E04,Signing keys and certificates,PREP,HC-PREP-E04-F01,Keys,ops,P0,1,LIC-047,Keys received and tested,,"PREP,PREP,ops,P0",To do,"Buy 2 hardware security keys (primary and backup) supporting Ed25519
+
+Done when: Keys received and tested
+Requirements: LIC-047
+Stage: Preparation and decisions
+Epic: HC-PREP-E04 Signing keys and certificates (milestone PREP)
+Feature: HC-PREP-E04-F01 Keys
+Type: ops, priority P0, estimate 1 days"
+HC-PREP-025,"Generate keys: licence signing, offer-code signing, public content, eval content, update manifest; record key ids",PREP,HC-PREP-E04,Signing keys and certificates,PREP,HC-PREP-E04-F01,Keys,ops,P0,1,"LIC-001, PAY-012, CONT-002, NFR-042",5 public keys exported for embedding; private keys only on hardware or offline media,,"PREP,PREP,ops,P0",To do,"Generate keys: licence signing, offer-code signing, public content, eval content, update manifest; record key ids
+
+Done when: 5 public keys exported for embedding; private keys only on hardware or offline media
+Requirements: LIC-001, PAY-012, CONT-002, NFR-042
+Stage: Preparation and decisions
+Epic: HC-PREP-E04 Signing keys and certificates (milestone PREP)
+Feature: HC-PREP-E04-F01 Keys
+Type: ops, priority P0, estimate 1 days"
+HC-PREP-026,Sealed paper backup of private keys stored in a safe place,PREP,HC-PREP-E04,Signing keys and certificates,PREP,HC-PREP-E04-F01,Keys,ops,P0,0.5,LIC-047,Backup envelope stored; recovery tested once,,"PREP,PREP,ops,P0",To do,"Sealed paper backup of private keys stored in a safe place
+
+Done when: Backup envelope stored; recovery tested once
+Requirements: LIC-047
+Stage: Preparation and decisions
+Epic: HC-PREP-E04 Signing keys and certificates (milestone PREP)
+Feature: HC-PREP-E04-F01 Keys
+Type: ops, priority P0, estimate 0.5 days"
+HC-PREP-027,Buy EV code-signing certificate (Windows Authenticode),PREP,HC-PREP-E04,Signing keys and certificates,PREP,HC-PREP-E04-F01,Keys,ops,P0,2,"TAM-006, SUX-009",Certificate on token; test signature verifies on Windows,,"PREP,PREP,ops,P0",To do,"Buy EV code-signing certificate (Windows Authenticode)
+
+Done when: Certificate on token; test signature verifies on Windows
+Requirements: TAM-006, SUX-009
+Stage: Preparation and decisions
+Epic: HC-PREP-E04 Signing keys and certificates (milestone PREP)
+Feature: HC-PREP-E04-F01 Keys
+Type: ops, priority P0, estimate 2 days"
+HC-PREP-028,Recruit 20 pilot doctors across at least 3 cities and 2 languages,PREP,HC-PREP-E05,Pilot recruitment,PREP,HC-PREP-E05-F01,Pilot doctors,biz,P0,3,NFR-031,"Signed-up list with contact, PC specs and preferred language",,"PREP,PREP,biz,P0",To do,"Recruit 20 pilot doctors across at least 3 cities and 2 languages
+
+Done when: Signed-up list with contact, PC specs and preferred language
+Requirements: NFR-031
+Stage: Preparation and decisions
+Epic: HC-PREP-E05 Pilot recruitment (milestone PREP)
+Feature: HC-PREP-E05-F01 Pilot doctors
+Type: biz, priority P0, estimate 3 days"
+HC-PREP-029,"Pilot evaluation agreement (free use, feedback, data stays on their PC, evaluation content not for redistribution)",PREP,HC-PREP-E05,Pilot recruitment,PREP,HC-PREP-E05-F01,Pilot doctors,legal,P0,1,CONT-004,Agreement template signed by each pilot doctor,,"PREP,PREP,legal,P0",To do,"Pilot evaluation agreement (free use, feedback, data stays on their PC, evaluation content not for redistribution)
+
+Done when: Agreement template signed by each pilot doctor
+Requirements: CONT-004
+Stage: Preparation and decisions
+Epic: HC-PREP-E05 Pilot recruitment (milestone PREP)
+Feature: HC-PREP-E05-F01 Pilot doctors
+Type: legal, priority P0, estimate 1 days"
+HC-PREP-030,"Collect sample paper prescriptions, case papers and letterheads from pilot doctors",PREP,HC-PREP-E05,Pilot recruitment,PREP,HC-PREP-E05-F01,Pilot doctors,biz,P1,1,RX-005,At least 10 samples to guide print layouts,,"PREP,PREP,biz,P1",To do,"Collect sample paper prescriptions, case papers and letterheads from pilot doctors
+
+Done when: At least 10 samples to guide print layouts
+Requirements: RX-005
+Stage: Preparation and decisions
+Epic: HC-PREP-E05 Pilot recruitment (milestone PREP)
+Feature: HC-PREP-E05-F01 Pilot doctors
+Type: biz, priority P1, estimate 1 days"

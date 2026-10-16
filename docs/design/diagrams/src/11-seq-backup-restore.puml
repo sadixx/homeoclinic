@@ -1,0 +1,28 @@
+@startuml
+title Encrypted backup and restore (BAK-001..004)
+actor Doctor
+participant "Backup job" as JOB
+participant "hc-storage" as ST
+database "clinic.db\nuser_content.db" as DB
+participant "files/" as F
+participant "Target\n(backups/ or USB)" as T
+== Automatic daily backup (on first launch of day / app close) ==
+JOB -> ST : run_backup(target, rotation)
+ST -> DB : SQLite online backup API -> snapshot (app keeps working)
+ST -> ST : backup key = Argon2id(backup password, salt)
+ST -> ST : stream tar(snapshots + files) -> AES-256-GCM 1 MB chunks
+F -> ST : encrypted blobs (re-wrapped)
+ST -> T : write .hcbak.tmp, fsync, rename
+ST -> T : verify: read header, decrypt test, checksum
+ST -> ST : rotate 14 daily / 8 weekly / 12 monthly
+ST --> JOB : ok + record last_backup_at
+== Restore ==
+Doctor -> ST : choose file + password
+ST -> T : read header only
+ST --> Doctor : preview (patients, last visit date)
+Doctor -> ST : confirm
+ST -> DB : safety backup of current data
+ST -> T : decrypt + verify all chunks to temp dir
+ST -> DB : swap files atomically, reopen, run migrations if older version
+ST --> Doctor : restored, rebuild search index (PSR-013)
+@enduml

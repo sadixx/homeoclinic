@@ -1,0 +1,31 @@
+@startuml
+title Licence purchase with UPI - MVP2 automated (PAY-001..005)
+actor Doctor
+participant "Desktop app" as APP
+participant "Portal (phone)" as POR
+participant "Licence API" as API
+database "Licence DB" as DB
+participant "Razorpay" as RZ
+participant "UPI app\n(GPay/PhonePe/Paytm)" as UPI
+participant "SMS/Email" as MSG
+Doctor -> APP : Buy / Renew
+APP --> Doctor : open browser, or QR of purchase URL\n(with activation request code)
+Doctor -> POR : choose plan, phone OTP, GSTIN optional
+POR -> API : POST /v1/orders
+API -> DB : order (status=created)
+API -> RZ : create order
+RZ --> API : order_id
+API --> POR : order_id
+POR -> RZ : Checkout (UPI Intent / QR / collect)
+RZ -> UPI : payment request
+Doctor -> UPI : approve with UPI PIN
+UPI --> RZ : success
+RZ --> POR : client callback (not trusted)
+RZ -> API : webhook payment.captured (HMAC)
+API -> API : verify HMAC, idempotent on payment_id
+API -> DB : order=paid, licence issued, invoice no. (one transaction)
+API -> MSG : licence key + response code + GST invoice PDF
+POR -> API : poll order status
+API --> POR : paid + licence key + response code/QR
+Doctor -> APP : enter key (online) or response code (offline)
+@enduml

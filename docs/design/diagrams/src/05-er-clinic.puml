@@ -1,0 +1,113 @@
+@startuml
+title ER - clinic.db (MVP1 core)
+hide circle
+skinparam linetype ortho
+entity doctor {
+  *id
+  --
+  name, qualification, reg_no, reg_council
+}
+entity clinic {
+  *id
+  --
+  name, address, gstin, fee_first_paise, patient_id_prefix
+}
+entity user {
+  *id
+  --
+  name, role, pin_hash
+}
+entity patient {
+  *id
+  --
+  code (unique)
+  name, name_phonetic, sex, dob
+  mobile_digits, city
+  last_visit_at, next_followup_on
+  balance_paise, visit_count
+}
+entity family_link {
+  *id
+  --
+  patient_id, related_patient_id, relation
+}
+entity case_template {
+  *id
+  --
+  name, schema_json
+}
+entity visit {
+  *id
+  --
+  patient_id, template_id
+  visit_at, type, data_json, vitals_json
+  complaint_status_json, improvement_pct
+  next_followup_on
+}
+entity attachment {
+  *id
+  --
+  patient_id, visit_id, sha256
+}
+entity analysis {
+  *id
+  --
+  visit_id, method, result_snapshot_json
+}
+entity analysis_rubric {
+  *id
+  --
+  analysis_id, pack_id, rubric_id
+  weight, is_eliminative
+}
+entity prescription {
+  *id
+  --
+  visit_id, advice_text, hide_remedy_names
+}
+entity prescription_item {
+  *id
+  --
+  prescription_id, remedy_id
+  potency, form, dose, frequency, is_placebo
+}
+entity invoice {
+  *id
+  --
+  patient_id, visit_id, number, fy, total_paise, balance_paise
+}
+entity invoice_line {
+  *id
+  --
+  invoice_id, amount_paise
+}
+entity payment {
+  *id
+  --
+  invoice_id, amount_paise, mode
+}
+entity appointment {
+  *id
+  --
+  patient_id, start_at, status, token_no
+}
+entity audit_log {
+  *id
+  --
+  user_id, entity, entity_id, action, diff_json
+}
+patient ||--o{ visit
+patient ||--o{ family_link
+patient ||--o{ attachment
+patient ||--o{ invoice
+patient |o--o{ appointment
+case_template ||--o{ visit
+visit ||--o{ analysis
+analysis ||--o{ analysis_rubric
+visit ||--o| prescription
+prescription ||--o{ prescription_item
+visit |o--o{ invoice
+invoice ||--o{ invoice_line
+invoice ||--o{ payment
+user ||--o{ audit_log
+@enduml

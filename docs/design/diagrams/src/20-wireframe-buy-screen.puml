@@ -1,0 +1,36 @@
+@startsalt
+title Wireframe - Buy / Renew licence (works offline)
+{+
+{ <b>Buy HomeoClinic licence | . | . | Install ID: HC-7K3P9 }
+{+
+{ <b>1. Choose plan
+  (X) 1 year - Rs 3,999
+  () 6 months - Rs 2,299
+  Offer code: | "          " | [Apply]
+  ..
+  <b>2. Your details
+  Full name   | "Dr Asha Kulkarni     "
+  Reg. no.    | "12345    " | ^MCH^
+  Email       | "asha@example.com     "
+  Mobile      | "98XXXXXXXX           "
+  Name and Reg. no. will be printed on prescriptions
+  and cannot be changed later.
+  [X] I agree to store these details
+} | { <b>3. Pay (scan with any UPI app)
+  [ PAY QR ]
+  Pay to: HomeoClinic (check this name)
+  UPI ID: homeoclinic@bank | [Copy]
+  Amount: Rs 3,999 | [Copy]
+  Note: HC-7K3P9 1Y | [Copy]
+} | { <b>4. Send payment screenshot
+  [ WHATSAPP QR ]
+  Opens our WhatsApp with your
+  details already typed.
+  Attach screenshot and send.
+  [Copy message]
+  WhatsApp: +91 9XXXX XXXXX
+} }
+{+ <b>5. After payment: we email your licence within 1 hour (Mon-Sat 10:00-19:00).
+   Your trial keeps working meanwhile. | [Import licence file] | [Scan licence QR] | [Type licence key] }
+}
+@endsalt

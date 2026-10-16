@@ -1,0 +1,23 @@
+@startuml
+title App startup (NFR-001: cold start < 4 s)
+actor Doctor
+participant "Webview UI" as UI
+participant "hc-app" as APP
+participant "hc-licence" as L
+participant "hc-storage" as ST
+participant "hc-repertory" as R
+Doctor -> UI : launch
+UI --> Doctor : splash + PIN screen (< 1 s)
+Doctor -> UI : PIN
+UI -> APP : unlock(pin)
+APP -> ST : derive KEK (Argon2id), unwrap DEK, open SQLCipher
+ST -> ST : check user_version, migrate if needed (with backup)
+APP -> L : verify licence + clock guard
+L --> APP : state (Active / Grace / ReadOnly ...)
+APP -> R : register packs (manifest + signature only, lazy open)
+APP --> UI : session + licence state
+UI -> APP : get_today()
+APP -> ST : follow-ups due, overdue, today's visits
+APP --> UI : Today screen
+APP -> APP : background: daily backup if due,\nlocal licence re-check, PRAGMA optimize\n(MVP2: online licence refresh)
+@enduml

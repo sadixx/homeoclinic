@@ -1,0 +1,40 @@
+@startsalt
+title Wireframe - Repertory workspace (patient: HC-000123)
+{+
+{ [<- Patient] | "fear dark          " | [Search] | ^All repertories^ | [Run analysis] }
+{+
+{ <b>Search results
+  MIND - FEAR - dark, of (42)
+  MIND - FEAR - evening (31)
+  MIND - FEAR - alone, of being (88)
+  ..
+  <b>Chapters
+  + MIND
+  + HEAD
+  + GENERALITIES
+} | { <b>Rubric detail
+  MIND - FEAR - dark, of
+  <b>CALC. CARB. PHOS. PULS. STRAM.
+  <i>ars. caust. lyc. med.
+  acon. bar-c. ...
+  Cross-ref: FEAR - night
+  [Add to clipboard]
+  [Add remedy + citation]
+} | { <b>Case clipboard
+  { [X] Fear dark (eliminative) | ^weight 2^ }
+  { [X] Thirstless | ^weight 1^ }
+  { [X] Chilly | ^weight 1^ }
+  { [ ] Desire sweets | ^weight 1^ }
+  { Method | ^Totality + grade^ }
+} }
+{+
+  <b>Analysis result
+  { (X) Grid | () List | () Graph }
+  {# Remedy | Score | Coverage | Action
+     Puls. | 14 | 4/4 | [Prescribe]
+     Phos. | 11 | 4/4 | [Prescribe]
+     Calc. | 10 | 3/4 | [Prescribe]
+     Lyc. | 8 | 3/4 | [Prescribe] }
+}
+}
+@endsalt

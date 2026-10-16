@@ -1,0 +1,65 @@
+ID,Title,Stage,Epic ID,Epic,Milestone,Feature ID,Feature,Type,Priority,Estimate (days),Requirements,Done when,Epic depends on,Labels,Status,Description
+HC-MVP5-001,Read live MySQL or .sql dump without needing MySQL installed,MVP5,HC-MVP5-E01,Data migration,MVP5,HC-MVP5-E01-F01,Legacy Doctor Clinic importer,dev,P0,2,IMP-002,Sample dump parsed,MVP4,"MVP5,MVP5,dev,P0",To do,"Read live MySQL or .sql dump without needing MySQL installed
+
+Done when: Sample dump parsed
+Requirements: IMP-002
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F01 Legacy Doctor Clinic importer
+Type: dev, priority P0, estimate 2 days"
+HC-MVP5-002,Map 19 legacy tables to new schema per design 05 section 6,MVP5,HC-MVP5-E01,Data migration,MVP5,HC-MVP5-E01-F01,Legacy Doctor Clinic importer,dev,P0,3,IMP-002,Counts match source,MVP4,"MVP5,MVP5,dev,P0",To do,"Map 19 legacy tables to new schema per design 05 section 6
+
+Done when: Counts match source
+Requirements: IMP-002
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F01 Legacy Doctor Clinic importer
+Type: dev, priority P0, estimate 3 days"
+HC-MVP5-003,Shivaji-font Marathi to Unicode Devanagari conversion,MVP5,HC-MVP5-E01,Data migration,MVP5,HC-MVP5-E01-F01,Legacy Doctor Clinic importer,dev,P0,2,IMP-002,Sample diet sheets read correctly,MVP4,"MVP5,MVP5,dev,P0",To do,"Shivaji-font Marathi to Unicode Devanagari conversion
+
+Done when: Sample diet sheets read correctly
+Requirements: IMP-002
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F01 Legacy Doctor Clinic importer
+Type: dev, priority P0, estimate 2 days"
+HC-MVP5-004,Photos and report files copied and encrypted,MVP5,HC-MVP5-E01,Data migration,MVP5,HC-MVP5-E01-F01,Legacy Doctor Clinic importer,dev,P0,1,IMP-002,Attachments open after import,MVP4,"MVP5,MVP5,dev,P0",To do,"Photos and report files copied and encrypted
+
+Done when: Attachments open after import
+Requirements: IMP-002
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F01 Legacy Doctor Clinic importer
+Type: dev, priority P0, estimate 1 days"
+HC-MVP5-005,Dry-run report and single-transaction commit,MVP5,HC-MVP5-E01,Data migration,MVP5,HC-MVP5-E01-F01,Legacy Doctor Clinic importer,dev,P0,1.5,IMP-002,Dry run lists warnings; commit atomic,MVP4,"MVP5,MVP5,dev,P0",To do,"Dry-run report and single-transaction commit
+
+Done when: Dry run lists warnings; commit atomic
+Requirements: IMP-002
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F01 Legacy Doctor Clinic importer
+Type: dev, priority P0, estimate 1.5 days"
+HC-MVP5-006,"CSV, Excel and Access import with column-mapping wizard",MVP5,HC-MVP5-E01,Data migration,MVP5,HC-MVP5-E01-F02,Competitor and generic import,dev,P0,3,"IMP-001, PAT-010",Sample exports import cleanly,MVP4,"MVP5,MVP5,dev,P0",To do,"CSV, Excel and Access import with column-mapping wizard
+
+Done when: Sample exports import cleanly
+Requirements: IMP-001, PAT-010
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F02 Competitor and generic import
+Type: dev, priority P0, estimate 3 days"
+HC-MVP5-007,Migration guides per competitor product,MVP5,HC-MVP5-E01,Data migration,MVP5,HC-MVP5-E01-F02,Competitor and generic import,doc,P1,2,IMP-001,Guides published,MVP4,"MVP5,MVP5,doc,P1",To do,"Migration guides per competitor product
+
+Done when: Guides published
+Requirements: IMP-001
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F02 Competitor and generic import
+Type: doc, priority P1, estimate 2 days"
+HC-MVP5-008,Assisted migration service process and pricing,MVP5,HC-MVP5-E01,Data migration,MVP5,HC-MVP5-E01-F03,Assisted migration,biz,P1,2,IMP-003,First clinic migrated by support,MVP4,"MVP5,MVP5,biz,P1",To do,"Assisted migration service process and pricing
+
+Done when: First clinic migrated by support
+Requirements: IMP-003
+Stage: MVP5: migration (de-prioritised)
+Epic: HC-MVP5-E01 Data migration (milestone MVP5)
+Feature: HC-MVP5-E01-F03 Assisted migration
+Type: biz, priority P1, estimate 2 days"

@@ -1,0 +1,4699 @@
+[
+  {
+    "code": "PREP",
+    "name": "Preparation and decisions",
+    "goal": "Everything that blocks or must run alongside MVP1 but is not code",
+    "epics": [
+      {
+        "milestone": "PREP",
+        "name": "Business setup",
+        "depends": [],
+        "features": [
+          {
+            "name": "Legal entity and money",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "biz",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Choose and register business entity (sole proprietorship, LLP or Pvt Ltd)",
+                "reqs": [],
+                "done_when": "Registration certificate and PAN available",
+                "id": "HC-PREP-001"
+              },
+              {
+                "type": "biz",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Open current account in business name",
+                "reqs": [],
+                "done_when": "Account active, cheque book and net banking working",
+                "id": "HC-PREP-002"
+              },
+              {
+                "type": "biz",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Set up business UPI ID (PhonePe Business, Paytm for Business, BharatPe or bank merchant UPI) with dashboard showing UTRs",
+                "reqs": [
+                  "PAY-011",
+                  "LIC-041"
+                ],
+                "done_when": "Test payment of Rs 1 visible in dashboard with UTR and note",
+                "id": "HC-PREP-003"
+              },
+              {
+                "type": "biz",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Consult CA on GST registration need and tax invoice format for software licences",
+                "reqs": [
+                  "LIC-045"
+                ],
+                "done_when": "Written CA advice saved; invoice template fields agreed",
+                "id": "HC-PREP-004"
+              },
+              {
+                "type": "biz",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Decide refund policy and write it for website and invoice",
+                "reqs": [
+                  "LIC-043"
+                ],
+                "done_when": "Policy text approved",
+                "id": "HC-PREP-005"
+              }
+            ],
+            "id": "HC-PREP-E01-F01"
+          },
+          {
+            "name": "Support channels",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "biz",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Get WhatsApp Business number, profile, business hours and quick-reply templates (payment received, balance due, licence sent)",
+                "reqs": [
+                  "PAY-013",
+                  "LIC-049"
+                ],
+                "done_when": "Number active; 3 quick replies saved",
+                "id": "HC-PREP-006"
+              },
+              {
+                "type": "biz",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Create business email for licence delivery and support",
+                "reqs": [
+                  "LIC-045"
+                ],
+                "done_when": "Mailbox working; SPF and DKIM set so licence mails do not land in spam",
+                "id": "HC-PREP-007"
+              },
+              {
+                "type": "decision",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Confirm support hours and licence turnaround promise (Q15)",
+                "reqs": [
+                  "LIC-049",
+                  "PAY-016"
+                ],
+                "done_when": "Hours written in 03-licensing-upi.md and app strings",
+                "id": "HC-PREP-008"
+              }
+            ],
+            "id": "HC-PREP-E01-F02"
+          }
+        ],
+        "id": "HC-PREP-E01"
+      },
+      {
+        "milestone": "PREP",
+        "name": "Product decisions",
+        "depends": [],
+        "features": [
+          {
+            "name": "Open questions from design review",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "decision",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Final product name and logo brief",
+                "reqs": [],
+                "done_when": "Name chosen; domain availability checked",
+                "id": "HC-PREP-009"
+              },
+              {
+                "type": "decision",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Final prices for 6-month and 1-year plans, UPI only or also cards (Q14)",
+                "reqs": [
+                  "PAY-010",
+                  "PAY-011"
+                ],
+                "done_when": "Prices written in requirements 03 section 1",
+                "id": "HC-PREP-010"
+              },
+              {
+                "type": "decision",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Confirm Q11 (certificate PDF without password)",
+                "reqs": [
+                  "LIC-045"
+                ],
+                "done_when": "Decision recorded in design/06-review-questions.md",
+                "id": "HC-PREP-011"
+              },
+              {
+                "type": "decision",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Confirm Q12 (licensed name and reg no locked on prints, one doctor per licence)",
+                "reqs": [
+                  "LIC-006",
+                  "LIC-007"
+                ],
+                "done_when": "Decision recorded",
+                "id": "HC-PREP-012"
+              },
+              {
+                "type": "decision",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Confirm Q13 (no PC limit)",
+                "reqs": [
+                  "LIC-064"
+                ],
+                "done_when": "Decision recorded",
+                "id": "HC-PREP-013"
+              },
+              {
+                "type": "decision",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Decide Q1: legacy prints in MVP1 (certificate, referral letter, envelope, declaration, birthday list)",
+                "reqs": [],
+                "done_when": "If yes, DOC requirements added to 01-mvp1-requirements.md",
+                "id": "HC-PREP-014"
+              },
+              {
+                "type": "decision",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Decide Q3: Marathi advice and diet print in MVP1",
+                "reqs": [
+                  "RX-007"
+                ],
+                "done_when": "If yes, requirement added to 01-mvp1-requirements.md",
+                "id": "HC-PREP-015"
+              },
+              {
+                "type": "decision",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Decide Q17: who receives internal evaluation builds",
+                "reqs": [
+                  "CONT-003",
+                  "CONT-004"
+                ],
+                "done_when": "Decision recorded",
+                "id": "HC-PREP-016"
+              },
+              {
+                "type": "decision",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Decide Q10: EV code-signing certificate budget and optional commercial obfuscator",
+                "reqs": [
+                  "TAM-006",
+                  "TAM-008"
+                ],
+                "done_when": "Budget approved",
+                "id": "HC-PREP-017"
+              }
+            ],
+            "id": "HC-PREP-E02-F01"
+          }
+        ],
+        "id": "HC-PREP-E02"
+      },
+      {
+        "milestone": "PREP",
+        "name": "Legal and compliance",
+        "depends": [],
+        "features": [
+          {
+            "name": "Content licensing",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "legal",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "IP lawyer opinion on public-domain status of Kent 1897, Boericke 1906, Boenninghausen TPB 1891, Allen Keynotes in India",
+                "reqs": [
+                  "REP-001"
+                ],
+                "done_when": "Written opinion stored with registry",
+                "id": "HC-PREP-018"
+              },
+              {
+                "type": "legal",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "GPL v3 review: may OOREP publicum and kent-de be used in internal evaluation builds given to pilot doctors",
+                "reqs": [
+                  "CONT-003",
+                  "CONT-006"
+                ],
+                "done_when": "Written opinion; registry permission status updated",
+                "id": "HC-PREP-019"
+              },
+              {
+                "type": "content",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Email OOREP author (Andreas Bauer) asking permission to use English Kent, Boger, Boenninghausen and Boericke conversions in a closed-source product (Q16)",
+                "reqs": [
+                  "CONT-008"
+                ],
+                "done_when": "Reply received and stored; registry updated",
+                "id": "HC-PREP-020"
+              }
+            ],
+            "id": "HC-PREP-E03-F01"
+          },
+          {
+            "name": "Privacy and terms",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "legal",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Privacy policy and consent text compliant with DPDP Act 2023",
+                "reqs": [
+                  "PAT-012",
+                  "PAY-010"
+                ],
+                "done_when": "Text approved and placed in app strings and website",
+                "id": "HC-PREP-021"
+              },
+              {
+                "type": "legal",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "End-user licence agreement and terms of sale",
+                "reqs": [
+                  "LIC-001"
+                ],
+                "done_when": "EULA shown in installer and Buy screen",
+                "id": "HC-PREP-022"
+              },
+              {
+                "type": "legal",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Medical disclaimer for repertorisation results (suggestion only)",
+                "reqs": [
+                  "REP-033"
+                ],
+                "done_when": "Disclaimer text shown in result panel and help",
+                "id": "HC-PREP-023"
+              }
+            ],
+            "id": "HC-PREP-E03-F02"
+          }
+        ],
+        "id": "HC-PREP-E03"
+      },
+      {
+        "milestone": "PREP",
+        "name": "Signing keys and certificates",
+        "depends": [],
+        "features": [
+          {
+            "name": "Keys",
+            "reqs": [
+              "TAM-006",
+              "LIC-047",
+              "CONT-002"
+            ],
+            "tasks": [
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Buy 2 hardware security keys (primary and backup) supporting Ed25519",
+                "reqs": [
+                  "LIC-047"
+                ],
+                "done_when": "Keys received and tested",
+                "id": "HC-PREP-024"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Generate keys: licence signing, offer-code signing, public content, eval content, update manifest; record key ids",
+                "reqs": [
+                  "LIC-001",
+                  "PAY-012",
+                  "CONT-002",
+                  "NFR-042"
+                ],
+                "done_when": "5 public keys exported for embedding; private keys only on hardware or offline media",
+                "id": "HC-PREP-025"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Sealed paper backup of private keys stored in a safe place",
+                "reqs": [
+                  "LIC-047"
+                ],
+                "done_when": "Backup envelope stored; recovery tested once",
+                "id": "HC-PREP-026"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Buy EV code-signing certificate (Windows Authenticode)",
+                "reqs": [
+                  "TAM-006",
+                  "SUX-009"
+                ],
+                "done_when": "Certificate on token; test signature verifies on Windows",
+                "id": "HC-PREP-027"
+              }
+            ],
+            "id": "HC-PREP-E04-F01"
+          }
+        ],
+        "id": "HC-PREP-E04"
+      },
+      {
+        "milestone": "PREP",
+        "name": "Pilot recruitment",
+        "depends": [],
+        "features": [
+          {
+            "name": "Pilot doctors",
+            "reqs": [
+              "NFR-031"
+            ],
+            "tasks": [
+              {
+                "type": "biz",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Recruit 20 pilot doctors across at least 3 cities and 2 languages",
+                "reqs": [
+                  "NFR-031"
+                ],
+                "done_when": "Signed-up list with contact, PC specs and preferred language",
+                "id": "HC-PREP-028"
+              },
+              {
+                "type": "legal",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Pilot evaluation agreement (free use, feedback, data stays on their PC, evaluation content not for redistribution)",
+                "reqs": [
+                  "CONT-004"
+                ],
+                "done_when": "Agreement template signed by each pilot doctor",
+                "id": "HC-PREP-029"
+              },
+              {
+                "type": "biz",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Collect sample paper prescriptions, case papers and letterheads from pilot doctors",
+                "reqs": [
+                  "RX-005"
+                ],
+                "done_when": "At least 10 samples to guide print layouts",
+                "id": "HC-PREP-030"
+              }
+            ],
+            "id": "HC-PREP-E05-F01"
+          }
+        ],
+        "id": "HC-PREP-E05"
+      }
+    ]
+  },
+  {
+    "code": "MVP1",
+    "name": "MVP1: complete offline desktop",
+    "goal": "Offline Windows and Linux clinic app with integrated repertory, offline licence and UPI purchase, no hosted servers",
+    "epics": [
+      {
+        "milestone": "HANDOFF",
+        "name": "Coding-agent handoff pack",
+        "depends": [
+          "PREP"
+        ],
+        "features": [
+          {
+            "name": "Close design gaps before coding",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "design",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Unify code layout: one crate list in requirements/06 and design/02",
+                "reqs": [],
+                "done_when": "Both documents name the same crates and folders",
+                "id": "HC-MVP1-001"
+              },
+              {
+                "type": "design",
+                "priority": "P0",
+                "estimate_days": 4.0,
+                "title": "Wireframes for Today, registration, patient dashboard, case form, follow-up, prescription, billing, backup, settings and licence screens",
+                "reqs": [
+                  "NFR-030",
+                  "NFR-034"
+                ],
+                "done_when": "10 wireframes in design/diagrams with field lists",
+                "id": "HC-MVP1-002"
+              },
+              {
+                "type": "design",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Case template JSON schema plus 3 default templates (chronic detailed, acute quick, child)",
+                "reqs": [
+                  "CASE-001",
+                  "CASE-004"
+                ],
+                "done_when": "Schema file and 3 template files validate",
+                "id": "HC-MVP1-003"
+              },
+              {
+                "type": "design",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Print layout specs: Rx A4, A5, letterhead margins, receipt, case paper; based on legacy Jasper templates and pilot samples",
+                "reqs": [
+                  "RX-005",
+                  "BILL-003",
+                  "CASE-009"
+                ],
+                "done_when": "Layout spec with field positions and sample PDFs",
+                "id": "HC-MVP1-004"
+              },
+              {
+                "type": "design",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Settings file with placeholders: business UPI ID, payee name, WhatsApp number, prices, support hours, public keys",
+                "reqs": [
+                  "PAY-011",
+                  "PAY-013",
+                  "PAY-015"
+                ],
+                "done_when": "Single config file referenced by build",
+                "id": "HC-MVP1-005"
+              },
+              {
+                "type": "doc",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "One self-contained brief per milestone M0 to M10 (scope, requirement ids, tests that must pass, out-of-scope)",
+                "reqs": [],
+                "done_when": "11 brief files in handoff folder",
+                "id": "HC-MVP1-006"
+              },
+              {
+                "type": "doc",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Development environment and CI guide including Windows build runner",
+                "reqs": [
+                  "NFR-040",
+                  "NFR-041"
+                ],
+                "done_when": "New developer builds Win and Linux artifacts from the guide",
+                "id": "HC-MVP1-007"
+              }
+            ],
+            "id": "HC-MVP1-E01-F01"
+          }
+        ],
+        "id": "HC-MVP1-E01"
+      },
+      {
+        "milestone": "M0",
+        "name": "Foundation: repo, shell, CI",
+        "depends": [
+          "HANDOFF"
+        ],
+        "features": [
+          {
+            "name": "Monorepo and toolchain",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Create monorepo with apps/desktop, crates, tools, content-sources, docs",
+                "reqs": [],
+                "done_when": "Layout matches handoff spec; README explains folders",
+                "id": "HC-MVP1-008"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Tauri 2 shell with React 18, TypeScript strict, Vite, Tailwind, shadcn/ui",
+                "reqs": [],
+                "done_when": "App window opens on Windows and Linux",
+                "id": "HC-MVP1-009"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Rust workspace with domain, storage, search, repertory, licence, docs, app crates (empty, compiling)",
+                "reqs": [],
+                "done_when": "cargo build and cargo test pass",
+                "id": "HC-MVP1-010"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Typed Tauri commands with tauri-specta; generated TS types checked in CI",
+                "reqs": [],
+                "done_when": "One sample command callable from UI with generated types",
+                "id": "HC-MVP1-011"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Tauri capability allowlist and webview Content Security Policy (no shell, no arbitrary FS)",
+                "reqs": [
+                  "NFR-022",
+                  "NFR-023"
+                ],
+                "done_when": "Security config reviewed; forbidden API call fails",
+                "id": "HC-MVP1-012"
+              }
+            ],
+            "id": "HC-MVP1-E02-F01"
+          },
+          {
+            "name": "CI and quality gates",
+            "reqs": [
+              "NFR-024"
+            ],
+            "tasks": [
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "CI pipeline (GitHub Actions or Forgejo Actions) building Windows and Linux artifacts on every main commit",
+                "reqs": [
+                  "NFR-040",
+                  "NFR-041"
+                ],
+                "done_when": "Artifacts downloadable from CI",
+                "id": "HC-MVP1-013"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Lint and format gates: clippy -D warnings, eslint, prettier, TS strict",
+                "reqs": [],
+                "done_when": "CI fails on any lint error",
+                "id": "HC-MVP1-014"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Dependency pinning and audit (Cargo.lock, package-lock, cargo audit, npm audit)",
+                "reqs": [
+                  "NFR-024"
+                ],
+                "done_when": "CI fails on known vulnerable dependency",
+                "id": "HC-MVP1-015"
+              }
+            ],
+            "id": "HC-MVP1-E02-F02"
+          },
+          {
+            "name": "Cross-cutting basics",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "i18n scaffold with locales/en.json; no hard-coded UI strings",
+                "reqs": [
+                  "I18N-001"
+                ],
+                "done_when": "Lint rule flags literal strings in JSX",
+                "id": "HC-MVP1-016"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Structured logging with rotation, no patient identifiers",
+                "reqs": [
+                  "NFR-013"
+                ],
+                "done_when": "Log file rotates at 10 MB x 5; test proves names are not logged",
+                "id": "HC-MVP1-017"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Error mapping to friendly messages with suggested action",
+                "reqs": [
+                  "NFR-033"
+                ],
+                "done_when": "No stack trace reaches UI in tests",
+                "id": "HC-MVP1-018"
+              },
+              {
+                "type": "doc",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "ADR folder with ADR-001 to ADR-011 copied from design",
+                "reqs": [],
+                "done_when": "docs/adr contains 11 records",
+                "id": "HC-MVP1-019"
+              }
+            ],
+            "id": "HC-MVP1-E02-F03"
+          }
+        ],
+        "id": "HC-MVP1-E02"
+      },
+      {
+        "milestone": "M1",
+        "name": "Storage, encryption, backup",
+        "depends": [
+          "M0"
+        ],
+        "features": [
+          {
+            "name": "Encrypted database",
+            "reqs": [
+              "NFR-010",
+              "NFR-020"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "SQLCipher pool: 1 writer and 4 reader connections, WAL, foreign keys, tuned pragmas",
+                "reqs": [
+                  "NFR-010"
+                ],
+                "done_when": "Concurrent read during write test passes",
+                "id": "HC-MVP1-020"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Key hierarchy: random DEK wrapped by PIN-derived KEK (Argon2id), OS store (DPAPI or Secret Service) and recovery code",
+                "reqs": [
+                  "NFR-020",
+                  "SET-004"
+                ],
+                "done_when": "Unlock works by PIN; recovery code restores access in test",
+                "id": "HC-MVP1-021"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Forward-only migrations with user_version and automatic pre-migration backup",
+                "reqs": [
+                  "NFR-011"
+                ],
+                "done_when": "Migration test from empty and from previous schema passes",
+                "id": "HC-MVP1-022"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Crash-safety test: kill process during writes in a loop, DB never corrupt",
+                "reqs": [
+                  "NFR-010",
+                  "NFR-012"
+                ],
+                "done_when": "1,000 kill cycles with integrity_check ok",
+                "id": "HC-MVP1-023"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Encrypted attachment store (AES-256-GCM blobs in files/)",
+                "reqs": [
+                  "NFR-021"
+                ],
+                "done_when": "Attachment round trip test; file on disk unreadable",
+                "id": "HC-MVP1-024"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Audit log writer used by every write command",
+                "reqs": [
+                  "ADM-002"
+                ],
+                "done_when": "Create, update, delete each produce an audit row with diff",
+                "id": "HC-MVP1-025"
+              }
+            ],
+            "id": "HC-MVP1-E03-F01"
+          },
+          {
+            "name": "First run and app lock",
+            "reqs": [
+              "SET-001",
+              "SET-002",
+              "SET-003",
+              "SET-004",
+              "SET-005",
+              "SET-006"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "First-run wizard: language, doctor profile, clinic profile, licence (trial or import)",
+                "reqs": [
+                  "SET-001",
+                  "SET-002",
+                  "SET-003"
+                ],
+                "done_when": "Wizard completes in under 3 minutes (flow 1)",
+                "id": "HC-MVP1-026"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "PIN set, unlock screen, idle auto-lock, printed recovery code",
+                "reqs": [
+                  "SET-004"
+                ],
+                "done_when": "Auto-lock after configured minutes; recovery path tested",
+                "id": "HC-MVP1-027"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Global font size setting",
+                "reqs": [
+                  "SET-005"
+                ],
+                "done_when": "Normal, Large, Extra large applied app-wide",
+                "id": "HC-MVP1-028"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Data folder location chooser",
+                "reqs": [
+                  "SET-006"
+                ],
+                "done_when": "Data moved safely to chosen folder",
+                "id": "HC-MVP1-029"
+              }
+            ],
+            "id": "HC-MVP1-E03-F02"
+          },
+          {
+            "name": "Backup and restore",
+            "reqs": [
+              "BAK-001",
+              "BAK-002",
+              "BAK-003",
+              "BAK-004",
+              "BAK-005"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": ".hcbak format: header, Argon2id key, AES-256-GCM chunked stream of DB snapshots and files",
+                "reqs": [
+                  "BAK-002"
+                ],
+                "done_when": "Round-trip test; header readable without decrypting body",
+                "id": "HC-MVP1-030"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Automatic daily backup with 14 daily, 8 weekly, 12 monthly rotation using SQLite online backup",
+                "reqs": [
+                  "BAK-001",
+                  "SUX-011"
+                ],
+                "done_when": "Rotation test over simulated 400 days; no password prompt",
+                "id": "HC-MVP1-031"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Manual backup to any folder or USB",
+                "reqs": [
+                  "BAK-002"
+                ],
+                "done_when": "Backup to USB works on Win and Linux",
+                "id": "HC-MVP1-032"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Restore wizard with preview, safety backup of current data, atomic swap, migration if older",
+                "reqs": [
+                  "BAK-003"
+                ],
+                "done_when": "Restore on clean PC with all data and attachments (flow 9)",
+                "id": "HC-MVP1-033"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Post-backup integrity check and banner if last good backup older than 7 days",
+                "reqs": [
+                  "BAK-004"
+                ],
+                "done_when": "Banner appears in test after 8 simulated days",
+                "id": "HC-MVP1-034"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Move to new computer guided flow (backup, restore, licence re-import)",
+                "reqs": [
+                  "BAK-005",
+                  "LIC-064"
+                ],
+                "done_when": "Guided flow tested end to end",
+                "id": "HC-MVP1-035"
+              }
+            ],
+            "id": "HC-MVP1-E03-F03"
+          }
+        ],
+        "id": "HC-MVP1-E03"
+      },
+      {
+        "milestone": "M2",
+        "name": "Patients and 50k search",
+        "depends": [
+          "M1"
+        ],
+        "features": [
+          {
+            "name": "Patient records",
+            "reqs": [
+              "PAT-001",
+              "PAT-002",
+              "PAT-004",
+              "PAT-005",
+              "PAT-006",
+              "PAT-008",
+              "PAT-011"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Patient registration form with age or DOB, mobile, address, occupation, referred by",
+                "reqs": [
+                  "PAT-001"
+                ],
+                "done_when": "All fields saved and validated",
+                "id": "HC-MVP1-036"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Auto patient code with configurable prefix, never reused",
+                "reqs": [
+                  "PAT-002"
+                ],
+                "done_when": "Codes unique across delete and restore",
+                "id": "HC-MVP1-037"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Patient photo from webcam or file",
+                "reqs": [
+                  "PAT-001"
+                ],
+                "done_when": "Photo captured on Win and Linux webcams",
+                "id": "HC-MVP1-038"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Duplicate warning on name plus mobile or name plus DOB",
+                "reqs": [
+                  "PAT-004"
+                ],
+                "done_when": "Warning shown in tests with Indian name variants",
+                "id": "HC-MVP1-039"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Patient dashboard: banner, alerts, visit timeline, last Rx, dues, quick actions",
+                "reqs": [
+                  "PAT-005"
+                ],
+                "done_when": "Opens in under 300 ms at 50k patients",
+                "id": "HC-MVP1-040"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Family linking and quick switch",
+                "reqs": [
+                  "PAT-006"
+                ],
+                "done_when": "Linked family visible on dashboard",
+                "id": "HC-MVP1-041"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Soft delete, 30-day recycle bin, PIN-protected permanent delete",
+                "reqs": [
+                  "PAT-008"
+                ],
+                "done_when": "Restore from bin works; permanent delete asks PIN",
+                "id": "HC-MVP1-042"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Export single patient as PDF and JSON",
+                "reqs": [
+                  "PAT-011"
+                ],
+                "done_when": "Export opens and contains all visits",
+                "id": "HC-MVP1-043"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Patient tags with filter",
+                "reqs": [
+                  "PAT-007"
+                ],
+                "done_when": "Tag filter works in list",
+                "id": "HC-MVP1-044"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.5,
+                "title": "Attachments per patient and visit with thumbnail viewer",
+                "reqs": [
+                  "PAT-009"
+                ],
+                "done_when": "Images and PDFs attach and preview",
+                "id": "HC-MVP1-045"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Consent record and printable consent form",
+                "reqs": [
+                  "PAT-012"
+                ],
+                "done_when": "Consent date stored and printable",
+                "id": "HC-MVP1-046"
+              }
+            ],
+            "id": "HC-MVP1-E04-F01"
+          },
+          {
+            "name": "Patient search",
+            "reqs": [
+              "PAT-003",
+              "PSR-001",
+              "PSR-002",
+              "PSR-003",
+              "PSR-004",
+              "PSR-005",
+              "PSR-006",
+              "PSR-007",
+              "PSR-011",
+              "PSR-012",
+              "PSR-013"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "FTS5 tables (prefix and trigram) with triggers in the same transaction",
+                "reqs": [
+                  "PSR-012"
+                ],
+                "done_when": "New patient findable immediately",
+                "id": "HC-MVP1-047"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Indian-name phonetic key (Sharma/Sarma, Mohd/Mohammad, Lakshmi/Laxmi)",
+                "reqs": [
+                  "PSR-003"
+                ],
+                "done_when": "Golden test of 200 name pairs passes",
+                "id": "HC-MVP1-048"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Ranked UNION query (exact ID or mobile, name prefix, phonetic, other fields) with keyset paging",
+                "reqs": [
+                  "PSR-004"
+                ],
+                "done_when": "Ranking golden tests pass",
+                "id": "HC-MVP1-049"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Global search box (Ctrl+K, F2), debounce, cancel on keystroke, keyboard-only flow, recent patients",
+                "reqs": [
+                  "PSR-001",
+                  "PSR-006",
+                  "PSR-007"
+                ],
+                "done_when": "Type, arrows, Enter opens patient",
+                "id": "HC-MVP1-050"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Result rows with photo, code, age, last visit, dues; virtualised list",
+                "reqs": [
+                  "PSR-005"
+                ],
+                "done_when": "Smooth scroll through 1,000 results",
+                "id": "HC-MVP1-051"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Advanced filters: dates, follow-up due, age, sex, city, tags, diagnosis, remedy, potency, dues; CSV export",
+                "reqs": [
+                  "PSR-008",
+                  "PSR-011"
+                ],
+                "done_when": "Filter \"overdue, given Sulphur\" correct (flow 2)",
+                "id": "HC-MVP1-052"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Search index rebuild tool with progress",
+                "reqs": [
+                  "PSR-013"
+                ],
+                "done_when": "Rebuild at 50k under 60 s",
+                "id": "HC-MVP1-053"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.5,
+                "title": "Full-text search in case notes with snippets",
+                "reqs": [
+                  "PSR-009"
+                ],
+                "done_when": "Snippet links to the exact visit",
+                "id": "HC-MVP1-054"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Saved filters on home screen",
+                "reqs": [
+                  "PSR-010"
+                ],
+                "done_when": "Saved filter reopens with one click",
+                "id": "HC-MVP1-055"
+              }
+            ],
+            "id": "HC-MVP1-E04-F02"
+          },
+          {
+            "name": "Scale testing",
+            "reqs": [
+              "NFR-002",
+              "NFR-007"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Synthetic data generator tools/seed for 50k and 100k realistic Indian patients, visits, Rx, bills",
+                "reqs": [
+                  "NFR-007"
+                ],
+                "done_when": "Both datasets generated in CI",
+                "id": "HC-MVP1-056"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Performance CI gate for search, dashboard, filter, Today list at 50k and 100k",
+                "reqs": [
+                  "NFR-002"
+                ],
+                "done_when": "CI fails when a budget is missed",
+                "id": "HC-MVP1-057"
+              }
+            ],
+            "id": "HC-MVP1-E04-F03"
+          }
+        ],
+        "id": "HC-MVP1-E04"
+      },
+      {
+        "milestone": "M3",
+        "name": "Case taking, visits and Today screen",
+        "depends": [
+          "M2",
+          "HANDOFF"
+        ],
+        "features": [
+          {
+            "name": "Template-driven case form",
+            "reqs": [
+              "CASE-001",
+              "CASE-002",
+              "CASE-003",
+              "CASE-004",
+              "CASE-005",
+              "CASE-009"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Form engine rendering case templates from JSON schema (text, long text, choice, number, date, scale)",
+                "reqs": [
+                  "CASE-001",
+                  "CASE-004"
+                ],
+                "done_when": "3 default templates render and validate",
+                "id": "HC-MVP1-058"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Collapsible and hideable sections per doctor; female and child sections shown conditionally",
+                "reqs": [
+                  "CASE-002"
+                ],
+                "done_when": "Hidden sections stay hidden after restart",
+                "id": "HC-MVP1-059"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Pick lists with free text (thermal, thirst, appetite and similar)",
+                "reqs": [
+                  "CASE-003"
+                ],
+                "done_when": "Pick lists editable in settings",
+                "id": "HC-MVP1-060"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Auto-save every 2 s and on blur with Saved indicator",
+                "reqs": [
+                  "CASE-005",
+                  "NFR-012"
+                ],
+                "done_when": "Kill app mid-typing; nothing lost (flow 3)",
+                "id": "HC-MVP1-061"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Vitals with BMI auto-calc",
+                "reqs": [
+                  "CASE-001"
+                ],
+                "done_when": "BMI correct in unit tests",
+                "id": "HC-MVP1-062"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Printable case summary",
+                "reqs": [
+                  "CASE-009"
+                ],
+                "done_when": "Prints on A4 per layout spec",
+                "id": "HC-MVP1-063"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Send selected text to repertory hook",
+                "reqs": [
+                  "CASE-006"
+                ],
+                "done_when": "Opens rubric search pre-filled",
+                "id": "HC-MVP1-064"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 3.0,
+                "title": "Template editor (add, remove, reorder fields)",
+                "reqs": [
+                  "CASE-004"
+                ],
+                "done_when": "Doctor builds a new template without help",
+                "id": "HC-MVP1-065"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Voice dictation via OS input in text fields",
+                "reqs": [
+                  "CASE-007"
+                ],
+                "done_when": "Windows dictation types into fields",
+                "id": "HC-MVP1-066"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Body diagram annotation (front and back)",
+                "reqs": [
+                  "CASE-008"
+                ],
+                "done_when": "Marks saved per visit",
+                "id": "HC-MVP1-067"
+              }
+            ],
+            "id": "HC-MVP1-E05-F01"
+          },
+          {
+            "name": "Visits and follow-ups",
+            "reqs": [
+              "VIS-001",
+              "VIS-002",
+              "VIS-003",
+              "VIS-004"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Visit model and types (first, follow-up, acute, tele)",
+                "reqs": [
+                  "VIS-001"
+                ],
+                "done_when": "Visits listed on timeline",
+                "id": "HC-MVP1-068"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Follow-up form pre-loading complaints with status and improvement slider",
+                "reqs": [
+                  "VIS-002"
+                ],
+                "done_when": "Status per complaint saved (flow 7)",
+                "id": "HC-MVP1-069"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Remedy response quick-pick",
+                "reqs": [
+                  "VIS-003"
+                ],
+                "done_when": "Values stored and shown on timeline",
+                "id": "HC-MVP1-070"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Next follow-up quick buttons",
+                "reqs": [
+                  "VIS-004"
+                ],
+                "done_when": "Date stored; appears in Today list",
+                "id": "HC-MVP1-071"
+              }
+            ],
+            "id": "HC-MVP1-E05-F02"
+          },
+          {
+            "name": "Today screen and appointments",
+            "reqs": [
+              "VIS-005",
+              "VIS-006",
+              "VIS-007"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Today screen: due today, overdue, today's visits; default home",
+                "reqs": [
+                  "VIS-005"
+                ],
+                "done_when": "Loads under 200 ms at 50k",
+                "id": "HC-MVP1-072"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 3.0,
+                "title": "Appointment book day view, drag to reschedule, walk-in tokens",
+                "reqs": [
+                  "VIS-006"
+                ],
+                "done_when": "Token printed and queue updates",
+                "id": "HC-MVP1-073"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Progress charts per complaint and vitals",
+                "reqs": [
+                  "VIS-007"
+                ],
+                "done_when": "Chart shows improvement across visits",
+                "id": "HC-MVP1-074"
+              }
+            ],
+            "id": "HC-MVP1-E05-F03"
+          }
+        ],
+        "id": "HC-MVP1-E05"
+      },
+      {
+        "milestone": "M4",
+        "name": "Content packs and channels",
+        "depends": [
+          "M1"
+        ],
+        "features": [
+          {
+            "name": "Pack format and loader",
+            "reqs": [
+              "PACK-001",
+              "PACK-002",
+              "PACK-005",
+              "PACK-006",
+              "PACK-007",
+              "PACK-008",
+              "PACK-013"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Pack format: zip with manifest.json, content.db, signature; manifest schema incl. distribution and licence",
+                "reqs": [
+                  "PACK-001",
+                  "PACK-002",
+                  "CONT-001"
+                ],
+                "done_when": "Schema validated in tests",
+                "id": "HC-MVP1-075"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Pack verifier and installer (signature with build-profile keys, sha256, format_version, atomic install)",
+                "reqs": [
+                  "PACK-001",
+                  "PACK-013",
+                  "CONT-003"
+                ],
+                "done_when": "Tampered and newer-format packs rejected",
+                "id": "HC-MVP1-076"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Generic repertory schema with per-pack grade scale, display style, page refs, author codes",
+                "reqs": [
+                  "PACK-007"
+                ],
+                "done_when": "Pack with 1-4 grade scale works without code change",
+                "id": "HC-MVP1-077"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Remedy master mapping on install; unmapped remedies added and flagged",
+                "reqs": [
+                  "PACK-008",
+                  "MM-001"
+                ],
+                "done_when": "Two packs share remedy ids in one analysis",
+                "id": "HC-MVP1-078"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Stable rubric ids across pack versions with id map",
+                "reqs": [
+                  "PACK-005"
+                ],
+                "done_when": "Old analysis opens after pack update",
+                "id": "HC-MVP1-079"
+              }
+            ],
+            "id": "HC-MVP1-E06-F01"
+          },
+          {
+            "name": "Build profiles and release gate",
+            "reqs": [
+              "CONT-002",
+              "CONT-003",
+              "CONT-004",
+              "CONT-005"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Internal and public build profiles embedding different content keys",
+                "reqs": [
+                  "CONT-003"
+                ],
+                "done_when": "Public build refuses eval pack copied in by hand",
+                "id": "HC-MVP1-080"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Internal build banner and EVALUATION mark on every print",
+                "reqs": [
+                  "CONT-004"
+                ],
+                "done_when": "Visible in all print templates",
+                "id": "HC-MVP1-081"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Release gate: fail public build if eval pack, eval key or internal-eval file present",
+                "reqs": [
+                  "CONT-005"
+                ],
+                "done_when": "Gate fails on a planted file in test",
+                "id": "HC-MVP1-082"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Bundle the packs allowed for each build profile in the installer",
+                "reqs": [
+                  "PACK-003"
+                ],
+                "done_when": "Internal installer has eval packs; public installer has only public packs",
+                "id": "HC-MVP1-083"
+              }
+            ],
+            "id": "HC-MVP1-E06-F02"
+          },
+          {
+            "name": "content-builder tool",
+            "reqs": [
+              "CONT-006",
+              "CONT-007",
+              "CONT-008",
+              "CONT-009",
+              "CONT-010"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Registry enforcement: refuse sources without REGISTRY.md row",
+                "reqs": [
+                  "CONT-006"
+                ],
+                "done_when": "Build fails for unregistered source",
+                "id": "HC-MVP1-084"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "import-oorep: parse oorep.sql.gz into one pack per repertory and per MM; ignore user tables",
+                "reqs": [
+                  "CONT-009"
+                ],
+                "done_when": "eval-publicum, eval-kent-de, eval-boericke-mm, eval-remedy-master built",
+                "id": "HC-MVP1-085"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Generic CSV and Excel importer (chapter, rubric path, remedy, grade, citation)",
+                "reqs": [
+                  "CONT-009",
+                  "PACK-011"
+                ],
+                "done_when": "Sample CSV builds a valid pack",
+                "id": "HC-MVP1-086"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Build FTS, top5_json, sign with channel key",
+                "reqs": [
+                  "CONT-002",
+                  "REP-015"
+                ],
+                "done_when": "Pack opens and searches in app",
+                "id": "HC-MVP1-087"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Import report with counts, unmapped remedies, grade distribution, diff vs previous build",
+                "reqs": [
+                  "CONT-010"
+                ],
+                "done_when": "Report generated for every build",
+                "id": "HC-MVP1-088"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Promote pack from internal_eval to public by registry change and re-sign",
+                "reqs": [
+                  "CONT-008"
+                ],
+                "done_when": "Ids unchanged after promotion",
+                "id": "HC-MVP1-089"
+              }
+            ],
+            "id": "HC-MVP1-E06-F03"
+          },
+          {
+            "name": "Content creation",
+            "reqs": [
+              "REP-012",
+              "REP-016"
+            ],
+            "tasks": [
+              {
+                "type": "content",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Starter sample pack (5 rubrics x 6 remedies) with hand-computed scoring fixtures",
+                "reqs": [
+                  "REP-033"
+                ],
+                "done_when": "Fixtures used by M6 tests",
+                "id": "HC-MVP1-090"
+              },
+              {
+                "type": "content",
+                "priority": "P0",
+                "estimate_days": 8.0,
+                "title": "Synonym and modern-language mapping table, 2,000 entries, language-tagged",
+                "reqs": [
+                  "REP-012",
+                  "REP-016"
+                ],
+                "done_when": "Synonym pack built; search golden tests use it",
+                "id": "HC-MVP1-091"
+              },
+              {
+                "type": "content",
+                "priority": "P1",
+                "estimate_days": 5.0,
+                "title": "Glossary of 1,000 archaic terms in plain English",
+                "reqs": [
+                  "REP-012"
+                ],
+                "done_when": "Glossary pack built",
+                "id": "HC-MVP1-092"
+              },
+              {
+                "type": "content",
+                "priority": "P1",
+                "estimate_days": 3.0,
+                "title": "Remedy relationships table from public-domain sources",
+                "reqs": [
+                  "MM-005",
+                  "RX-008"
+                ],
+                "done_when": "Relationships pack built",
+                "id": "HC-MVP1-093"
+              },
+              {
+                "type": "content",
+                "priority": "P0",
+                "estimate_days": 20.0,
+                "title": "Public repertory for release: OOREP permission (Q16) or OCR and proofreading of Kent 1897",
+                "reqs": [
+                  "REP-001",
+                  "CONT-008"
+                ],
+                "done_when": "A public-channel Kent pack passes proofreading targets",
+                "id": "HC-MVP1-094"
+              }
+            ],
+            "id": "HC-MVP1-E06-F04"
+          }
+        ],
+        "id": "HC-MVP1-E06"
+      },
+      {
+        "milestone": "M5",
+        "name": "Rubric search, repertory browser, materia medica",
+        "depends": [
+          "M4"
+        ],
+        "features": [
+          {
+            "name": "Rubric search",
+            "reqs": [
+              "REP-010",
+              "REP-011",
+              "REP-012",
+              "REP-013",
+              "REP-014",
+              "REP-015",
+              "REP-017"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Rubric search over all enabled packs with synonym and abbreviation expansion and ranking",
+                "reqs": [
+                  "REP-010",
+                  "REP-011",
+                  "REP-012",
+                  "REP-013"
+                ],
+                "done_when": "Golden queries return expected top rubrics",
+                "id": "HC-MVP1-095"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Filters: repertory, chapter, minimum remedy count, contains remedy",
+                "reqs": [
+                  "REP-014"
+                ],
+                "done_when": "Each filter covered by tests",
+                "id": "HC-MVP1-096"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Result rows with full path, count, top 5 remedies, source",
+                "reqs": [
+                  "REP-015"
+                ],
+                "done_when": "Rows render from top5_json",
+                "id": "HC-MVP1-097"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Performance test on publicum + kent-de: under 100 ms per keystroke",
+                "reqs": [
+                  "NFR-003"
+                ],
+                "done_when": "CI perf test green",
+                "id": "HC-MVP1-098"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Recent and favourite rubrics",
+                "reqs": [
+                  "REP-017"
+                ],
+                "done_when": "Lists persist across restart",
+                "id": "HC-MVP1-099"
+              }
+            ],
+            "id": "HC-MVP1-E07-F01"
+          },
+          {
+            "name": "Repertory browser",
+            "reqs": [
+              "REP-020",
+              "REP-021",
+              "REP-022",
+              "REP-023",
+              "REP-024"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Book view: chapter list, rubric tree, breadcrumb, keyboard navigation",
+                "reqs": [
+                  "REP-020"
+                ],
+                "done_when": "Navigate Kent tree with keyboard only",
+                "id": "HC-MVP1-100"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Rubric detail with grade styling, counts, cross-references, parent and children",
+                "reqs": [
+                  "REP-021"
+                ],
+                "done_when": "Matches repertory wireframe",
+                "id": "HC-MVP1-101"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Remedy popup with keynotes and open-in-MM",
+                "reqs": [
+                  "REP-022"
+                ],
+                "done_when": "Popup loads under 100 ms",
+                "id": "HC-MVP1-102"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.5,
+                "title": "Compare same rubric across two repertories",
+                "reqs": [
+                  "REP-023"
+                ],
+                "done_when": "Side-by-side view works",
+                "id": "HC-MVP1-103"
+              }
+            ],
+            "id": "HC-MVP1-E07-F02"
+          },
+          {
+            "name": "Materia medica reader",
+            "reqs": [
+              "MM-001",
+              "MM-002",
+              "MM-003",
+              "MM-004",
+              "MM-005"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "MM reader with remedy list and sections",
+                "reqs": [
+                  "MM-002"
+                ],
+                "done_when": "Boericke readable section by section",
+                "id": "HC-MVP1-104"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Full-text search across MM books with highlight",
+                "reqs": [
+                  "MM-002"
+                ],
+                "done_when": "Search hits highlighted",
+                "id": "HC-MVP1-105"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Compare one remedy across books",
+                "reqs": [
+                  "MM-003"
+                ],
+                "done_when": "Same section from each book side by side",
+                "id": "HC-MVP1-106"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Bookmarks and notes on paragraphs",
+                "reqs": [
+                  "MM-004"
+                ],
+                "done_when": "Notes saved in user_content.db",
+                "id": "HC-MVP1-107"
+              }
+            ],
+            "id": "HC-MVP1-E07-F03"
+          },
+          {
+            "name": "Repertory manager",
+            "reqs": [
+              "PACK-009",
+              "CONT-007",
+              "PACK-011",
+              "PACK-012"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Repertory manager: list, install from file, enable, disable, default, uninstall with saved-analysis guard",
+                "reqs": [
+                  "PACK-009",
+                  "CONT-007"
+                ],
+                "done_when": "Install from USB and uninstall work (flow 11)",
+                "id": "HC-MVP1-108"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 3.0,
+                "title": "Doctor-built repertory in app and Excel import; export as unsigned pack",
+                "reqs": [
+                  "PACK-011"
+                ],
+                "done_when": "Imported pack shows Unverified badge",
+                "id": "HC-MVP1-109"
+              },
+              {
+                "type": "doc",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Publisher SDK: pack format spec, JSON schema, content-builder guide",
+                "reqs": [
+                  "PACK-012"
+                ],
+                "done_when": "Spec published in docs",
+                "id": "HC-MVP1-110"
+              }
+            ],
+            "id": "HC-MVP1-E07-F04"
+          }
+        ],
+        "id": "HC-MVP1-E07"
+      },
+      {
+        "milestone": "M6",
+        "name": "Repertorisation and citations",
+        "depends": [
+          "M5",
+          "M3"
+        ],
+        "features": [
+          {
+            "name": "Repertorisation workspace",
+            "reqs": [
+              "REP-030",
+              "REP-031",
+              "REP-032",
+              "REP-037",
+              "REP-038"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Case clipboard linked to visit, up to 10 named clipboards, combine",
+                "reqs": [
+                  "REP-030",
+                  "REP-031"
+                ],
+                "done_when": "Clipboard saved with visit",
+                "id": "HC-MVP1-111"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Per-rubric weight, eliminative, causation, exclude; keyboard shortcuts",
+                "reqs": [
+                  "REP-032"
+                ],
+                "done_when": "Settings change results live",
+                "id": "HC-MVP1-112"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Prescribe from result pre-fills Rx",
+                "reqs": [
+                  "REP-037"
+                ],
+                "done_when": "Rx form opens with remedy",
+                "id": "HC-MVP1-113"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Save analysis snapshot with visit and reopen identically",
+                "reqs": [
+                  "REP-038"
+                ],
+                "done_when": "Snapshot survives pack changes",
+                "id": "HC-MVP1-114"
+              }
+            ],
+            "id": "HC-MVP1-E08-F01"
+          },
+          {
+            "name": "Scoring engine",
+            "reqs": [
+              "REP-033",
+              "REP-036",
+              "NFR-004"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Bitset scoring engine with LRU cache",
+                "reqs": [
+                  "REP-036"
+                ],
+                "done_when": "30 rubrics recompute under 300 ms on reference PC",
+                "id": "HC-MVP1-115"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Six analysis methods (sum, totality, Kent, Boenninghausen, elimination, small-rubric bonus)",
+                "reqs": [
+                  "REP-033"
+                ],
+                "done_when": "Hand-computed fixtures pass for every method",
+                "id": "HC-MVP1-116"
+              }
+            ],
+            "id": "HC-MVP1-E08-F02"
+          },
+          {
+            "name": "Results display",
+            "reqs": [
+              "REP-034",
+              "REP-035",
+              "REP-039",
+              "REP-040",
+              "REP-041",
+              "REP-042"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Result grid (rubrics x remedies, grades, scores, coverage)",
+                "reqs": [
+                  "REP-034"
+                ],
+                "done_when": "Matches wireframe; sortable",
+                "id": "HC-MVP1-117"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Ranked list and bar graph views",
+                "reqs": [
+                  "REP-035"
+                ],
+                "done_when": "Toggle grid, list, graph",
+                "id": "HC-MVP1-118"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Remedy differentiation view",
+                "reqs": [
+                  "REP-039"
+                ],
+                "done_when": "2 to 5 remedies compared",
+                "id": "HC-MVP1-119"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Kingdom and family filter",
+                "reqs": [
+                  "REP-040"
+                ],
+                "done_when": "Filter applied to results",
+                "id": "HC-MVP1-120"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Relationship hints on top results",
+                "reqs": [
+                  "REP-041"
+                ],
+                "done_when": "Inimical warning shown when relevant",
+                "id": "HC-MVP1-121"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Print repertorisation chart",
+                "reqs": [
+                  "REP-042"
+                ],
+                "done_when": "Chart prints on A4",
+                "id": "HC-MVP1-122"
+              },
+              {
+                "type": "dev",
+                "priority": "P2",
+                "estimate_days": 2.0,
+                "title": "Cross-repertorisation across multiple repertories with grade normalisation",
+                "reqs": [
+                  "REP-043"
+                ],
+                "done_when": "Mixed-pack analysis matches fixtures",
+                "id": "HC-MVP1-123"
+              }
+            ],
+            "id": "HC-MVP1-E08-F03"
+          },
+          {
+            "name": "Smart helpers",
+            "reqs": [
+              "CASE-006"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Symptom-to-rubric helper under case form lines (FTS plus synonyms)",
+                "reqs": [
+                  "CASE-006"
+                ],
+                "done_when": "3 suggestions per line; one click adds",
+                "id": "HC-MVP1-124"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 3.0,
+                "title": "Guided acute mode (fever, cold, cough, diarrhoea, injury)",
+                "reqs": [
+                  "REP-033"
+                ],
+                "done_when": "5 to 8 taps produce ranked remedies",
+                "id": "HC-MVP1-125"
+              }
+            ],
+            "id": "HC-MVP1-E08-F04"
+          },
+          {
+            "name": "Citations and doctor additions",
+            "reqs": [
+              "CIT-001",
+              "CIT-002",
+              "CIT-003",
+              "CIT-004",
+              "CIT-005",
+              "CIT-006",
+              "REP-024"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Source library and citation CRUD with all fields",
+                "reqs": [
+                  "CIT-002",
+                  "CIT-003"
+                ],
+                "done_when": "Sources reusable via autocomplete",
+                "id": "HC-MVP1-126"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Citation links to rubric, rubric-remedy, user rubric, MM section, analysis rubric, prescription",
+                "reqs": [
+                  "CIT-001"
+                ],
+                "done_when": "Each target type tested",
+                "id": "HC-MVP1-127"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Clinical-experience citation linked to patient and visits",
+                "reqs": [
+                  "CIT-004"
+                ],
+                "done_when": "Click opens the case",
+                "id": "HC-MVP1-128"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "My repertory layer: add remedy or rubric with citation, visually marked",
+                "reqs": [
+                  "REP-024",
+                  "CIT-006"
+                ],
+                "done_when": "Quick-add under 20 seconds",
+                "id": "HC-MVP1-129"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Citation markers with hover details",
+                "reqs": [
+                  "CIT-005"
+                ],
+                "done_when": "Marker visible in rubric detail and grid",
+                "id": "HC-MVP1-130"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Include or exclude additions and confidence filter in analysis",
+                "reqs": [
+                  "CIT-008"
+                ],
+                "done_when": "Results change only when toggled",
+                "id": "HC-MVP1-131"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Citations list screen and CSV or PDF export",
+                "reqs": [
+                  "CIT-007"
+                ],
+                "done_when": "Export opens in Excel",
+                "id": "HC-MVP1-132"
+              },
+              {
+                "type": "dev",
+                "priority": "P2",
+                "estimate_days": 1.0,
+                "title": "Suggest-to-publisher export of confirmed additions",
+                "reqs": [
+                  "CIT-010"
+                ],
+                "done_when": "Export file in documented format",
+                "id": "HC-MVP1-133"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Citations survive backup and restore",
+                "reqs": [
+                  "CIT-009"
+                ],
+                "done_when": "Flow 11 citation steps pass",
+                "id": "HC-MVP1-134"
+              }
+            ],
+            "id": "HC-MVP1-E08-F05"
+          }
+        ],
+        "id": "HC-MVP1-E08"
+      },
+      {
+        "milestone": "M7",
+        "name": "Prescription and printing",
+        "depends": [
+          "M3"
+        ],
+        "features": [
+          {
+            "name": "Prescription",
+            "reqs": [
+              "RX-001",
+              "RX-002",
+              "RX-003",
+              "RX-004",
+              "RX-007",
+              "RX-008"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Rx items with remedy autocomplete, potency, form, dose, frequency, duration, instructions",
+                "reqs": [
+                  "RX-001"
+                ],
+                "done_when": "Abbreviations like sulph resolve",
+                "id": "HC-MVP1-135"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Placebo entries and hide-remedy-name on print",
+                "reqs": [
+                  "RX-002"
+                ],
+                "done_when": "Real remedy stored, hidden on print",
+                "id": "HC-MVP1-136"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Favourites and saved Rx templates",
+                "reqs": [
+                  "RX-003"
+                ],
+                "done_when": "Template inserted in one click",
+                "id": "HC-MVP1-137"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Repeat last prescription",
+                "reqs": [
+                  "RX-004"
+                ],
+                "done_when": "One click copies last Rx",
+                "id": "HC-MVP1-138"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Advice library (diet, avoid list) multi-select",
+                "reqs": [
+                  "RX-007"
+                ],
+                "done_when": "Advice prints on Rx",
+                "id": "HC-MVP1-139"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Inimical remedy warning",
+                "reqs": [
+                  "RX-008"
+                ],
+                "done_when": "Warning shown with source",
+                "id": "HC-MVP1-140"
+              }
+            ],
+            "id": "HC-MVP1-E09-F01"
+          },
+          {
+            "name": "Print engine",
+            "reqs": [
+              "RX-005",
+              "RX-006",
+              "LIC-006"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "hc-docs: HTML templates to PDF via webview, Unicode fonts, Indian number format",
+                "reqs": [
+                  "RX-005"
+                ],
+                "done_when": "Rx, receipt, case paper render to PDF",
+                "id": "HC-MVP1-141"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Page setups A4, A5, letterhead with margin calibration",
+                "reqs": [
+                  "RX-005"
+                ],
+                "done_when": "Prints correctly on a pilot doctor's letterhead",
+                "id": "HC-MVP1-142"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Doctor identity on prints read from verified licence only",
+                "reqs": [
+                  "LIC-006",
+                  "TAM-014"
+                ],
+                "done_when": "Editing DB does not change printed name",
+                "id": "HC-MVP1-143"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Save Rx PDF and WhatsApp share link",
+                "reqs": [
+                  "RX-006"
+                ],
+                "done_when": "Flow 6 passes",
+                "id": "HC-MVP1-144"
+              }
+            ],
+            "id": "HC-MVP1-E09-F02"
+          },
+          {
+            "name": "Legacy prints (pending decision Q1 and Q3)",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Medical certificate, referral letter, envelope, declaration print templates",
+                "reqs": [],
+                "done_when": "Only if Q1 accepted",
+                "id": "HC-MVP1-145"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Birthday list on Today screen",
+                "reqs": [],
+                "done_when": "Only if Q1 accepted",
+                "id": "HC-MVP1-146"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.5,
+                "title": "Marathi advice and diet sheet print with Noto Devanagari",
+                "reqs": [],
+                "done_when": "Only if Q3 accepted",
+                "id": "HC-MVP1-147"
+              }
+            ],
+            "id": "HC-MVP1-E09-F03"
+          }
+        ],
+        "id": "HC-MVP1-E09"
+      },
+      {
+        "milestone": "M8",
+        "name": "Billing and reports",
+        "depends": [
+          "M7"
+        ],
+        "features": [
+          {
+            "name": "Billing",
+            "reqs": [
+              "BILL-001",
+              "BILL-002",
+              "BILL-003",
+              "BILL-005",
+              "BILL-006"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Invoice with lines, discount, payments by mode, balance; money in paise",
+                "reqs": [
+                  "BILL-001"
+                ],
+                "done_when": "No rounding errors in tests",
+                "id": "HC-MVP1-148"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Running patient balance on dashboard",
+                "reqs": [
+                  "BILL-002"
+                ],
+                "done_when": "Dues update after payment",
+                "id": "HC-MVP1-149"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Receipt print with FY sequential number and amount in words",
+                "reqs": [
+                  "BILL-003"
+                ],
+                "done_when": "Numbering restarts each April",
+                "id": "HC-MVP1-150"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Clinic UPI QR for patient payments (doctor's own UPI ID)",
+                "reqs": [
+                  "BILL-005"
+                ],
+                "done_when": "Patient scans and pays doctor; doctor marks paid",
+                "id": "HC-MVP1-151"
+              },
+              {
+                "type": "dev",
+                "priority": "P2",
+                "estimate_days": 1.0,
+                "title": "GST invoice fields if GSTIN set",
+                "reqs": [
+                  "BILL-006"
+                ],
+                "done_when": "GST fields print only when set",
+                "id": "HC-MVP1-152"
+              }
+            ],
+            "id": "HC-MVP1-E10-F01"
+          },
+          {
+            "name": "Reports",
+            "reqs": [
+              "BILL-004"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Daily collection by mode and monthly summary; Excel and CSV export",
+                "reqs": [
+                  "BILL-004"
+                ],
+                "done_when": "Flow 8 totals correct",
+                "id": "HC-MVP1-153"
+              }
+            ],
+            "id": "HC-MVP1-E10-F02"
+          }
+        ],
+        "id": "HC-MVP1-E10"
+      },
+      {
+        "milestone": "M9",
+        "name": "Licensing and UPI purchase",
+        "depends": [
+          "M1",
+          "M7"
+        ],
+        "features": [
+          {
+            "name": "Licence core (hc-licence)",
+            "reqs": [
+              "LIC-001",
+              "LIC-002",
+              "LIC-004",
+              "LIC-005",
+              "LIC-006",
+              "LIC-007"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Licence payload (CBOR), Ed25519 verify with 2 embedded keys, key_id",
+                "reqs": [
+                  "LIC-001",
+                  "LIC-002"
+                ],
+                "done_when": "Valid licence verifies; edited byte fails",
+                "id": "HC-MVP1-154"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Licence storage in data folder and OS secure store",
+                "reqs": [
+                  "LIC-004"
+                ],
+                "done_when": "Survives reinstall when data folder kept",
+                "id": "HC-MVP1-155"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Clock-rollback guard",
+                "reqs": [
+                  "LIC-005"
+                ],
+                "done_when": "Clock set back 1 year still expires",
+                "id": "HC-MVP1-156"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Identity lock of name and reg no; one licensed doctor per install",
+                "reqs": [
+                  "LIC-006",
+                  "LIC-007"
+                ],
+                "done_when": "Settings fields locked after import",
+                "id": "HC-MVP1-157"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Licence state machine (Unlicensed, Trial, Active, Grace, ReadOnly, Tampered)",
+                "reqs": [
+                  "LIC-020",
+                  "LIC-063"
+                ],
+                "done_when": "State diagram transitions tested",
+                "id": "HC-MVP1-158"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Local 30-day trial from signed seed",
+                "reqs": [
+                  "LIC-063"
+                ],
+                "done_when": "Trial starts offline at first run",
+                "id": "HC-MVP1-159"
+              }
+            ],
+            "id": "HC-MVP1-E11-F01"
+          },
+          {
+            "name": "Buy screen (offline)",
+            "reqs": [
+              "PAY-010",
+              "PAY-011",
+              "PAY-012",
+              "PAY-013",
+              "PAY-014",
+              "PAY-015",
+              "PAY-016"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Buy screen per wireframe: plan, details, consent, identity warning",
+                "reqs": [
+                  "PAY-010"
+                ],
+                "done_when": "Matches diagram 20",
+                "id": "HC-MVP1-160"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Offline UPI QR (upi://pay with UPI ID, payee, amount, note, tr) plus copy fallback",
+                "reqs": [
+                  "PAY-011"
+                ],
+                "done_when": "GPay, PhonePe, Paytm, BHIM show correct payee, amount, note",
+                "id": "HC-MVP1-161"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "WhatsApp click-to-chat QR with pre-typed message plus copy fallback",
+                "reqs": [
+                  "PAY-013"
+                ],
+                "done_when": "Message opens fully filled on Android and iPhone",
+                "id": "HC-MVP1-162"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Signed offer codes changing QR amount",
+                "reqs": [
+                  "PAY-012"
+                ],
+                "done_when": "Forged or expired code rejected",
+                "id": "HC-MVP1-163"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "install_id generation and display",
+                "reqs": [
+                  "PAY-014"
+                ],
+                "done_when": "Id stable across restarts",
+                "id": "HC-MVP1-164"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Encrypted constants for UPI ID, WhatsApp number, keys",
+                "reqs": [
+                  "PAY-015",
+                  "TAM-003"
+                ],
+                "done_when": "strings scan finds none",
+                "id": "HC-MVP1-165"
+              }
+            ],
+            "id": "HC-MVP1-E11-F02"
+          },
+          {
+            "name": "Licence import",
+            "reqs": [
+              "LIC-060",
+              "LIC-061",
+              "LIC-062",
+              "LIC-064"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Import .hclic by drag-drop, file picker and double-click file association",
+                "reqs": [
+                  "LIC-060"
+                ],
+                "done_when": "All three paths work on Win and Linux",
+                "id": "HC-MVP1-166"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Scan certificate QR with webcam",
+                "reqs": [
+                  "LIC-060"
+                ],
+                "done_when": "Scans printed and on-screen PDF QR",
+                "id": "HC-MVP1-167"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Typed licence key with per-group check and identity hash match",
+                "reqs": [
+                  "LIC-046",
+                  "LIC-062"
+                ],
+                "done_when": "Wrong group reported precisely",
+                "id": "HC-MVP1-168"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Confirmation card and apply",
+                "reqs": [
+                  "LIC-061"
+                ],
+                "done_when": "Card shows name, reg no, plan, expiry",
+                "id": "HC-MVP1-169"
+              }
+            ],
+            "id": "HC-MVP1-E11-F03"
+          },
+          {
+            "name": "Expiry",
+            "reqs": [
+              "LIC-020",
+              "LIC-021",
+              "SUX-008"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Grace period, read-only mode, ongoing visit can finish",
+                "reqs": [
+                  "LIC-020",
+                  "SUX-008"
+                ],
+                "done_when": "Flow 10 read-only checks pass",
+                "id": "HC-MVP1-170"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Reminders at 30, 15, 7, 1 days with Renew opening Buy screen",
+                "reqs": [
+                  "LIC-021"
+                ],
+                "done_when": "Reminder shown in clock tests",
+                "id": "HC-MVP1-171"
+              }
+            ],
+            "id": "HC-MVP1-E11-F04"
+          },
+          {
+            "name": "Vendor Licence Tool (internal)",
+            "reqs": [
+              "LIC-040",
+              "LIC-041",
+              "LIC-042",
+              "LIC-043",
+              "LIC-044",
+              "LIC-045",
+              "LIC-047",
+              "LIC-048",
+              "LIC-049",
+              "LIC-050"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "WhatsApp message parser for the fixed message format",
+                "reqs": [
+                  "LIC-040"
+                ],
+                "done_when": "All fields parsed from sample messages",
+                "id": "HC-MVP1-172"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Register DB (SQLCipher) with unique UTR, customers, licences, invoices",
+                "reqs": [
+                  "LIC-042",
+                  "LIC-048"
+                ],
+                "done_when": "Duplicate UTR refused",
+                "id": "HC-MVP1-173"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Plan from amount, under and over payment handling, renewal stacking",
+                "reqs": [
+                  "LIC-043",
+                  "LIC-044"
+                ],
+                "done_when": "Renewal extends from current expiry",
+                "id": "HC-MVP1-174"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Signing on hardware key",
+                "reqs": [
+                  "LIC-047"
+                ],
+                "done_when": "Licence verifies in app; key never leaves token",
+                "id": "HC-MVP1-175"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Outputs: .hclic, certificate PDF with QR and key text, GST invoice, email draft, WhatsApp reply",
+                "reqs": [
+                  "LIC-045"
+                ],
+                "done_when": "Operator sends a licence in under 5 minutes",
+                "id": "HC-MVP1-176"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Register export to Excel and daily encrypted backup",
+                "reqs": [
+                  "LIC-048"
+                ],
+                "done_when": "Export opens; backup restores",
+                "id": "HC-MVP1-177"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Dealer tagging",
+                "reqs": [
+                  "LIC-050"
+                ],
+                "done_when": "Licences filterable by dealer",
+                "id": "HC-MVP1-178"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "End-to-end purchase with clinic PC offline in under 30 minutes",
+                "reqs": [
+                  "SUX-010"
+                ],
+                "done_when": "03 section 8 MVP1 tests pass",
+                "id": "HC-MVP1-179"
+              }
+            ],
+            "id": "HC-MVP1-E11-F05"
+          }
+        ],
+        "id": "HC-MVP1-E11"
+      },
+      {
+        "milestone": "M10",
+        "name": "Hardening, packaging and release",
+        "depends": [
+          "M9",
+          "M8",
+          "M6"
+        ],
+        "features": [
+          {
+            "name": "Tamper protection",
+            "reqs": [
+              "TAM-001",
+              "TAM-002",
+              "TAM-003",
+              "TAM-004",
+              "TAM-005",
+              "TAM-006",
+              "TAM-007",
+              "TAM-008",
+              "TAM-010",
+              "TAM-012",
+              "TAM-013",
+              "TAM-014"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Encrypted embedded UI assets decrypted in memory",
+                "reqs": [
+                  "TAM-001"
+                ],
+                "done_when": "No loose JS on disk; startup within budget",
+                "id": "HC-MVP1-180"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Hardened release profile (fat LTO, strip, no devtools)",
+                "reqs": [
+                  "TAM-002"
+                ],
+                "done_when": "Release scan finds no symbols or devtools",
+                "id": "HC-MVP1-181"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Compile-time string encryption for sensitive constants",
+                "reqs": [
+                  "TAM-003"
+                ],
+                "done_when": "strings scan clean",
+                "id": "HC-MVP1-182"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Multi-site licence checks (startup, write commands, timer)",
+                "reqs": [
+                  "TAM-004"
+                ],
+                "done_when": "Patching one check does not unlock writes",
+                "id": "HC-MVP1-183"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Self-integrity manifest signed at build and verified in background",
+                "reqs": [
+                  "TAM-005",
+                  "SUX-002"
+                ],
+                "done_when": "One-byte patch leads to Repair then read-only",
+                "id": "HC-MVP1-184"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Authenticode EV signing and GPG signing in CI",
+                "reqs": [
+                  "TAM-006",
+                  "NFR-025"
+                ],
+                "done_when": "Signatures verify; no SmartScreen warning",
+                "id": "HC-MVP1-185"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Per-licence watermark",
+                "reqs": [
+                  "TAM-010"
+                ],
+                "done_when": "Licence id traceable in test outputs",
+                "id": "HC-MVP1-186"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Release scan job (symbols, devtools, secrets, signatures, eval content)",
+                "reqs": [
+                  "TAM-012",
+                  "CONT-005"
+                ],
+                "done_when": "Job blocks a bad build",
+                "id": "HC-MVP1-187"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Anti-debug and anti-hook, silent",
+                "reqs": [
+                  "TAM-007"
+                ],
+                "done_when": "Debugger disables paid paths without crash",
+                "id": "HC-MVP1-188"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Targeted obfuscation of hc-licence",
+                "reqs": [
+                  "TAM-008"
+                ],
+                "done_when": "No measurable slowdown elsewhere",
+                "id": "HC-MVP1-189"
+              }
+            ],
+            "id": "HC-MVP1-E12-F01"
+          },
+          {
+            "name": "Security UX guardrails",
+            "reqs": [
+              "SUX-001",
+              "SUX-002",
+              "SUX-003",
+              "SUX-004",
+              "SUX-005",
+              "SUX-006",
+              "SUX-007",
+              "SUX-008",
+              "SUX-009",
+              "SUX-011",
+              "SUX-012"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Two-check rule and self-repair before any restriction",
+                "reqs": [
+                  "SUX-005",
+                  "SUX-006"
+                ],
+                "done_when": "AV quarantine test triggers Repair",
+                "id": "HC-MVP1-190"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Friendly restriction messages with one action button",
+                "reqs": [
+                  "SUX-007"
+                ],
+                "done_when": "Copy reviewed by a pilot doctor",
+                "id": "HC-MVP1-191"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Run all perf budgets on the protected build",
+                "reqs": [
+                  "SUX-001"
+                ],
+                "done_when": "Overhead within limits",
+                "id": "HC-MVP1-192"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Reference-PC perf suite: cold start under 4 s, Rx preview under 1 s, RAM under 300 MB, installer size",
+                "reqs": [
+                  "NFR-001",
+                  "NFR-005",
+                  "NFR-006"
+                ],
+                "done_when": "Suite green on i3 4 GB HDD reference PC",
+                "id": "HC-MVP1-193"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Antivirus scan of every release (Defender and top 5 Indian AV)",
+                "reqs": [
+                  "SUX-009"
+                ],
+                "done_when": "Zero detections",
+                "id": "HC-MVP1-194"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Support health-check screen",
+                "reqs": [
+                  "SUX-012"
+                ],
+                "done_when": "Support resolves a test case in one call",
+                "id": "HC-MVP1-195"
+              }
+            ],
+            "id": "HC-MVP1-E12-F02"
+          },
+          {
+            "name": "Installers and updates",
+            "reqs": [
+              "NFR-040",
+              "NFR-041",
+              "NFR-042",
+              "NFR-043"
+            ],
+            "tasks": [
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Windows NSIS and MSI, per-user install, offline WebView2 bootstrapper",
+                "reqs": [
+                  "NFR-040"
+                ],
+                "done_when": "Installs on Windows 10 without internet",
+                "id": "HC-MVP1-196"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Linux AppImage and .deb",
+                "reqs": [
+                  "NFR-041"
+                ],
+                "done_when": "Installs on Ubuntu 20.04 and Debian 11",
+                "id": "HC-MVP1-197"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Install update from USB file with signature check; optional static manifest check",
+                "reqs": [
+                  "NFR-042",
+                  "NFR-022"
+                ],
+                "done_when": "Signed update installs offline; unsigned refused",
+                "id": "HC-MVP1-198"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Uninstall keeps data unless ticked with PIN",
+                "reqs": [
+                  "NFR-043"
+                ],
+                "done_when": "Data folder remains after uninstall",
+                "id": "HC-MVP1-199"
+              }
+            ],
+            "id": "HC-MVP1-E12-F03"
+          },
+          {
+            "name": "Usability and polish",
+            "reqs": [
+              "ADM-001",
+              "ADM-003",
+              "ADM-004",
+              "ADM-005",
+              "NFR-030",
+              "NFR-032",
+              "NFR-034",
+              "NFR-035"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Settings screens for profile, print layouts, fees, ID prefix, auto-lock",
+                "reqs": [
+                  "ADM-001"
+                ],
+                "done_when": "All settings persist",
+                "id": "HC-MVP1-200"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Bundled offline help pages and links to videos",
+                "reqs": [
+                  "ADM-004"
+                ],
+                "done_when": "Help opens offline",
+                "id": "HC-MVP1-201"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 0.5,
+                "title": "Diagnostic report zip without patient data",
+                "reqs": [
+                  "ADM-005"
+                ],
+                "done_when": "Zip contains no patient names in test",
+                "id": "HC-MVP1-202"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Keyboard shortcuts screen",
+                "reqs": [
+                  "ADM-003"
+                ],
+                "done_when": "F1 to F8 and Ctrl+P documented and working",
+                "id": "HC-MVP1-203"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Accessibility pass: contrast, focus, screen-reader labels, 14 px minimum, 1366x768",
+                "reqs": [
+                  "NFR-032",
+                  "NFR-034"
+                ],
+                "done_when": "Audit checklist passed",
+                "id": "HC-MVP1-204"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Undo for destructive actions",
+                "reqs": [
+                  "NFR-035"
+                ],
+                "done_when": "Undo works for clipboard and Rx lines",
+                "id": "HC-MVP1-205"
+              }
+            ],
+            "id": "HC-MVP1-E12-F04"
+          },
+          {
+            "name": "Acceptance",
+            "reqs": [
+              "NFR-031"
+            ],
+            "tasks": [
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Automate the 13 core flows with Playwright on Win and Linux, network disabled",
+                "reqs": [],
+                "done_when": "All 13 flows green",
+                "id": "HC-MVP1-206"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Usability test with 5 doctors (task under 10 minutes, buy and activate under 3 minutes)",
+                "reqs": [
+                  "NFR-031",
+                  "SUX-010"
+                ],
+                "done_when": "Results recorded; blocking issues fixed",
+                "id": "HC-MVP1-207"
+              }
+            ],
+            "id": "HC-MVP1-E12-F05"
+          }
+        ],
+        "id": "HC-MVP1-E12"
+      },
+      {
+        "milestone": "PILOT",
+        "name": "Pilot and public launch",
+        "depends": [
+          "M10"
+        ],
+        "features": [
+          {
+            "name": "Pilot",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Distribute internal builds to pilot doctors under agreement",
+                "reqs": [
+                  "CONT-004"
+                ],
+                "done_when": "20 doctors installed",
+                "id": "HC-MVP1-208"
+              },
+              {
+                "type": "biz",
+                "priority": "P0",
+                "estimate_days": 20.0,
+                "title": "Four-week pilot with weekly check-ins and feedback log",
+                "reqs": [],
+                "done_when": "Feedback log with priorities",
+                "id": "HC-MVP1-209"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 10.0,
+                "title": "Fix pilot blockers and top usability issues",
+                "reqs": [],
+                "done_when": "No open P0 pilot bugs",
+                "id": "HC-MVP1-210"
+              }
+            ],
+            "id": "HC-MVP1-E13-F01"
+          },
+          {
+            "name": "Public release",
+            "reqs": [
+              "CONT-005"
+            ],
+            "tasks": [
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Build public release with only public-channel content",
+                "reqs": [
+                  "CONT-003",
+                  "CONT-005"
+                ],
+                "done_when": "Release gate green",
+                "id": "HC-MVP1-211"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Static download website with signed installers, pricing, privacy policy, EULA, support contacts",
+                "reqs": [],
+                "done_when": "Site live; downloads verify",
+                "id": "HC-MVP1-212"
+              },
+              {
+                "type": "biz",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Launch: first paid licences issued through the MVP1 flow",
+                "reqs": [
+                  "LIC-040"
+                ],
+                "done_when": "First 10 paying doctors activated",
+                "id": "HC-MVP1-213"
+              }
+            ],
+            "id": "HC-MVP1-E13-F02"
+          }
+        ],
+        "id": "HC-MVP1-E13"
+      },
+      {
+        "milestone": "RELEASES",
+        "name": "Working release at every milestone (ADR 0002)",
+        "depends": [
+          "M0"
+        ],
+        "features": [
+          {
+            "name": "Release demos (one installable, usable build per milestone)",
+            "reqs": [],
+            "tasks": [
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "R0 walking skeleton: installer from CI opens on Windows and Linux, shell, nav, Today empty state, lock screen stub",
+                "reqs": [
+                  "NFR-040",
+                  "NFR-041"
+                ],
+                "done_when": "R0 demo script in docs/milestones/README.md passes as an E2E smoke run on both OS",
+                "id": "HC-MVP1-214"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "R1 set up and protect: first-run wizard (trial-dev licence step), PIN unlock, backup now and restore from the UI",
+                "reqs": [
+                  "SET-001",
+                  "SET-004",
+                  "BAK-002",
+                  "BAK-003"
+                ],
+                "done_when": "R1 demo passes; R0 demo still passes",
+                "id": "HC-MVP1-215"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "R2 patient register: register, search, open dashboard, edit, recycle bin",
+                "reqs": [
+                  "PAT-001",
+                  "PSR-001",
+                  "PAT-005"
+                ],
+                "done_when": "R2 demo passes at 50k seeded patients; R1 data opens after upgrade install",
+                "id": "HC-MVP1-216"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "R3 paper replacement: case form, follow-up visit, Today list with due and overdue",
+                "reqs": [
+                  "CASE-001",
+                  "VIS-002",
+                  "VIS-005"
+                ],
+                "done_when": "R3 demo passes; R2 data opens after upgrade install",
+                "id": "HC-MVP1-217"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "R4 consultation complete: prescription, print A5, PDF, WhatsApp share",
+                "reqs": [
+                  "RX-001",
+                  "RX-005",
+                  "RX-006"
+                ],
+                "done_when": "R4 demo passes; R3 data opens after upgrade install",
+                "id": "HC-MVP1-218"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "R5 clinic basics: bill, partial payment, dues, daily collection report",
+                "reqs": [
+                  "BILL-001",
+                  "BILL-002",
+                  "BILL-004"
+                ],
+                "done_when": "R5 demo passes; acceptance flows 1, 2, 3, 6 (without repertory), 7, 8, 9 pass",
+                "id": "HC-MVP1-219"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "R6 repertory reading: rubric search, browser, materia medica on internal-eval packs",
+                "reqs": [
+                  "REP-010",
+                  "MM-001"
+                ],
+                "done_when": "R6 demo passes on the internal build; public build refuses eval packs",
+                "id": "HC-MVP1-220"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "R7 repertorisation: send symptoms, analyse, prescribe from result",
+                "reqs": [
+                  "REP-030",
+                  "REP-037"
+                ],
+                "done_when": "R7 demo passes; acceptance flows 4, 5, 11 pass",
+                "id": "HC-MVP1-221"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "R8 licence and purchase: trial, Buy screen, import .hclic, expiry read-only",
+                "reqs": [
+                  "PAY-010",
+                  "LIC-061",
+                  "LIC-020"
+                ],
+                "done_when": "R8 demo passes; acceptance flow 10 passes",
+                "id": "HC-MVP1-222"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "R9 release candidate: hardened build, all 13 acceptance flows",
+                "reqs": [
+                  "TAM-012",
+                  "SUX-001"
+                ],
+                "done_when": "All 13 flows pass on the protected build",
+                "id": "HC-MVP1-223"
+              }
+            ],
+            "id": "HC-MVP1-E14-F01"
+          },
+          {
+            "name": "Early pilot on Clinic Basics (R5)",
+            "reqs": [
+              "CONT-004"
+            ],
+            "tasks": [
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Ship R5 internal build to 3 to 5 pilot doctors under the pilot agreement (no repertory content included)",
+                "reqs": [
+                  "CONT-004"
+                ],
+                "done_when": "3 doctors use it for real consultations for 2 weeks",
+                "id": "HC-MVP1-224"
+              },
+              {
+                "type": "biz",
+                "priority": "P0",
+                "estimate_days": 10.0,
+                "title": "Two-week early pilot with feedback log; feed findings into M4 to M10",
+                "reqs": [],
+                "done_when": "Feedback log triaged; P0 issues fixed before R6",
+                "id": "HC-MVP1-225"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Upgrade path test harness: install release N over release N-1 with seeded data, verify data and backups open",
+                "reqs": [
+                  "NFR-011",
+                  "NFR-042"
+                ],
+                "done_when": "Runs in CI for every release tag",
+                "id": "HC-MVP1-226"
+              }
+            ],
+            "id": "HC-MVP1-E14-F02"
+          }
+        ],
+        "id": "HC-MVP1-E14"
+      }
+    ]
+  },
+  {
+    "code": "MVP2",
+    "name": "MVP2: clinic grows and first servers",
+    "goal": "Hosted licence and payments, cloud backup, LAN multi-user, stock, messaging, reports, languages, paid content. Start only when MVP1 revenue covers hosting.",
+    "epics": [
+      {
+        "milestone": "MVP2",
+        "name": "Hosted licence and payments",
+        "depends": [
+          "PILOT"
+        ],
+        "features": [
+          {
+            "name": "Licence server",
+            "reqs": [
+              "SRV-001",
+              "SRV-003",
+              "SRV-002",
+              "LSRV-001",
+              "LSRV-002",
+              "LSRV-003",
+              "LSRV-004",
+              "LSRV-005",
+              "LSRV-006"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 5.0,
+                "title": "Licence API (axum + PostgreSQL) with activate, offline activate, deactivate, refresh",
+                "reqs": [
+                  "LSRV-001"
+                ],
+                "done_when": "API integration tests pass",
+                "id": "HC-MVP2-001"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 4.0,
+                "title": "Admin dashboard behind SSO and 2FA",
+                "reqs": [
+                  "LSRV-002",
+                  "LSRV-006"
+                ],
+                "done_when": "Issue, extend, revoke from dashboard",
+                "id": "HC-MVP2-002"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "KMS or HSM signing, key rotation plan",
+                "reqs": [
+                  "LSRV-003"
+                ],
+                "done_when": "Signing never exposes private key",
+                "id": "HC-MVP2-003"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Rate limiting and abuse detection",
+                "reqs": [
+                  "LSRV-004",
+                  "TAM-011"
+                ],
+                "done_when": "Abuse scenarios blocked in tests",
+                "id": "HC-MVP2-004"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Import Vendor Licence Tool register",
+                "reqs": [
+                  "SRV-002",
+                  "LIC-048"
+                ],
+                "done_when": "All MVP1 licences present and valid",
+                "id": "HC-MVP2-005"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Deploy in AWS ap-south-1 with backups, monitoring, no patient data",
+                "reqs": [
+                  "LSRV-005"
+                ],
+                "done_when": "Production environment live",
+                "id": "HC-MVP2-006"
+              }
+            ],
+            "id": "HC-MVP2-E01-F01"
+          },
+          {
+            "name": "Automated purchase",
+            "reqs": [
+              "PAY-001",
+              "PAY-002",
+              "PAY-003",
+              "PAY-004",
+              "PAY-005",
+              "PAY-006",
+              "PAY-007",
+              "PAY-008",
+              "PAY-009"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 4.0,
+                "title": "Purchase portal with phone OTP and Razorpay Checkout (UPI Intent, QR, cards)",
+                "reqs": [
+                  "PAY-001",
+                  "PAY-002"
+                ],
+                "done_when": "Test payment succeeds end to end",
+                "id": "HC-MVP2-007"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Webhook-only payment confirmation, idempotent",
+                "reqs": [
+                  "PAY-003"
+                ],
+                "done_when": "Replayed webhook issues one licence",
+                "id": "HC-MVP2-008"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Automatic licence and GST invoice delivery by email and SMS",
+                "reqs": [
+                  "PAY-004",
+                  "PAY-005"
+                ],
+                "done_when": "Licence delivered within 1 minute",
+                "id": "HC-MVP2-009"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 3.0,
+                "title": "UPI AutoPay subscriptions",
+                "reqs": [
+                  "PAY-006"
+                ],
+                "done_when": "Renewal auto-extends licence",
+                "id": "HC-MVP2-010"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Referral discounts",
+                "reqs": [
+                  "PAY-007"
+                ],
+                "done_when": "Both doctors get extra month",
+                "id": "HC-MVP2-011"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 3.0,
+                "title": "Dealer portal",
+                "reqs": [
+                  "PAY-008"
+                ],
+                "done_when": "Dealer buys and assigns keys",
+                "id": "HC-MVP2-012"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Refunds and revocation",
+                "reqs": [
+                  "PAY-009"
+                ],
+                "done_when": "Refunded licence revoked on next refresh",
+                "id": "HC-MVP2-013"
+              }
+            ],
+            "id": "HC-MVP2-E01-F02"
+          },
+          {
+            "name": "App-side online licensing",
+            "reqs": [
+              "LIC-003",
+              "LIC-010",
+              "LIC-011",
+              "LIC-012",
+              "LIC-013",
+              "LIC-014",
+              "LIC-022"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Online activation and silent weekly refresh",
+                "reqs": [
+                  "LIC-010",
+                  "LIC-014"
+                ],
+                "done_when": "Offline operation unaffected",
+                "id": "HC-MVP2-014"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Device fingerprint binding and transfer (if Q13 changes)",
+                "reqs": [
+                  "LIC-003",
+                  "LIC-012"
+                ],
+                "done_when": "2 of 3 component match tested",
+                "id": "HC-MVP2-015"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 1.0,
+                "title": "Perpetual licence with updates_until",
+                "reqs": [
+                  "LIC-022"
+                ],
+                "done_when": "Newer updates refused with clear message",
+                "id": "HC-MVP2-016"
+              }
+            ],
+            "id": "HC-MVP2-E01-F03"
+          }
+        ],
+        "id": "HC-MVP2-E01"
+      },
+      {
+        "milestone": "MVP2",
+        "name": "Cloud backup",
+        "depends": [
+          "MVP2"
+        ],
+        "features": [
+          {
+            "name": "Zero-knowledge backup",
+            "reqs": [
+              "CLD-001",
+              "CLD-002",
+              "CLD-003",
+              "CLD-004",
+              "CLD-005"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Client-side encrypted incremental and full backups",
+                "reqs": [
+                  "CLD-001",
+                  "CLD-002"
+                ],
+                "done_when": "Server stores only ciphertext",
+                "id": "HC-MVP2-017"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Resumable chunked upload for slow networks",
+                "reqs": [
+                  "CLD-002"
+                ],
+                "done_when": "Upload resumes after disconnect",
+                "id": "HC-MVP2-018"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Restore from cloud to new PC with recovery key",
+                "reqs": [
+                  "CLD-003"
+                ],
+                "done_when": "Restore tested on clean PC",
+                "id": "HC-MVP2-019"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "S3-compatible storage in India region with per-customer prefix",
+                "reqs": [
+                  "CLD-004"
+                ],
+                "done_when": "Bucket policies reviewed",
+                "id": "HC-MVP2-020"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "Backup status widget",
+                "reqs": [
+                  "CLD-005"
+                ],
+                "done_when": "Last backup time shown",
+                "id": "HC-MVP2-021"
+              }
+            ],
+            "id": "HC-MVP2-E02-F01"
+          }
+        ],
+        "id": "HC-MVP2-E02"
+      },
+      {
+        "milestone": "MVP2",
+        "name": "LAN multi-user and roles",
+        "depends": [
+          "MVP2"
+        ],
+        "features": [
+          {
+            "name": "LAN server and roles",
+            "reqs": [
+              "USR-001",
+              "USR-002",
+              "USR-003",
+              "USR-004",
+              "USR-005"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 5.0,
+                "title": "Main computer LAN server exposing hc-app commands over TLS with device tokens",
+                "reqs": [
+                  "USR-001",
+                  "USR-002"
+                ],
+                "done_when": "Client PC works against main PC",
+                "id": "HC-MVP2-022"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "mDNS discovery and 6-digit pairing",
+                "reqs": [
+                  "USR-001"
+                ],
+                "done_when": "Pairing under 1 minute",
+                "id": "HC-MVP2-023"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Roles and permissions (doctor, assistant, receptionist, dispenser)",
+                "reqs": [
+                  "USR-003"
+                ],
+                "done_when": "Receptionist cannot see case notes",
+                "id": "HC-MVP2-024"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Per-user PIN login and audit by user",
+                "reqs": [
+                  "USR-004"
+                ],
+                "done_when": "Audit shows user per change",
+                "id": "HC-MVP2-025"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Seat counting in licence",
+                "reqs": [
+                  "USR-005"
+                ],
+                "done_when": "Extra client refused beyond seats",
+                "id": "HC-MVP2-026"
+              }
+            ],
+            "id": "HC-MVP2-E03-F01"
+          }
+        ],
+        "id": "HC-MVP2-E03"
+      },
+      {
+        "milestone": "MVP2",
+        "name": "Dispensary, messaging, reports, languages, content",
+        "depends": [
+          "MVP2"
+        ],
+        "features": [
+          {
+            "name": "Dispensary and stock",
+            "reqs": [
+              "STK-001",
+              "STK-002",
+              "STK-003",
+              "STK-004"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Inventory with batch, expiry, prices",
+                "reqs": [
+                  "STK-001"
+                ],
+                "done_when": "Stock list and edits work",
+                "id": "HC-MVP2-027"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Auto-deduct on dispense and alerts",
+                "reqs": [
+                  "STK-002"
+                ],
+                "done_when": "Low-stock alert in test",
+                "id": "HC-MVP2-028"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Purchases and supplier ledger",
+                "reqs": [
+                  "STK-003"
+                ],
+                "done_when": "Ledger balances",
+                "id": "HC-MVP2-029"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 0.5,
+                "title": "In-stock filter in repertory results",
+                "reqs": [
+                  "STK-004",
+                  "REP-040"
+                ],
+                "done_when": "Filter applied",
+                "id": "HC-MVP2-030"
+              }
+            ],
+            "id": "HC-MVP2-E04-F01"
+          },
+          {
+            "name": "Messaging",
+            "reqs": [
+              "COM-001",
+              "COM-002"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 4.0,
+                "title": "WhatsApp Business API and SMS (DLT templates) with offline queue",
+                "reqs": [
+                  "COM-001"
+                ],
+                "done_when": "Reminders delivered in test",
+                "id": "HC-MVP2-031"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Opt-in greeting campaigns",
+                "reqs": [
+                  "COM-002"
+                ],
+                "done_when": "Only opted-in patients receive",
+                "id": "HC-MVP2-032"
+              }
+            ],
+            "id": "HC-MVP2-E04-F02"
+          },
+          {
+            "name": "Reports",
+            "reqs": [
+              "RPT-001",
+              "RPT-002"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Patient, revenue and remedy statistics",
+                "reqs": [
+                  "RPT-001"
+                ],
+                "done_when": "Reports match seeded data",
+                "id": "HC-MVP2-033"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Remedy outcome summary",
+                "reqs": [
+                  "RPT-002"
+                ],
+                "done_when": "Percent better per remedy correct",
+                "id": "HC-MVP2-034"
+              }
+            ],
+            "id": "HC-MVP2-E04-F03"
+          },
+          {
+            "name": "Languages",
+            "reqs": [
+              "I18N-001",
+              "REP-016"
+            ],
+            "tasks": [
+              {
+                "type": "content",
+                "priority": "P0",
+                "estimate_days": 10.0,
+                "title": "Translate UI strings to 8 Indian languages",
+                "reqs": [
+                  "I18N-001"
+                ],
+                "done_when": "Each language reviewed by a native speaker",
+                "id": "HC-MVP2-035"
+              },
+              {
+                "type": "content",
+                "priority": "P1",
+                "estimate_days": 5.0,
+                "title": "Hindi and Hinglish synonym mappings for rubric search",
+                "reqs": [
+                  "REP-016"
+                ],
+                "done_when": "\"sir dard\" finds HEAD - PAIN",
+                "id": "HC-MVP2-036"
+              }
+            ],
+            "id": "HC-MVP2-E04-F04"
+          },
+          {
+            "name": "Paid and additional content",
+            "reqs": [
+              "CPK-001",
+              "PACK-004",
+              "PACK-010",
+              "LIC-030",
+              "LIC-031",
+              "TAM-009"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Paid pack encryption with per-licence wrapped keys",
+                "reqs": [
+                  "LIC-031",
+                  "TAM-009"
+                ],
+                "done_when": "Copied paid pack fails on other licence",
+                "id": "HC-MVP2-037"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Pack entitlements in licence",
+                "reqs": [
+                  "LIC-030",
+                  "PACK-004"
+                ],
+                "done_when": "Unentitled pack refused",
+                "id": "HC-MVP2-038"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 3.0,
+                "title": "Online pack catalogue",
+                "reqs": [
+                  "PACK-010"
+                ],
+                "done_when": "Download and install from catalogue",
+                "id": "HC-MVP2-039"
+              },
+              {
+                "type": "content",
+                "priority": "P1",
+                "estimate_days": 15.0,
+                "title": "Additional public packs (Boger-Boenninghausen, Clarke MM) and first licensed paid pack",
+                "reqs": [
+                  "CPK-001"
+                ],
+                "done_when": "Packs built and proofread",
+                "id": "HC-MVP2-040"
+              }
+            ],
+            "id": "HC-MVP2-E04-F05"
+          }
+        ],
+        "id": "HC-MVP2-E04"
+      }
+    ]
+  },
+  {
+    "code": "MVP3",
+    "name": "MVP3: anywhere access (mobile)",
+    "goal": "Android and iOS apps with encrypted sync",
+    "epics": [
+      {
+        "milestone": "MVP3",
+        "name": "Mobile apps and sync",
+        "depends": [
+          "MVP2"
+        ],
+        "features": [
+          {
+            "name": "Mobile shell",
+            "reqs": [
+              "MOB-001"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 5.0,
+                "title": "Tauri 2 mobile builds for Android 8+ and iOS 15+ with mobile layouts",
+                "reqs": [
+                  "MOB-001"
+                ],
+                "done_when": "Apps run on test devices",
+                "id": "HC-MVP3-001"
+              },
+              {
+                "type": "ops",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Play Store and App Store accounts, signing, privacy labels",
+                "reqs": [
+                  "MOB-001"
+                ],
+                "done_when": "Internal test track live",
+                "id": "HC-MVP3-002"
+              }
+            ],
+            "id": "HC-MVP3-E01-F01"
+          },
+          {
+            "name": "Sync",
+            "reqs": [
+              "MOB-002"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 8.0,
+                "title": "Change-log table with hybrid logical clocks and device ids",
+                "reqs": [
+                  "MOB-002"
+                ],
+                "done_when": "Two devices converge in tests",
+                "id": "HC-MVP3-003"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 5.0,
+                "title": "End-to-end encrypted cloud relay",
+                "reqs": [
+                  "MOB-002"
+                ],
+                "done_when": "Relay sees only ciphertext",
+                "id": "HC-MVP3-004"
+              },
+              {
+                "type": "test",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Conflict and offline-merge test suite",
+                "reqs": [
+                  "MOB-002"
+                ],
+                "done_when": "All conflict scenarios pass",
+                "id": "HC-MVP3-005"
+              }
+            ],
+            "id": "HC-MVP3-E01-F02"
+          },
+          {
+            "name": "Mobile features",
+            "reqs": [
+              "MOB-003",
+              "MOB-004",
+              "MOB-007"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Offline packs and 6-month patient cache",
+                "reqs": [
+                  "MOB-003"
+                ],
+                "done_when": "Works in airplane mode",
+                "id": "HC-MVP3-006"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 5.0,
+                "title": "Lookup, history, quick visit, repertorise, prescribe, share, Today, biometric lock",
+                "reqs": [
+                  "MOB-004"
+                ],
+                "done_when": "Doctor completes a visit on phone",
+                "id": "HC-MVP3-007"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Remote revoke and wipe",
+                "reqs": [
+                  "MOB-007"
+                ],
+                "done_when": "Revoked phone wiped on next contact",
+                "id": "HC-MVP3-008"
+              }
+            ],
+            "id": "HC-MVP3-E01-F03"
+          },
+          {
+            "name": "Patient-facing",
+            "reqs": [
+              "MOB-005",
+              "MOB-006"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 4.0,
+                "title": "Online booking link feeding appointment book",
+                "reqs": [
+                  "MOB-005"
+                ],
+                "done_when": "Booking appears after sync",
+                "id": "HC-MVP3-009"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 3.0,
+                "title": "Teleconsult notes and Rx per Telemedicine Guidelines 2020",
+                "reqs": [
+                  "MOB-006"
+                ],
+                "done_when": "Checklist of guideline fields satisfied",
+                "id": "HC-MVP3-010"
+              }
+            ],
+            "id": "HC-MVP3-E01-F04"
+          }
+        ],
+        "id": "HC-MVP3-E01"
+      }
+    ]
+  },
+  {
+    "code": "MVP4",
+    "name": "MVP4: smart assistant",
+    "goal": "On-device suggestions, similarity, voice, ABDM, marketplace",
+    "epics": [
+      {
+        "milestone": "MVP4",
+        "name": "Smart features",
+        "depends": [
+          "MVP3"
+        ],
+        "features": [
+          {
+            "name": "On-device intelligence",
+            "reqs": [
+              "AI-001",
+              "AI-002",
+              "AI-003",
+              "AI-004"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 8.0,
+                "title": "Free-text to rubric suggestions with on-device embeddings and vector search",
+                "reqs": [
+                  "AI-001"
+                ],
+                "done_when": "Top-5 accuracy measured on labelled cases",
+                "id": "HC-MVP4-001"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 4.0,
+                "title": "Similar-case search from past rubric sets and outcomes",
+                "reqs": [
+                  "AI-002"
+                ],
+                "done_when": "Doctor rates usefulness in pilot",
+                "id": "HC-MVP4-002"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 5.0,
+                "title": "Voice case taking in English and Hindi on device",
+                "reqs": [
+                  "AI-003"
+                ],
+                "done_when": "Word error rate measured on sample recordings",
+                "id": "HC-MVP4-003"
+              },
+              {
+                "type": "dev",
+                "priority": "P2",
+                "estimate_days": 3.0,
+                "title": "Optional cloud LLM features with per-use opt-in and de-identification",
+                "reqs": [
+                  "AI-004"
+                ],
+                "done_when": "No identifiers leave device in tests",
+                "id": "HC-MVP4-004"
+              }
+            ],
+            "id": "HC-MVP4-E01-F01"
+          },
+          {
+            "name": "Integrations and marketplace",
+            "reqs": [
+              "ABDM-001",
+              "MKT-001"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 8.0,
+                "title": "ABHA linking and record sharing per ABDM specs",
+                "reqs": [
+                  "ABDM-001"
+                ],
+                "done_when": "ABDM sandbox certification passed",
+                "id": "HC-MVP4-005"
+              },
+              {
+                "type": "dev",
+                "priority": "P1",
+                "estimate_days": 8.0,
+                "title": "Content marketplace with publisher revenue share",
+                "reqs": [
+                  "MKT-001"
+                ],
+                "done_when": "First publisher pack sold",
+                "id": "HC-MVP4-006"
+              }
+            ],
+            "id": "HC-MVP4-E01-F02"
+          }
+        ],
+        "id": "HC-MVP4-E01"
+      }
+    ]
+  },
+  {
+    "code": "MVP5",
+    "name": "MVP5: migration (de-prioritised)",
+    "goal": "Bring existing records from the legacy app and competitors",
+    "epics": [
+      {
+        "milestone": "MVP5",
+        "name": "Data migration",
+        "depends": [
+          "MVP4"
+        ],
+        "features": [
+          {
+            "name": "Legacy Doctor Clinic importer",
+            "reqs": [
+              "IMP-002"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Read live MySQL or .sql dump without needing MySQL installed",
+                "reqs": [
+                  "IMP-002"
+                ],
+                "done_when": "Sample dump parsed",
+                "id": "HC-MVP5-001"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "Map 19 legacy tables to new schema per design 05 section 6",
+                "reqs": [
+                  "IMP-002"
+                ],
+                "done_when": "Counts match source",
+                "id": "HC-MVP5-002"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 2.0,
+                "title": "Shivaji-font Marathi to Unicode Devanagari conversion",
+                "reqs": [
+                  "IMP-002"
+                ],
+                "done_when": "Sample diet sheets read correctly",
+                "id": "HC-MVP5-003"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.0,
+                "title": "Photos and report files copied and encrypted",
+                "reqs": [
+                  "IMP-002"
+                ],
+                "done_when": "Attachments open after import",
+                "id": "HC-MVP5-004"
+              },
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 1.5,
+                "title": "Dry-run report and single-transaction commit",
+                "reqs": [
+                  "IMP-002"
+                ],
+                "done_when": "Dry run lists warnings; commit atomic",
+                "id": "HC-MVP5-005"
+              }
+            ],
+            "id": "HC-MVP5-E01-F01"
+          },
+          {
+            "name": "Competitor and generic import",
+            "reqs": [
+              "IMP-001",
+              "PAT-010"
+            ],
+            "tasks": [
+              {
+                "type": "dev",
+                "priority": "P0",
+                "estimate_days": 3.0,
+                "title": "CSV, Excel and Access import with column-mapping wizard",
+                "reqs": [
+                  "IMP-001",
+                  "PAT-010"
+                ],
+                "done_when": "Sample exports import cleanly",
+                "id": "HC-MVP5-006"
+              },
+              {
+                "type": "doc",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Migration guides per competitor product",
+                "reqs": [
+                  "IMP-001"
+                ],
+                "done_when": "Guides published",
+                "id": "HC-MVP5-007"
+              }
+            ],
+            "id": "HC-MVP5-E01-F02"
+          },
+          {
+            "name": "Assisted migration",
+            "reqs": [
+              "IMP-003"
+            ],
+            "tasks": [
+              {
+                "type": "biz",
+                "priority": "P1",
+                "estimate_days": 2.0,
+                "title": "Assisted migration service process and pricing",
+                "reqs": [
+                  "IMP-003"
+                ],
+                "done_when": "First clinic migrated by support",
+                "id": "HC-MVP5-008"
+              }
+            ],
+            "id": "HC-MVP5-E01-F03"
+          }
+        ],
+        "id": "HC-MVP5-E01"
+      }
+    ]
+  }
+]

@@ -1,0 +1,39 @@
+# Build output
+/target/
+**/node_modules/
+**/dist/
+apps/desktop/src-tauri/gen/
+*.log
+
+# Agent run artifacts and generated agent configs
+.worklog/
+hc-agents/dist/
+
+# Local data and secrets: never commit
+.env
+.env.*
+*.pem
+*.key
+*.hclic
+*.hcbak
+*.db
+*.db-wal
+*.db-shm
+**/secrets/
+
+# internal_eval content (GPL / unlicensed): kept locally, never pushed
+content-sources/internal-eval/**/*.sql.gz
+content-sources/internal-eval/**/*.hcpack
+content-sources/internal-eval/**/build/
+*.hcpack
+
+# Design build byproducts
+docs/design/diagrams/svg/*.tmp
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+__pycache__/

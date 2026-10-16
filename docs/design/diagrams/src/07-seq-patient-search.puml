@@ -1,0 +1,23 @@
+@startuml
+title Patient search per keystroke (PSR, budget < 100 ms p95 at 50k patients)
+actor Doctor
+participant "Search box (UI)" as UI
+participant "hc-app" as APP
+participant "hc-search" as S
+database "clinic.db\n(reader conn)" as DB
+Doctor -> UI : types "sarma 98"
+UI -> UI : debounce 80 ms
+UI -> APP : search_patients(q, limit=20, cursor=null)
+APP -> APP : cancel previous query token
+APP -> S : build query
+S -> S : normalise, split words\nphonetic keys, digit tokens
+S -> DB : UNION: exact code/mobile\n+ patient_fts prefix\n+ phonetic match\n+ patient_trgm digits\nORDER BY rank, last_visit_at DESC LIMIT 20
+DB --> S : rows (summary columns, no joins)
+S --> APP : ranked results + next cursor
+APP --> UI : results
+UI --> Doctor : list with photo, ID, age, last visit, dues
+Doctor -> UI : Enter
+UI -> APP : open_patient(id)
+APP -> DB : patient + visits(patient_id, visit_at DESC) LIMIT 50
+APP --> UI : dashboard (< 300 ms)
+@enduml

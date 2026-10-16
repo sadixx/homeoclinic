@@ -1,0 +1,33 @@
+@startuml
+!include <C4/C4_Container>
+title Containers - HomeoClinic MVP1
+Person(doc, "Doctor")
+System_Boundary(desk, "Clinic PC (offline)") {
+  Container(ui, "Desktop UI", "React + TypeScript in Tauri webview", "Screens, forms, print preview")
+  Container(core, "Desktop Core", "Rust, Tauri 2", "Business logic, search, repertory engine, licence, backup, PDF")
+  ContainerDb(cdb, "clinic.db", "SQLite + SQLCipher", "Patients, visits, Rx, bills, audit")
+  ContainerDb(udb, "user_content.db", "SQLite + SQLCipher", "Doctor additions, citations")
+  ContainerDb(packs, "content/*.hcpack", "Signed read-only SQLite", "Repertories, Materia Medica")
+  ContainerDb(files, "files/", "AES-256-GCM blobs", "Photos, attachments, PDFs")
+}
+System_Boundary(cloud, "Our backend - MVP2, AWS ap-south-1 (not in MVP1)") {
+  Container(api, "Licence API", "Rust axum", "Activate, offline activate, refresh, webhook")
+  Container(portal, "Portal", "React, mobile first", "Buy, renew, devices, invoices")
+  ContainerDb(pg, "Licence DB", "PostgreSQL", "Customers, orders, licences")
+  Container(kms, "Signing key", "Cloud KMS", "Ed25519 private key")
+}
+System_Ext(rzp, "Razorpay (MVP2)")
+Rel(doc, ui, "Uses")
+Rel(ui, core, "Typed Tauri commands / events")
+Rel(core, cdb, "SQL (1 writer, 4 readers)")
+Rel(core, udb, "SQL")
+Rel(core, packs, "Read-only attach")
+Rel(core, files, "Encrypt / decrypt")
+Rel(core, api, "MVP2 only: HTTPS, optional")
+Rel(portal, api, "HTTPS")
+Rel(api, pg, "SQL")
+Rel(api, kms, "Sign")
+Rel(api, rzp, "Orders")
+Rel(rzp, api, "Webhook (HMAC)")
+SHOW_LEGEND()
+@enduml

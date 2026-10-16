@@ -1,0 +1,21 @@
+@startuml
+title Content pipeline (tools/content-builder) and install
+left to right direction
+rectangle "Sources + REGISTRY.md row\n(OOREP dump, CSV, OCR text,\npublisher XML)" as s
+rectangle "Parser\n(per book layout)" as p
+rectangle "Intermediate JSON\nchapter / rubric / remedy / grade" as j
+rectangle "Remedy normaliser\n(abbrev -> remedy master)" as n
+rectangle "Proofreading UI\n100% grade-3, 10% sample" as q
+rectangle "Pack builder\ncontent.db + FTS + top5" as b
+rectangle "Signer\n(PUBLIC or EVAL key\nby channel)" as g
+rectangle ".hcpack\n(file / catalogue)" as k
+rectangle "App PackRegistry\nverify sig (keys of this\nbuild profile), sha256,\nformat, entitlement" as a
+s --> p
+p --> j
+j --> n
+n --> q
+q --> b
+b --> g
+g --> k
+k --> a
+@enduml

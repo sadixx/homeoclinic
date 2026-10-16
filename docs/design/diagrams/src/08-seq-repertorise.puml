@@ -1,0 +1,26 @@
+@startuml
+title Case text to rubric to remedy to Rx (REP-030..038, CASE-006)
+actor Doctor
+participant "Case form" as CF
+participant "Repertory workspace" as RW
+participant "hc-repertory" as R
+database "packs + user_content" as P
+participant "Prescription" as RX
+Doctor -> CF : selects "fear of dark, worse evening"
+CF -> RW : send_to_repertory(text, visit_id)
+RW -> R : search_rubrics(text)
+R -> R : normalise + synonyms + abbreviations
+R -> P : rubric_fts MATCH (all enabled packs)
+P --> R : candidates
+R --> RW : top rubrics with top5 remedies
+Doctor -> RW : add rubrics, set weights, mark eliminative
+RW -> R : analyse(clipboard, method)
+R -> P : load remedy bitsets + grades (LRU cache)
+R -> R : eliminate, score, cover, sort
+R --> RW : results (< 300 ms)
+RW --> Doctor : grid / list / graph
+Doctor -> RW : "Prescribe Sulphur"
+RW -> R : save snapshot(analysis)
+RW -> RX : prefill remedy
+Doctor -> RX : potency 200C, dose, print
+@enduml

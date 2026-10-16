@@ -1,0 +1,27 @@
+Epic ID,Stage,Epic,Milestone,Depends on,Tasks,Estimate (days)
+HC-PREP-E01,PREP,Business setup,PREP,,8,8
+HC-PREP-E02,PREP,Product decisions,PREP,,9,4.5
+HC-PREP-E03,PREP,Legal and compliance,PREP,,6,7
+HC-PREP-E04,PREP,Signing keys and certificates,PREP,,4,4.5
+HC-PREP-E05,PREP,Pilot recruitment,PREP,,3,5
+HC-MVP1-E01,MVP1,Coding-agent handoff pack,HANDOFF,PREP,7,13
+HC-MVP1-E02,MVP1,"Foundation: repo, shell, CI",M0,HANDOFF,12,9.5
+HC-MVP1-E03,MVP1,"Storage, encryption, backup",M1,M0,16,21.5
+HC-MVP1-E04,MVP1,Patients and 50k search,M2,M1,22,28.5
+HC-MVP1-E05,MVP1,"Case taking, visits and Today screen",M3,"M2, HANDOFF",17,25.5
+HC-MVP1-E06,MVP1,Content packs and channels,M4,M1,20,57.5
+HC-MVP1-E07,MVP1,"Rubric search, repertory browser, materia medica",M5,M4,16,25
+HC-MVP1-E08,MVP1,Repertorisation and citations,M6,"M5, M3",24,37
+HC-MVP1-E09,MVP1,Prescription and printing,M7,M3,13,16.5
+HC-MVP1-E10,MVP1,Billing and reports,M8,M7,6,7
+HC-MVP1-E11,MVP1,Licensing and UPI purchase,M9,"M1, M7",26,29.5
+HC-MVP1-E12,MVP1,"Hardening, packaging and release",M10,"M9, M8, M6",28,40
+HC-MVP1-E13,MVP1,Pilot and public launch,PILOT,M10,6,36
+HC-MVP1-E14,MVP1,Working release at every milestone (ADR 0002),RELEASES,M0,13,22
+HC-MVP2-E01,MVP2,Hosted licence and payments,MVP2,PILOT,16,39.5
+HC-MVP2-E02,MVP2,Cloud backup,MVP2,MVP2,5,9.5
+HC-MVP2-E03,MVP2,LAN multi-user and roles,MVP2,MVP2,5,12
+HC-MVP2-E04,MVP2,"Dispensary, messaging, reports, languages, content",MVP2,MVP2,14,55.5
+HC-MVP3-E01,MVP3,Mobile apps and sync,MVP3,MVP2,10,41
+HC-MVP4-E01,MVP4,Smart features,MVP4,MVP3,6,36
+HC-MVP5-E01,MVP5,Data migration,MVP5,MVP4,8,16.5

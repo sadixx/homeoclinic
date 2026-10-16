@@ -1,0 +1,49 @@
+ID,Title,Stage,Epic ID,Epic,Milestone,Feature ID,Feature,Type,Priority,Estimate (days),Requirements,Done when,Epic depends on,Labels,Status,Description
+HC-MVP4-001,Free-text to rubric suggestions with on-device embeddings and vector search,MVP4,HC-MVP4-E01,Smart features,MVP4,HC-MVP4-E01-F01,On-device intelligence,dev,P0,8,AI-001,Top-5 accuracy measured on labelled cases,MVP3,"MVP4,MVP4,dev,P0",To do,"Free-text to rubric suggestions with on-device embeddings and vector search
+
+Done when: Top-5 accuracy measured on labelled cases
+Requirements: AI-001
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F01 On-device intelligence
+Type: dev, priority P0, estimate 8 days"
+HC-MVP4-002,Similar-case search from past rubric sets and outcomes,MVP4,HC-MVP4-E01,Smart features,MVP4,HC-MVP4-E01-F01,On-device intelligence,dev,P0,4,AI-002,Doctor rates usefulness in pilot,MVP3,"MVP4,MVP4,dev,P0",To do,"Similar-case search from past rubric sets and outcomes
+
+Done when: Doctor rates usefulness in pilot
+Requirements: AI-002
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F01 On-device intelligence
+Type: dev, priority P0, estimate 4 days"
+HC-MVP4-003,Voice case taking in English and Hindi on device,MVP4,HC-MVP4-E01,Smart features,MVP4,HC-MVP4-E01-F01,On-device intelligence,dev,P1,5,AI-003,Word error rate measured on sample recordings,MVP3,"MVP4,MVP4,dev,P1",To do,"Voice case taking in English and Hindi on device
+
+Done when: Word error rate measured on sample recordings
+Requirements: AI-003
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F01 On-device intelligence
+Type: dev, priority P1, estimate 5 days"
+HC-MVP4-004,Optional cloud LLM features with per-use opt-in and de-identification,MVP4,HC-MVP4-E01,Smart features,MVP4,HC-MVP4-E01-F01,On-device intelligence,dev,P2,3,AI-004,No identifiers leave device in tests,MVP3,"MVP4,MVP4,dev,P2",To do,"Optional cloud LLM features with per-use opt-in and de-identification
+
+Done when: No identifiers leave device in tests
+Requirements: AI-004
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F01 On-device intelligence
+Type: dev, priority P2, estimate 3 days"
+HC-MVP4-005,ABHA linking and record sharing per ABDM specs,MVP4,HC-MVP4-E01,Smart features,MVP4,HC-MVP4-E01-F02,Integrations and marketplace,dev,P1,8,ABDM-001,ABDM sandbox certification passed,MVP3,"MVP4,MVP4,dev,P1",To do,"ABHA linking and record sharing per ABDM specs
+
+Done when: ABDM sandbox certification passed
+Requirements: ABDM-001
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F02 Integrations and marketplace
+Type: dev, priority P1, estimate 8 days"
+HC-MVP4-006,Content marketplace with publisher revenue share,MVP4,HC-MVP4-E01,Smart features,MVP4,HC-MVP4-E01-F02,Integrations and marketplace,dev,P1,8,MKT-001,First publisher pack sold,MVP3,"MVP4,MVP4,dev,P1",To do,"Content marketplace with publisher revenue share
+
+Done when: First publisher pack sold
+Requirements: MKT-001
+Stage: MVP4: smart assistant
+Epic: HC-MVP4-E01 Smart features (milestone MVP4)
+Feature: HC-MVP4-E01-F02 Integrations and marketplace
+Type: dev, priority P1, estimate 8 days"
