@@ -1,0 +1,224 @@
+# HomeoClinic CI
+#
+# Task HC-MVP1-007 (starter). Lints, tests and builds DEBUG Tauri artifacts
+# for Linux and Windows on every push/PR to main, satisfying:
+#   - R-DEL-001  : main is always releasable (Win + Linux artifacts build green)
+#   - requirements/05 S6: "Build artifacts for Windows and Linux on every
+#                          main-branch commit"
+#   - NFR-040 (Windows x64) / NFR-041 (Linux x64 AppImage + .deb, WebKitGTK 4.1)
+#   - requirements/05 S6 lint gate (R-LINT-001..005)
+#   - NFR-024 / R-SEC-008 dependency audit
+#
+# Constraints honoured:
+#   - R-SEC-008: every action is pinned to a released tag.
+#   - R-SEC-005: NO secrets are referenced. Code signing (Authenticode EV /
+#                GPG; NFR-025, TAM-006) and the release scan (TAM-012) are the
+#                release pipeline's job (hc-release-gate), not this workflow.
+#   - Product rule 1: the APP makes no network calls; CI fetching deps is a
+#                     build-host activity and does not change the app.
+#
+# PRE-M0 GUARD: the repo currently has no Cargo.toml / package.json / Tauri
+# project (HC-MVP1-008..011 create them). Steps that need that workspace are
+# gated on the repo variable WORKSPACE_READY so this file is valid and correct
+# today and starts doing real work the moment M0 sets WORKSPACE_READY=true.
+# It never reports a build it did not run as green. CI's full M0 gate is
+# HC-MVP1-013, which supersedes this starter.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save runner time.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "20"
+  # Ubuntu 24.04 Tauri 2 system deps (see docs/dev/environment.md section 2.1).
+  LINUX_TAURI_DEPS: >-
+    libwebkit2gtk-4.1-dev
+    build-essential
+    curl
+    wget
+    file
+    libxdo-dev
+    libssl-dev
+    libayatana-appindicator3-dev
+    librsvg2-dev
+
+jobs:
+  lint-and-test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Ubuntu system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ env.LINUX_TAURI_DEPS }}
+
+      # ---- The steps below need the M0 workspace (HC-MVP1-008..011). ----
+      - name: Rust format check
+        if: vars.WORKSPACE_READY == 'true'
+        run: cargo fmt --all -- --check
+
+      - name: Rust clippy (deny warnings)
+        if: vars.WORKSPACE_READY == 'true'
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Rust tests
+        if: vars.WORKSPACE_READY == 'true'
+        run: cargo test --workspace
+
+      - name: Install JS dependencies
+        if: vars.WORKSPACE_READY == 'true'
+        run: npm ci
+        working-directory: apps/desktop
+
+      - name: TypeScript typecheck (strict)
+        if: vars.WORKSPACE_READY == 'true'
+        run: npm run typecheck
+        working-directory: apps/desktop
+
+      - name: ESLint
+        if: vars.WORKSPACE_READY == 'true'
+        run: npm run lint
+        working-directory: apps/desktop
+
+      - name: Prettier format check
+        if: vars.WORKSPACE_READY == 'true'
+        # R-LINT-004: Prettier leaves no diff. The `format` script is the
+        # canonical name from docs/rules/lint-policy.md (R-LINT-004); the
+        # exact check-mode invocation is finalised with package.json at M0
+        # (HC-MVP1-009/014).
+        run: npm run format -- --check
+        working-directory: apps/desktop
+
+      - name: UI unit tests
+        if: vars.WORKSPACE_READY == 'true'
+        run: npm run test -- --run
+        working-directory: apps/desktop
+
+      # ---- Dependency audit (NFR-024 / R-SEC-008). ----
+      - name: Install cargo-audit
+        if: vars.WORKSPACE_READY == 'true'
+        run: cargo install cargo-audit --locked
+
+      - name: cargo audit
+        if: vars.WORKSPACE_READY == 'true'
+        run: cargo audit
+
+      - name: npm audit (production deps)
+        if: vars.WORKSPACE_READY == 'true'
+        run: npm audit --omit=dev
+        working-directory: apps/desktop
+
+      - name: Pre-M0 notice
+        if: vars.WORKSPACE_READY != 'true'
+        run: |
+          echo "WORKSPACE_READY is not set: the Rust/JS workspace does not"
+          echo "exist yet (pre-M0, HC-MVP1-008..011). Lint/test steps are"
+          echo "intentionally skipped. Set repo variable WORKSPACE_READY=true"
+          echo "at M0 to enable them. This is not a passing build."
+
+  build:
+    name: Build debug artifacts
+    needs: lint-and-test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Ubuntu system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ env.LINUX_TAURI_DEPS }}
+
+      # ---- The build needs the M0 workspace (HC-MVP1-008..011). ----
+      - name: Install JS dependencies
+        if: vars.WORKSPACE_READY == 'true'
+        run: npm ci
+        working-directory: apps/desktop
+
+      - name: Build debug Tauri bundle
+        if: vars.WORKSPACE_READY == 'true'
+        # Debug build only. Release hardening + signing is hc-release-gate
+        # (TAM-002/006, NFR-025), not this workflow.
+        run: npm run tauri build -- --debug
+        working-directory: apps/desktop
+
+      # Artifact paths follow the Tauri bundler layout (debug profile) and
+      # design/02 section 5: Linux AppImage + .deb, Windows NSIS .exe + .msi.
+      - name: Upload Linux artifacts (AppImage + .deb)
+        if: vars.WORKSPACE_READY == 'true' && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: homeoclinic-linux-x64-debug
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/desktop/src-tauri/target/debug/bundle/appimage/*.AppImage
+            apps/desktop/src-tauri/target/debug/bundle/deb/*.deb
+
+      - name: Upload Windows artifacts (NSIS .exe + .msi)
+        if: vars.WORKSPACE_READY == 'true' && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: homeoclinic-windows-x64-debug
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/desktop/src-tauri/target/debug/bundle/nsis/*-setup.exe
+            apps/desktop/src-tauri/target/debug/bundle/msi/*.msi
+
+      - name: Pre-M0 notice
+        if: vars.WORKSPACE_READY != 'true'
+        run: |
+          echo "WORKSPACE_READY is not set: no Tauri project to build yet"
+          echo "(pre-M0, HC-MVP1-008..011). Build and upload steps are"
+          echo "intentionally skipped on ${{ matrix.os }}. This is not a"
+          echo "passing build; it documents the intended pipeline."
+        shell: bash
