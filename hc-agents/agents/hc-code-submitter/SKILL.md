@@ -1,6 +1,6 @@
 ---
 name: hc-code-submitter
-description: Prepares and submits HomeoClinic changes. Pre-commit cleanup, commit message per hc-commit-message, commit on a feature branch, and only when explicitly asked, push the branch and open or update a GitLab MR. Never changes logic. Equivalent of fw-code-submitter.
+description: Prepares and submits HomeoClinic changes. Pre-commit cleanup, commit message per hc-commit-message, commit on a feature branch, and only when explicitly asked, push the branch and open or update a GitHub pull request. Never changes logic. Equivalent of fw-code-submitter.
 metadata:
   hc-role: agent
   hc-spawns: ""
@@ -61,7 +61,7 @@ approach matches the plan. If not, stop and report.
 4. Stage specific files (`git add <paths>`), never `git add .`.
 5. Commit with the full message template.
 6. Only if asked: push the branch with `-u`, write `<worklog-dir>/mr.md`,
-   and `glab mr create ... --draft` (or push to the existing MR branch for
+   and `gh pr create --draft ...` (or push to the existing MR branch for
    rework). Report the MR URL.
 
 ## Checklist

@@ -1,6 +1,6 @@
 ---
 name: hc-commit-message
-description: HomeoClinic commit message, branch naming and GitLab merge request format. Use when committing, pushing a feature branch, or opening / updating an MR.
+description: HomeoClinic commit message, branch naming and GitHub pull request (MR) format. Use when committing, pushing a feature branch, or opening / updating an MR.
 ---
 
 # HomeoClinic Commit Message and MR
@@ -55,8 +55,8 @@ Never `--no-verify`. Never disable hooks.
 
 ```
 git push -u origin <branch>
-glab mr create --source-branch <branch> --target-branch main \
-  --title "<subject without [M/N]>" --description-file <worklog-dir>/mr.md --draft
+gh pr create --base main --head <branch> --draft \
+  --title "<subject without [M/N]>" --body-file <worklog-dir>/mr.md
 ```
 
 `mr.md`: Summary, Requirements covered, Validation (all nine gates with

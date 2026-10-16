@@ -29,7 +29,7 @@ desktop app. Load `hc-project-context` alongside this skill.
 | `hc-build-analyzer` | Build failure diagnosis |
 | `hc-lint-fixer` | Fix clippy / rustfmt / ESLint / tsc findings |
 | `hc-requirements-reviewer` | DoD verification |
-| `hc-code-submitter` | Commit, push feature branch, open GitLab MR |
+| `hc-code-submitter` | Commit, push feature branch, open GitHub pull request |
 | `hc-release-gate` | Release-only checks (channels, signing, scan) |
 
 `hc-grill-me` is human-facing only; the leader never spawns it.
@@ -215,7 +215,7 @@ the user, and finish.
 ## Rework Detection (before selecting a workflow)
 
 1. Check `.worklog/<task-id>/status.md` for an MR link.
-2. Only if inconclusive, `glab mr list --search <task-id>` (or `git branch
+2. Only if inconclusive, `gh pr list --state open --search <task-id>` (or `git branch
    -a | grep <task-id>`).
 
 - Open MR for this task -> Rework template on that branch.
@@ -231,7 +231,7 @@ Starting points; adapt to the task.
 ```
 checkout the existing MR branch
   -> hc-code-reviewer (fresh internal review FIRST)
-  -> fetch MR comments (glab mr view <id> --comments), classify by importance
+  -> fetch MR comments (`gh pr view <n> --comments`), classify by importance
   -> merge both finding sets
   -> <implementation-agent> (production fixes) / hc-unit-tester (test fixes)
   -> <implementation-agent> (target build)

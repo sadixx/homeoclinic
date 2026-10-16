@@ -118,4 +118,4 @@ with no spec is still a BLOCKING gap.
 | DEK / KEK | Data / key encryption key (SQLCipher + Argon2id) |
 | CUT | Code under test |
 | DoD | Definition of Done |
-| MR | GitLab merge request (the hc equivalent of a Gerrit change) |
+| MR | Merge request: a GitHub pull request on `sadixx/homeoclinic` (the hc equivalent of a Gerrit change). Tool: `gh` |
