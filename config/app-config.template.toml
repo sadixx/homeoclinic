@@ -1,0 +1,54 @@
+# config/app-config.template.toml
+#
+# TEMPLATE — placeholders only. NEVER put real UPI ids, phone numbers or keys here.
+# Copy to config/app-config.local.toml and fill real values there (gitignored),
+# or supply real values via HC_* environment variables in CI. See config/README.md.
+# Rules: R-SEC-005 (no secrets in source), PAY-015 (secrets compile-time embedded).
+#
+# The build never reads this template for real values at release time; it is the
+# schema/shape reference and lets a dev build compile with obvious placeholders.
+
+config_version = 1               # bump when the field shape changes; used by the shape check
+
+[business]
+# PAY-011 upi://pay fields + PAY-013 wa.me. SECRET/PII — placeholder only.
+upi_id        = "PLACEHOLDER_UPI_ID@examplebank"  # upi://pay `pa` (payee address). REAL = secret, never commit.
+payee_name    = "PLACEHOLDER Business Name"       # upi://pay `pn` (payee name) / "Check that your UPI app shows <name>".
+whatsapp_e164 = "+910000000000"                   # wa.me/<number>. E.164, digits only after the app strips '+'. PII — placeholder only.
+
+[upi]
+# Static parts of the upi://pay link (PAY-011). `am`/`tn`/`tr` are built at runtime
+# from the chosen plan amount and install_id, so they are NOT stored here.
+currency    = "INR"                   # upi://pay `cu`. Safe constant.
+tn_template = "{install_id} {plan}"   # `tn` note template; app substitutes install_id + plan label.
+tr_template = "{install_id}"          # `tr` ref template.
+
+[plans]
+# PAY section 1 plans. Prices are PLACEHOLDERS (product owner to finalise, PAY section 1, Q14).
+# Integer paise (product rule 8). Rupee value in comment.
+clinic_6m_paise = 229900   # Rs 2,299 / 6 months  (CLINIC_6M)
+clinic_1y_paise = 399900   # Rs 3,999 / year      (CLINIC_1Y)
+
+[support]
+# PAY-016 / LIC-049 turnaround message. Safe (public marketing copy). Placeholder per Q15.
+hours_label = "Mon-Sat 10:00-19:00 IST"   # shown as "within 1 hour during support hours (...)".
+timezone    = "Asia/Kolkata"              # IANA tz for any time logic.
+
+[keys]
+# R-LIC-001 / R-CONT-002: ed25519 PUBLIC verification keys embedded in the CLIENT.
+# These are PUBLIC keys (verification only) — committing the REAL public keys later is
+# acceptable and not a secret leak. They stay PLACEHOLDERS now because the real keys do
+# not exist yet. NEVER put a PRIVATE key here (the private signing key lives only on the
+# hardware key / offline laptop — R-LIC-010). Encoding: base64 of the 32-byte raw ed25519
+# public key.
+#
+# Two licence keys = rotation (current + next, R-LIC-001). Two content keys = channel
+# separation (R-CONT-002):
+#   - public-channel keys go in every build;
+#   - the internal_eval key is embedded ONLY in internal builds (R-CONT-003); the public
+#     release gate (R-CONT-004) must fail if the eval key appears in a public artifact.
+licence_pub_current = "PLACEHOLDER_BASE64_ED25519_PUBKEY_32B_CURRENT"   # LIC-001 current key
+licence_pub_next    = "PLACEHOLDER_BASE64_ED25519_PUBKEY_32B_NEXT"      # LIC-001 next/rotation key
+content_pub_public  = "PLACEHOLDER_BASE64_ED25519_PUBKEY_32B_PUBLIC"    # R-CONT-002 public-channel content key
+content_pub_eval    = "PLACEHOLDER_BASE64_ED25519_PUBKEY_32B_EVAL"      # R-CONT-002 internal_eval content key (internal builds only)
+key_id_current      = "k1"                                              # key_id matching LIC-002 payload `key_id`. Safe label.
