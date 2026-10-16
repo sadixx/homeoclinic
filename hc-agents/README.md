@@ -64,7 +64,7 @@ How portability works:
 | `fw-code-reviewer` | `hc-code-reviewer` | |
 | `cacr-review` | `hc-guidelines-reviewer` | rules from `docs/rules/`, 3-pass phase |
 | `fw-requirements-reviewer` | `hc-requirements-reviewer` | |
-| `fw-code-submitter` | `hc-code-submitter` | git branch + GitLab MR |
+| `fw-code-submitter` | `hc-code-submitter` | git branch + GitHub pull request |
 | `fw-code-submitter-hs`, `fw-altus-code-submitter-hs` | none | Headstart is Ring-only |
 | `integ-test-orchestrator` | `hc-e2e-orchestrator` | |
 | `integ-test-selector` / `-executor` / `-analyzer` / `-explorer` / `-editor` | `hc-e2e-selector` / `-executor` / `-analyzer` / `-explorer` / `-editor` | WebdriverIO + tauri-driver |
