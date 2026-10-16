@@ -102,7 +102,8 @@ export function TopBar({ onHelp, onLock }: TopBarProps): JSX.Element {
       </button>
 
       <span data-testid="topbar-version" className="text-xs text-slate-500">
-        v{version}
+        {t('topbar.versionPrefix')}
+        {version}
       </span>
     </header>
   );

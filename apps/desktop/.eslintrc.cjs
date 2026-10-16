@@ -13,7 +13,7 @@ module.exports = {
     ecmaFeatures: { jsx: true },
   },
   settings: { react: { version: '18' } },
-  plugins: ['@typescript-eslint', 'react-hooks', 'react-refresh'],
+  plugins: ['@typescript-eslint', 'react', 'react-hooks', 'react-refresh'],
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
@@ -23,6 +23,19 @@ module.exports = {
     '@typescript-eslint/ban-ts-comment': 'error',
     'react-hooks/rules-of-hooks': 'error',
     'react-hooks/exhaustive-deps': 'warn',
+    // R-UI-007: visible JSX text must come from locales/en.json via t(), not be
+    // hard-coded. jsx-no-literals flags a bare text child (e.g. <button>Save
+    // </button>) while leaving attributes (aria-label, data-testid, className)
+    // and non-text layout symbols (allowedStrings) alone.
+    'react/jsx-no-literals': [
+      'error',
+      {
+        noStrings: true,
+        ignoreProps: true,
+        allowedStrings: ['·', '–', '—', '…', '₹', '%', '/', ':', '×', '✓'],
+        elementOverrides: {},
+      },
+    ],
     'no-restricted-imports': [
       'error',
       {
@@ -43,6 +56,7 @@ module.exports = {
       files: ['**/*.test.ts', '**/*.test.tsx', 'src/test/**'],
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',
+        'react/jsx-no-literals': 'off',
       },
     },
   ],

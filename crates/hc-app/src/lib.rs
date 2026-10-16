@@ -9,6 +9,8 @@
 //! share one source of truth for the command list.
 
 pub mod commands;
+pub mod error;
+pub mod logging;
 
 use tauri_specta::{collect_commands, Builder};
 
@@ -19,5 +21,8 @@ use tauri_specta::{collect_commands, Builder};
 /// command is registered here and nowhere else, keeping one source of truth
 /// for the command collection.
 pub fn specta_builder() -> Builder<tauri::Wry> {
-    Builder::<tauri::Wry>::new().commands(collect_commands![commands::app_info::app_info])
+    Builder::<tauri::Wry>::new().commands(collect_commands![
+        commands::app_info::app_info,
+        commands::health::health_check
+    ])
 }

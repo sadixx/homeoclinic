@@ -14,9 +14,9 @@ export function StatusBar(): JSX.Element {
       data-testid="status-bar"
       className="flex h-6 items-center gap-4 border-t border-slate-200 bg-slate-50 px-3 text-xs text-slate-600"
     >
-      <span data-testid="status-autosave">Saved —</span>
-      <span data-testid="status-backup">Last backup: —</span>
-      <span data-testid="status-licence">Licence: —</span>
+      <span data-testid="status-autosave">{t('status.autosave')}</span>
+      <span data-testid="status-backup">{t('status.backup')}</span>
+      <span data-testid="status-licence">{t('status.licence')}</span>
       <span className="flex-1" />
       <span data-testid="status-appinfo">
         {info

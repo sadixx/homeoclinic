@@ -6,3 +6,4 @@
 //! types defined here (R-RUST-007). It depends on no other workspace crate.
 
 pub mod app_info;
+pub mod error;
