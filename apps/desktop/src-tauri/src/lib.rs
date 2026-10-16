@@ -9,15 +9,26 @@
 
 /// Build and run the HomeoClinic desktop application.
 ///
-/// Mounts the single typed command surface from `hc-app` into the Tauri
-/// invoke handler and runs the event loop. Panics only if the Tauri runtime
-/// itself fails to start — a non-recoverable startup invariant.
+/// Initialises structured JSON logging (HC-MVP1-017) and mounts the single
+/// typed command surface from `hc-app` into the Tauri invoke handler before
+/// running the event loop. The logging [`WorkerGuard`] is held for the whole
+/// app lifetime so buffered lines are flushed on exit. Adds no network client,
+/// server or socket (product rule 1). Panics only if the Tauri runtime itself
+/// fails to start — a non-recoverable startup invariant.
 pub fn run() {
     let builder = hc_app::specta_builder();
 
     tauri::Builder::default()
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
+            // Resolve the per-user app data dir and initialise logging before
+            // anything else writes diagnostics. The guard must outlive the
+            // app, so it is stashed in managed state.
+            use tauri::Manager as _;
+            let data_dir = app.path().app_data_dir()?;
+            let guard = hc_app::logging::init(&data_dir, hc_app::logging::RotationPolicy::DEFAULT)?;
+            app.manage(guard);
+
             builder.mount_events(app);
             Ok(())
         })

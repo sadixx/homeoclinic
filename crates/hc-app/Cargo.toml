@@ -12,10 +12,15 @@ hc-repertory = { path = "../hc-repertory" }
 hc-licence = { path = "../hc-licence" }
 hc-docs = { path = "../hc-docs" }
 serde = { workspace = true }
+serde_json = { workspace = true }
 specta = { workspace = true }
 tauri = { workspace = true }
 tauri-specta = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+sha2 = { workspace = true }
 
 [dev-dependencies]
-serde_json = { workspace = true }
 specta-typescript = { workspace = true }

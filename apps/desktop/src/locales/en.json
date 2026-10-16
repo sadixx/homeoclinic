@@ -10,5 +10,9 @@
   "today.empty.action": "New patient",
   "lock.title": "Enter PIN to unlock",
   "lock.unlock": "Unlock",
-  "nav.comingLater": "Available in a later update"
+  "nav.comingLater": "Available in a later update",
+  "status.autosave": "Saved —",
+  "status.backup": "Last backup: —",
+  "status.licence": "Licence: —",
+  "topbar.versionPrefix": "v"
 }

@@ -12,6 +12,15 @@ export const commands = {
 	 *  typed command wired end to end at M0 (R-ARCH-005).
 	 */
 	appInfo: () => __TAURI_INVOKE<AppInfo>("app_info"),
+	/**
+	 *  Return a patient-data-free health summary for the support screen.
+	 * 
+	 *  The one M0 command that returns `Result<_, UserFacingError>`, proving the
+	 *  friendly-error contract crosses the boundary (R-ARCH-006, NFR-033). Any
+	 *  internal `AppError` is mapped to [`UserFacingError`] before it reaches the
+	 *  UI; a raw error, SQL or stack trace never crosses (R-UI-008).
+	 */
+	healthCheck: () => typedError<HealthStatus, UserFacingError>(__TAURI_INVOKE("health_check")),
 };
 
 /* Types */
@@ -42,4 +51,61 @@ export type BuildProfile =
 "debug" | 
 /**  Compiled in release mode (an optimised, shipped build). */
 "release";
+
+/**
+ *  Stable machine code for a mapped error.
+ * 
+ *  Serialises as a `snake_case` string (e.g. `"db_busy"`); the UI uses it as
+ *  the `t()` key (R-UI-007). Changing a variant name is a contract change the
+ *  UI must follow, so the set is deliberately small and stable.
+ */
+export type ErrorCode = 
+/**  A required value was invalid (domain validation failed). */
+"validation" | 
+/**  The database was busy / locked; the doctor should retry. */
+"db_busy" | 
+/**  A record was not found. */
+"not_found" | 
+/**  A conflicting edit (optimistic concurrency / `row_version`). */
+"conflict" | 
+/**  Anything not otherwise classified. The message stays generic. */
+"unexpected";
+
+/**
+ *  Read-only health summary returned by [`health_check`].
+ * 
+ *  Carries only safe, patient-data-free status (R-PRIV-001): whether logging
+ *  is initialised. Serialises with camelCase keys to match the TS binding.
+ */
+export type HealthStatus = {
+	/**  Whether structured logging has been initialised this session. */
+	loggingReady: boolean,
+};
+
+/**
+ *  The ONLY error shape the UI ever receives.
+ * 
+ *  Contains no raw error text, no SQL, no file path and no stack trace — only
+ *  a code, a plain-language message and a suggested action (NFR-033,
+ *  R-UI-008). Serialises with camelCase keys (`code`, `message`,
+ *  `suggestedAction`) and crosses to TypeScript via `specta` (R-ARCH-004).
+ */
+export type UserFacingError = {
+	/**  Machine code; also the i18n key the UI resolves with `t()`. */
+	code: ErrorCode,
+	/**  Plain-language, patient-data-free message (safe default / fallback). */
+	message: string,
+	/**  One concrete next step, e.g. `"Try again"` / `"Check the details"`. */
+	suggestedAction: string,
+};
+
+/* Tauri Specta runtime */
+async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
+    try {
+        return { status: "ok", data: await result };
+    } catch (e) {
+        if (e instanceof Error) throw e;
+        return { status: "error", error: e as any };
+    }
+}
 
