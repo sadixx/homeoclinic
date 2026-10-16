@@ -20,7 +20,7 @@ R0    R1    R2    R3    R4    R5                    (R6 at M5)   R7    R8    R9
 | Release | Milestone | What a doctor can do | Screens (docs/ui) | Backlog |
 |---|---|---|---|---|
 | R0 Walking skeleton | M0 | Install, open the app, see the shell, nav and an empty Today | shell, S03 empty, S02 stub | HC-MVP1-214 |
-| R1 Set up and protect | M1 | Run first-run wizard (dev trial), lock and unlock with PIN, back up to USB and restore | S01 (licence step = dev trial), S02, S17 | HC-MVP1-215 |
+| R1 Set up and protect | M1 | Run first-run wizard (dev trial), lock and unlock with PIN, back up to USB and restore | S01 (licence step = dev trial), S02, S17, S18 (minimal: profiles, PIN change, font size, data folder) | HC-MVP1-215 |
 | R2 Patient register | M2 | Register patients with photo, find anyone instantly, open dashboard, edit, recycle bin | S04, S05, S06, S07 | HC-MVP1-216 |
 | R3 Paper replacement | M3 | Take a full case, record follow-ups, see who is due today | S08, S09, S03 | HC-MVP1-217 |
 | R4 Consultation complete | M7 | Prescribe, print A5 or letterhead, save PDF, share on WhatsApp | S13, S14 | HC-MVP1-218 |
@@ -29,7 +29,7 @@ R0    R1    R2    R3    R4    R5                    (R6 at M5)   R7    R8    R9
 | R6 Repertory reading | M4 + M5 | Search rubrics, browse repertory, read Materia Medica (internal build) | S10, S12, S19 | HC-MVP1-220 |
 | R7 Repertorisation | M6 | Send symptoms from case, analyse, prescribe from result, cite | S11, S22 | HC-MVP1-221 |
 | R8 Licence and purchase | M9 | Trial, Buy with UPI QR, import licence, expiry goes read-only | S20, S01 licence step | HC-MVP1-222 |
-| R9 Release candidate | M10 | Everything above on the hardened, signed build | S18, S21, all | HC-MVP1-223 |
+| R9 Release candidate | M10 | Everything above on the hardened, signed build | S18 (full: audit log, recycle bin, templates, advice library), S21, all | HC-MVP1-223 |
 
 Upgrade-path harness: HC-MVP1-226.
 

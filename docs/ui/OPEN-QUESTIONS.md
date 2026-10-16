@@ -108,7 +108,10 @@ Gaps the spec authors did not invent answers for. Record each decision in the sc
 
 ## S18 Settings
 
-- OQ-S18-1: The release plan (docs/milestones/README.md) lists S18 only at R9,
+- OQ-S18-1: RESOLVED (2026-10-16): a minimal Settings ships at R1 (doctor and
+  clinic profile, PIN change, font size, data folder); the full S18 (audit log,
+  recycle bin, templates, advice library) completes at R9. milestones/README.md,
+  ui/README.md and S18 header (Milestone M1 / Release R1) now agree.
 - OQ-S18-2: ADM-002 does not define an audit-log retention period or whether the
 - OQ-S18-3: SET-006 does not state what happens to existing data when the folder
 - OQ-S18-4: PAT-008 fixes a 30-day recycle window but not whether expired items

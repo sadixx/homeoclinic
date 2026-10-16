@@ -172,7 +172,7 @@ Not used: kernel drivers / rootkit-style DRM and whole-binary packers (UPX, VMPr
 - Errors: domain errors mapped to friendly messages with a suggested action (NFR-033).
 - i18n: all UI strings in `locales/en.json` from day one; Noto Sans / Noto Sans Devanagari bundled for print.
 - Accessibility: keyboard-first, focus rings, min font 14 px, WCAG AA contrast.
-- Testing: unit tests per crate, golden tests for scoring and search ranking, Playwright E2E for the 11 core flows, perf tests with 50k/100k seeded data.
+- Testing: unit tests per crate, golden tests for scoring and search ranking, WebdriverIO + tauri-driver E2E for the 13 core flows (requirements/05 section 7), perf tests with 50k/100k seeded data.
 
 ## 9. How MVP1 prepares for MVP2/MVP3
 
