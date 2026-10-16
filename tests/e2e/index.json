@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-10-16T20:07:46.305Z",
+  "specs": [
+    {
+      "path": "tests/e2e/specs/app/shell.e2e.ts",
+      "reqs": [
+        "NFR-030",
+        "NFR-032"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "app.name": "HomeoClinic",
+  "nav.today": "Today",
+  "nav.patients": "Patients",
+  "nav.settings": "Settings",
+  "search.placeholder": "Search patients…",
+  "topbar.help": "Help",
+  "topbar.lock": "Lock",
+  "today.empty.message": "No follow-ups or visits yet. Register your first patient.",
+  "today.empty.action": "New patient",
+  "lock.title": "Enter PIN to unlock",
+  "lock.unlock": "Unlock",
+  "nav.comingLater": "Available in a later update"
+}

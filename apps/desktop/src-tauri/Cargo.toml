@@ -1,0 +1,17 @@
+[package]
+name = "homeoclinic-desktop"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+description = "HomeoClinic desktop shell"
+
+[lib]
+name = "homeoclinic_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+hc-app = { path = "../../../crates/hc-app" }
+tauri = { workspace = true }

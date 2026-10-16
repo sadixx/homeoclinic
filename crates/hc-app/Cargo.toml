@@ -1,0 +1,21 @@
+[package]
+name = "hc-app"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+hc-domain = { path = "../hc-domain" }
+hc-storage = { path = "../hc-storage" }
+hc-search = { path = "../hc-search" }
+hc-repertory = { path = "../hc-repertory" }
+hc-licence = { path = "../hc-licence" }
+hc-docs = { path = "../hc-docs" }
+serde = { workspace = true }
+specta = { workspace = true }
+tauri = { workspace = true }
+tauri-specta = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+specta-typescript = { workspace = true }
