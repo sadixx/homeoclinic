@@ -29,7 +29,10 @@ export function TodayScreen({ onNewPatient }: TodayScreenProps): JSX.Element {
       aria-label={t('nav.today')}
       className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center"
     >
-      <p data-testid="today-empty" className="max-w-md text-base text-slate-700">
+      <p
+        data-testid="today-empty"
+        className="max-w-md text-base text-slate-700"
+      >
         {t('today.empty.message')}
       </p>
       <button

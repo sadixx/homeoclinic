@@ -19,7 +19,9 @@ export function StatusBar(): JSX.Element {
       <span data-testid="status-licence">Licence: —</span>
       <span className="flex-1" />
       <span data-testid="status-appinfo">
-        {info ? `${info.name} v${info.version} (${info.build_profile})` : `${t('app.name')} …`}
+        {info
+          ? `${info.name} v${info.version} (${info.build_profile})`
+          : `${t('app.name')} …`}
       </span>
     </footer>
   );
