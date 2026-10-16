@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/hc-domain",
+  "crates/hc-storage",
+  "crates/hc-search",
+  "crates/hc-repertory",
+  "crates/hc-licence",
+  "crates/hc-docs",
+  "crates/hc-app",
+  "apps/desktop/src-tauri",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "proprietary"
+
+[workspace.dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+specta-typescript = "0.0.12"
+tauri = { version = "2.9.1" }
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+thiserror = "2.0.17"

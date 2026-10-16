@@ -1,0 +1,9 @@
+[package]
+name = "hc-search"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+hc-domain = { path = "../hc-domain" }
+hc-storage = { path = "../hc-storage" }

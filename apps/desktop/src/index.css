@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Normal font size baseline (SET-005 / 00-conventions §1): 14px. */
+  font-size: 14px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: theme('fontFamily.sans');
+  color: #0f172a;
+  background: #ffffff;
+}
