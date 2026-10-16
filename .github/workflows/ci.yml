@@ -28,9 +28,12 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging-main]
   pull_request:
-    branches: [main]
+    branches: [main, staging-main]
+  # Allow running the pipeline on demand from the Actions tab for any branch
+  # (used for milestone-close Windows verification before promoting to main).
+  workflow_dispatch: {}
 
 # Cancel superseded runs on the same ref to save runner time.
 concurrency:

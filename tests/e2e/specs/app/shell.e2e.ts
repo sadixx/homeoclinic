@@ -1,7 +1,7 @@
 // @req NFR-030 NFR-032
 // @tier regression
 // @area settings
-// @targets linux
+// @targets linux, windows
 //
 // R0 walking-skeleton demo (docs/milestones/README.md), network disabled.
 // Verifies the three gated steps against the built M0 shell:
