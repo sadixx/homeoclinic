@@ -6,3 +6,27 @@ license.workspace = true
 
 [dependencies]
 hc-domain = { path = "../hc-domain" }
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher", "trace"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { version = "1.28", features = ["v7"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+zeroize = "1.8"
+# Available in the library only under the `testing` feature (temp_db seam).
+tempfile = { version = "3", optional = true }
+
+[dev-dependencies]
+# Self-dependency with the `testing` feature enabled so the crate's own
+# integration tests (tests/*.rs) see `hc_storage::testing::*` under a plain
+# `cargo test` / `cargo test --workspace`, without forcing the feature on for
+# normal library consumers (R-TEST-009; keeps the test seam out of prod builds).
+hc-storage = { path = ".", features = ["testing"] }
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher"] }
+serde_json = { workspace = true }
+tempfile = "3"
+
+[features]
+# Exposes hc_storage::testing::* (DevKeyProvider, temp_db, crash_child_main) to
+# other crates' tests and to this crate's integration tests.
+testing = ["dep:tempfile"]
