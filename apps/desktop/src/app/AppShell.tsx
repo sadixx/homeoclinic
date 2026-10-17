@@ -9,7 +9,7 @@
 //   /today  -> S03 Today (empty state at R0), the default route
 //   /lock   -> S02 lock stub (full-window overlay, no nav)
 // Unknown routes redirect to /today.
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   HashRouter,
   Navigate,
@@ -24,6 +24,15 @@ import { SideNav, type NavRoute } from '@/app/SideNav';
 import { StatusBar } from '@/app/StatusBar';
 import { TopBar } from '@/app/TopBar';
 import { TodayScreen } from '@/home/TodayScreen';
+import { SetupWizard } from '@/setup/SetupWizard';
+
+/**
+ * Default idle auto-lock timeout in minutes (SET-004). The shell runs the idle
+ * timer; the backend owns sealing/unsealing. The configured value is persisted
+ * at setup and resolved by the boot/lock wiring; the shell falls back to this
+ * default so it can run without a binding call (keeping it unit-testable).
+ */
+const DEFAULT_AUTOLOCK_MINUTES = 15;
 
 /** Inner shell chrome; assumes a router is present above it. */
 function ShellFrame(): JSX.Element {
@@ -35,6 +44,37 @@ function ShellFrame(): JSX.Element {
     (route: NavRoute) => navigate(route),
     [navigate],
   );
+
+  // Idle auto-lock (SET-004): after the configured idle timeout with no user
+  // activity, lock the app. Any clinical edit is already autosaved (CASE-005),
+  // so locking never loses data. Ctrl+L (TopBar) is the explicit path.
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const timeoutMs = DEFAULT_AUTOLOCK_MINUTES * 60 * 1000;
+    const reset = (): void => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+      }
+      timerRef.current = setTimeout(() => navigate('/lock'), timeoutMs);
+    };
+    const activity: ReadonlyArray<keyof WindowEventMap> = [
+      'mousemove',
+      'mousedown',
+      'keydown',
+      'wheel',
+      'touchstart',
+    ];
+    activity.forEach((evt) =>
+      window.addEventListener(evt, reset, { passive: true }),
+    );
+    reset();
+    return () => {
+      activity.forEach((evt) => window.removeEventListener(evt, reset));
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [navigate]);
 
   const activeRoute: NavRoute | undefined =
     location.pathname === '/today' || location.pathname === '/'
@@ -65,12 +105,33 @@ function ShellFrame(): JSX.Element {
   );
 }
 
+/** `/lock` route: unlock returns to Today (or the previous screen). */
+function LockRoute(): JSX.Element {
+  const navigate = useNavigate();
+  const goHome = useCallback(
+    () => navigate('/today', { replace: true }),
+    [navigate],
+  );
+  return <LockScreen onUnlocked={goHome} />;
+}
+
+/** `/setup` route: finishing the wizard opens Today unlocked (S01). */
+function SetupRoute(): JSX.Element {
+  const navigate = useNavigate();
+  const goHome = useCallback(
+    () => navigate('/today', { replace: true }),
+    [navigate],
+  );
+  return <SetupWizard onComplete={goHome} />;
+}
+
 /** Top-level shell: provides the router and renders the chrome. */
 export function AppShell(): JSX.Element {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/lock" element={<LockScreen />} />
+        <Route path="/setup" element={<SetupRoute />} />
+        <Route path="/lock" element={<LockRoute />} />
         <Route path="*" element={<ShellFrame />} />
       </Routes>
     </HashRouter>

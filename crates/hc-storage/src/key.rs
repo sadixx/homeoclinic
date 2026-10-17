@@ -301,6 +301,24 @@ impl<'a> KeyHierarchy<'a> {
         Ok(())
     }
 
+    /// Forgot-PIN reset (SET-004): unwrap the DEK with the recovery code, then
+    /// re-wrap the PIN wrap under a fresh KEK from `new_pin`. The DEK (and so
+    /// the DB) is never re-encrypted — after this the NEW pin unlocks and the
+    /// OLD pin no longer does. The recovery wrap is left intact so the same
+    /// printed code keeps working. Wrong code → `WrongRecoveryCode`.
+    pub fn reset_pin_with_recovery_code(
+        &self,
+        code: &str,
+        new_pin: &str,
+    ) -> Result<(), StorageError> {
+        let (mut record, per_install_secret) = self.load_record()?;
+        let dek = Self::open_wrap(&record.recovery_wrap, code.as_bytes(), &per_install_secret)
+            .map_err(|_| StorageError::WrongRecoveryCode)?;
+        record.pin_wrap = Self::make_wrap(&dek, new_pin.as_bytes(), &per_install_secret)?;
+        self.store.store(&record)?;
+        Ok(())
+    }
+
     /// True if this install's keystore already holds a wrapped DEK.
     pub fn is_initialized(&self) -> Result<bool, StorageError> {
         Ok(self.store.load()?.is_some())

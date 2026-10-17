@@ -27,6 +27,12 @@ pub enum ErrorCode {
     NotFound,
     /// A conflicting edit (optimistic concurrency / `row_version`).
     Conflict,
+    /// The PIN did not unlock the database (SET-004, SUX-007). Distinct so the
+    /// lock UI shows a precise inline message; NEVER restricts the app
+    /// (SUX-005).
+    WrongPin,
+    /// The recovery code did not unlock the database (SET-004).
+    WrongRecoveryCode,
     /// Anything not otherwise classified. The message stays generic.
     Unexpected,
 }
@@ -68,6 +74,14 @@ pub enum AppError {
     /// A conflicting edit was detected.
     #[error("conflict")]
     Conflict,
+    /// The PIN did not unlock the database (from
+    /// `StorageError::WrongPin`). Kept as a distinct variant (NOT boxed into
+    /// `Storage`) so [`map_error`] can surface a precise code (SUX-007).
+    #[error("wrong pin")]
+    WrongPin,
+    /// The recovery code did not unlock the database (SET-004).
+    #[error("wrong recovery code")]
+    WrongRecoveryCode,
 }
 
 /// Map any internal error to the UI-facing value.
@@ -99,6 +113,16 @@ pub fn map_error(err: &AppError) -> UserFacingError {
             suggested_action: "Please try again. If it keeps happening, restart the app."
                 .to_string(),
         },
+        AppError::WrongPin => UserFacingError {
+            code: ErrorCode::WrongPin,
+            message: "That PIN is not correct.".to_string(),
+            suggested_action: "Check the PIN and try again.".to_string(),
+        },
+        AppError::WrongRecoveryCode => UserFacingError {
+            code: ErrorCode::WrongRecoveryCode,
+            message: "That recovery code is not correct.".to_string(),
+            suggested_action: "Check the code from your setup printout and try again.".to_string(),
+        },
     }
 }
 
@@ -106,4 +130,18 @@ pub fn map_error(err: &AppError) -> UserFacingError {
 /// `Result`, mapping the error through [`map_error`].
 pub fn to_user_result<T>(r: Result<T, AppError>) -> Result<T, UserFacingError> {
     r.map_err(|e| map_error(&e))
+}
+
+/// Map a storage-layer error to the app error, PRESERVING the wrong-PIN /
+/// wrong-recovery-code variants so [`map_error`] can surface a precise code
+/// (SUX-007); every other storage error is boxed opaquely into
+/// [`AppError::Storage`] (its text is never read — R-PRIV-001, R-UI-008).
+impl From<hc_storage::StorageError> for AppError {
+    fn from(err: hc_storage::StorageError) -> Self {
+        match err {
+            hc_storage::StorageError::WrongPin => AppError::WrongPin,
+            hc_storage::StorageError::WrongRecoveryCode => AppError::WrongRecoveryCode,
+            other => AppError::Storage(Box::new(other)),
+        }
+    }
 }

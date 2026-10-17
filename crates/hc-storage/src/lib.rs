@@ -18,6 +18,7 @@ pub mod key;
 pub mod keystore;
 pub mod migrate;
 pub mod pool;
+pub mod profile;
 pub(crate) mod wrap;
 
 #[cfg(any(test, feature = "testing"))]

@@ -20,6 +20,18 @@ export interface Features {
   readonly patients: boolean;
   /** Settings module. Turns on at M1. */
   readonly settings: boolean;
+  /**
+   * Setup wizard P1 controls: font size (SET-005 / HC-MVP1-028) and the
+   * data-folder chooser (SET-006 / HC-MVP1-029). DEFERRED this slice — the
+   * controls may render disabled, and the wizard completes without them
+   * (R-DEL-002/006). Turns on at a later M1 slice.
+   */
+  readonly setupP1Controls: boolean;
+  /**
+   * The "I already have a licence" import path on the setup licence step
+   * (S20 / LIC-061). Hidden until R8; the trial-only path is the default.
+   */
+  readonly licenceImport: boolean;
 }
 
 // `__FEATURES__` is a Vite compile-time constant (see vite.config.ts `define`

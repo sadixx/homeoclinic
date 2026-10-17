@@ -21,6 +21,45 @@ export const commands = {
 	 *  UI; a raw error, SQL or stack trace never crosses (R-UI-008).
 	 */
 	healthCheck: () => typedError<HealthStatus, UserFacingError>(__TAURI_INVOKE("health_check")),
+	/**  Current wizard state (`setup_get_state`). */
+	setupGetState: () => typedError<SetupState, UserFacingError>(__TAURI_INVOKE("setup_get_state")),
+	/**  Validate and stage the doctor profile (SET-002). */
+	setupSaveDoctorProfile: (req: SaveDoctorProfileRequest) => typedError<SaveDoctorProfileResponse, UserFacingError>(__TAURI_INVOKE("setup_save_doctor_profile", { req })),
+	/**  Validate and stage the clinic profile (SET-003). */
+	setupSaveClinicProfile: (req: SaveClinicProfileRequest) => typedError<SaveClinicProfileResponse, UserFacingError>(__TAURI_INVOKE("setup_save_clinic_profile", { req })),
+	/**
+	 *  Set the app PIN (SET-004): mint the DEK + recovery code, open + migrate the
+	 *  encrypted DB, flush staged profiles + the autolock setting, and stash the
+	 *  open pool (unlocked) in the lock flag. Returns the one-time recovery code.
+	 */
+	setupSetPin: (req: SetPinRequest) => typedError<SetPinResponse, UserFacingError>(__TAURI_INVOKE("setup_set_pin", { req })),
+	/**  Persist the chosen data dir (P1/DEFERRED minimal, A2). */
+	setupSetDataDir: (req: SetDataDirRequest) => typedError<SetDataDirResponse, UserFacingError>(__TAURI_INVOKE("setup_set_data_dir", { req })),
+	/**  Persist the chosen font size (P1/DEFERRED minimal, A2). */
+	setupSetFontSize: (req: SetFontSizeRequest) => typedError<null, UserFacingError>(__TAURI_INVOKE("setup_set_font_size", { req })),
+	/**  Start the local 30-day trial (LIC-063) in the open DB. */
+	setupStartTrial: () => typedError<StartTrialResponse, UserFacingError>(__TAURI_INVOKE("setup_start_trial")),
+	/**  Mark setup complete and return the home route (`/today`). */
+	setupComplete: () => typedError<CompleteSetupResponse, UserFacingError>(__TAURI_INVOKE("setup_complete")),
+	/**  Report the current lock state (`auth_get_lock_state`). */
+	authGetLockState: () => typedError<LockState, UserFacingError>(__TAURI_INVOKE("auth_get_lock_state")),
+	/**
+	 *  Unlock by PIN (SUX-003): open the encrypted DB and stash it unlocked. A
+	 *  wrong PIN maps to a `wrong_pin` error and leaves the app locked, never
+	 *  restricting the next attempt (SUX-005).
+	 */
+	authUnlock: (req: UnlockRequest) => typedError<UnlockResponse, UserFacingError>(__TAURI_INVOKE("auth_unlock", { req })),
+	/**
+	 *  Lock the app (`auth_lock`): drop the open pool, sealing the DB and zeroizing
+	 *  the DEK (R-SEC-006). Idempotent.
+	 */
+	authLock: () => typedError<null, UserFacingError>(__TAURI_INVOKE("auth_lock")),
+	/**
+	 *  Forgot-PIN recovery (SET-004): reset the PIN via the recovery code. A wrong
+	 *  code maps to `wrong_recovery_code`. Leaves the app locked; the user then
+	 *  unlocks with the new PIN.
+	 */
+	authRecoverWithCode: (req: RecoverRequest) => typedError<RecoverResponse, UserFacingError>(__TAURI_INVOKE("auth_recover_with_code", { req })),
 };
 
 /* Types */
@@ -52,6 +91,12 @@ export type BuildProfile =
 /**  Compiled in release mode (an optimised, shipped build). */
 "release";
 
+/**  Result of completing setup. */
+export type CompleteSetupResponse = {
+	/**  Route to open after setup (`"/today"`). */
+	homeRoute: string,
+};
+
 /**
  *  Stable machine code for a mapped error.
  * 
@@ -68,8 +113,25 @@ export type ErrorCode =
 "not_found" | 
 /**  A conflicting edit (optimistic concurrency / `row_version`). */
 "conflict" | 
+/**
+ *  The PIN did not unlock the database (SET-004, SUX-007). Distinct so the
+ *  lock UI shows a precise inline message; NEVER restricts the app
+ *  (SUX-005).
+ */
+"wrong_pin" | 
+/**  The recovery code did not unlock the database (SET-004). */
+"wrong_recovery_code" | 
 /**  Anything not otherwise classified. The message stays generic. */
 "unexpected";
+
+/**  Global font size (SET-005, DEFERRED/P1 — minimal persist only). */
+export type FontSize = 
+/**  14px base. */
+"normal" | 
+/**  16px base. */
+"large" | 
+/**  18px base. */
+"xlarge";
 
 /**
  *  Read-only health summary returned by [`health_check`].
@@ -80,6 +142,159 @@ export type ErrorCode =
 export type HealthStatus = {
 	/**  Whether structured logging has been initialised this session. */
 	loggingReady: boolean,
+};
+
+/**  Lock-screen state (`auth_get_lock_state`). */
+export type LockState = {
+	/**  Whether the app is currently locked. */
+	locked: boolean,
+	/**  Idle auto-lock timeout in minutes (the UI runs the idle timer). */
+	autolockMinutes: number,
+};
+
+/**  Forgot-PIN recovery input (`auth_recover_with_code`, SET-004). */
+export type RecoverRequest = {
+	/**  The recovery code shown once at setup. */
+	recoveryCode: string,
+	/**  The new PIN to set. */
+	newPin: string,
+	/**  Confirmation; must equal `new_pin`. */
+	confirmPin: string,
+};
+
+/**  Recovery result. */
+export type RecoverResponse = {
+	/**  Whether the recovery + PIN reset succeeded. */
+	ok: boolean,
+};
+
+/**  Clinic profile input (SET-003). Fees are integer paise (R-DATA-004). */
+export type SaveClinicProfileRequest = {
+	/**  Clinic name (required). */
+	name: string,
+	/**  Clinic address (required). */
+	address: string,
+	/**  Optional phone. */
+	phone: string | null,
+	/**  Optional timings. */
+	timings: string | null,
+	/**
+	 *  Default consultation fee, integer paise (required).
+	 * 
+	 *  Kept as `i64` in Rust (R-DATA-004); exported as a TS `number` via the
+	 *  `Number` override because paise amounts are always within JS
+	 *  safe-integer range, so no precision is lost.
+	 */
+	feeFirstPaise: number,
+	/**  Default follow-up fee, integer paise (required). */
+	feeFollowupPaise: number,
+	/**  Optional GSTIN. */
+	gstin: string | null,
+};
+
+/**  Result of staging the clinic profile. */
+export type SaveClinicProfileResponse = {
+	/**  The UUIDv7 assigned to the clinic profile. */
+	clinicId: string,
+};
+
+/**  Doctor profile input (SET-002). */
+export type SaveDoctorProfileRequest = {
+	/**  Full name (required). */
+	name: string,
+	/**  Qualification (required). */
+	qualification: string,
+	/**  Registration number (required). */
+	regNo: string,
+	/**  Registration council (required). */
+	regCouncil: string,
+	/**  Optional phone. */
+	phone: string | null,
+	/**  Optional email. */
+	email: string | null,
+	/**  Optional signature image source path (opaque; stored as attachment ref). */
+	signatureImagePath: string | null,
+	/**  Optional clinic logo source path. */
+	clinicLogoPath: string | null,
+};
+
+/**  Result of staging the doctor profile. */
+export type SaveDoctorProfileResponse = {
+	/**  The UUIDv7 assigned to the doctor profile. */
+	doctorId: string,
+};
+
+/**  Data-folder chooser input (SET-006, DEFERRED/P1 — minimal persist only). */
+export type SetDataDirRequest = {
+	/**  The chosen data directory. */
+	path: string,
+};
+
+/**  Resolved data directory. */
+export type SetDataDirResponse = {
+	/**  The data directory now in effect. */
+	dataDir: string,
+};
+
+/**  Font size input. */
+export type SetFontSizeRequest = {
+	/**  The chosen font size. */
+	size: FontSize,
+};
+
+/**
+ *  PIN set input (SET-004). `pin` must be 4–6 numeric digits and equal
+ *  `confirm_pin`.
+ */
+export type SetPinRequest = {
+	/**  The chosen PIN (request-only secret; never echoed or logged). */
+	pin: string,
+	/**  Confirmation; must equal `pin`. */
+	confirmPin: string,
+	/**  Idle auto-lock timeout in minutes (default 15). */
+	autolockMinutes: number,
+};
+
+/**  Result of setting the PIN: the one-time recovery code (shown once, SET-004). */
+export type SetPinResponse = {
+	/**  Grouped recovery code to show once and print; never shown again. */
+	recoveryCode: string,
+};
+
+/**  Wizard progress snapshot (`setup_get_state`). */
+export type SetupState = {
+	/**  Whether first-run setup has completed. */
+	completed: boolean,
+	/**  The step the wizard should resume on (1..=4). */
+	currentStep: number,
+	/**  The resolved data directory (display only; UI never builds paths). */
+	dataDir: string,
+};
+
+/**  Result of starting the local trial (LIC-063). */
+export type StartTrialResponse = {
+	/**  RFC3339 UTC expiry. */
+	trialValidUntil: string,
+	/**  Whole days remaining in the trial (30 at start). */
+	trialDaysRemaining: number,
+};
+
+/**  Unlock input (`auth_unlock`). `pin` is a request-only secret. */
+export type UnlockRequest = {
+	/**  The entered PIN. */
+	pin: string,
+};
+
+/**
+ *  Unlock result. `attempts_remaining` is a soft, non-restricting hint
+ *  (SUX-005 forbids false lockouts); a wrong PIN returns an error, not
+ *  `ok:false`.
+ */
+export type UnlockResponse = {
+	/**  Whether the unlock succeeded. */
+	ok: boolean,
+	/**  Advisory remaining-attempts hint; never gates access. */
+	attemptsRemaining: number,
 };
 
 /**

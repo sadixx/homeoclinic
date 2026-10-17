@@ -1591,10 +1591,13 @@ dependencies = [
  "specta-typescript",
  "tauri",
  "tauri-specta",
+ "tempfile",
  "thiserror 2.0.21",
+ "time",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

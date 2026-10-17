@@ -1,11 +1,27 @@
 {
-  "generatedAt": "2026-10-16T22:15:33.216Z",
+  "generatedAt": "2026-10-17T11:57:36.998Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/shell.e2e.ts",
       "reqs": [
         "NFR-030",
         "NFR-032"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/setup/first-run.e2e.ts",
+      "reqs": [
+        "SET-001",
+        "SET-002",
+        "SET-003",
+        "SET-004",
+        "LIC-063"
       ],
       "tier": "regression",
       "area": "settings",

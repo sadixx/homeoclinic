@@ -8,9 +8,13 @@
 //! [`tauri_specta::Builder`] so the Tauri shell and the bindings-export test
 //! share one source of truth for the command list.
 
+pub mod auth;
+pub mod clock;
 pub mod commands;
 pub mod error;
 pub mod logging;
+pub mod setup;
+pub mod state;
 
 use tauri_specta::{collect_commands, Builder};
 
@@ -23,6 +27,20 @@ use tauri_specta::{collect_commands, Builder};
 pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new().commands(collect_commands![
         commands::app_info::app_info,
-        commands::health::health_check
+        commands::health::health_check,
+        // First-run setup (HC-MVP1-026).
+        commands::setup::setup_get_state,
+        commands::setup::setup_save_doctor_profile,
+        commands::setup::setup_save_clinic_profile,
+        commands::setup::setup_set_pin,
+        commands::setup::setup_set_data_dir,
+        commands::setup::setup_set_font_size,
+        commands::setup::setup_start_trial,
+        commands::setup::setup_complete,
+        // PIN lock/unlock (HC-MVP1-027).
+        commands::auth::auth_get_lock_state,
+        commands::auth::auth_unlock,
+        commands::auth::auth_lock,
+        commands::auth::auth_recover_with_code
     ])
 }

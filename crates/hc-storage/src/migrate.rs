@@ -23,10 +23,16 @@ pub struct Migration {
 ///
 /// Index `i` has `target == i + 1`. Append-only (R-DATA-002).
 pub fn migrations() -> &'static [Migration] {
-    &[Migration {
-        target: 1,
-        sql: include_str!("migrations/0001_init.sql"),
-    }]
+    &[
+        Migration {
+            target: 1,
+            sql: include_str!("migrations/0001_init.sql"),
+        },
+        Migration {
+            target: 2,
+            sql: include_str!("migrations/0002_setup.sql"),
+        },
+    ]
 }
 
 /// Current schema version from `PRAGMA user_version` (0 on a fresh DB).
