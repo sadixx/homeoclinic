@@ -13,6 +13,8 @@
 
 pub mod attachment;
 pub mod audit;
+pub mod backup;
+pub mod clock;
 pub mod error;
 pub mod key;
 pub mod keystore;

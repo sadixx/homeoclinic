@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-17T11:57:36.998Z",
+  "generatedAt": "2026-10-17T18:00:12.493Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/shell.e2e.ts",
@@ -12,6 +12,31 @@
       "targets": [
         "linux",
         "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/backup/backup-now.e2e.ts",
+      "reqs": [
+        "BAK-001",
+        "BAK-002",
+        "BAK-004"
+      ],
+      "tier": "regression",
+      "area": "backup",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/backup/restore-clean-install.e2e.ts",
+      "reqs": [
+        "BAK-002",
+        "BAK-003"
+      ],
+      "tier": "regression",
+      "area": "backup",
+      "targets": [
+        "linux"
       ]
     },
     {

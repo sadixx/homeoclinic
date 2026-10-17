@@ -9,6 +9,7 @@
 //! share one source of truth for the command list.
 
 pub mod auth;
+pub mod backup;
 pub mod clock;
 pub mod commands;
 pub mod error;
@@ -41,6 +42,18 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         commands::auth::auth_get_lock_state,
         commands::auth::auth_unlock,
         commands::auth::auth_lock,
-        commands::auth::auth_recover_with_code
+        commands::auth::auth_recover_with_code,
+        // Backup / restore (HC-MVP1-030..034, S17).
+        commands::backup::get_backup_status,
+        commands::backup::set_auto_backup,
+        commands::backup::list_removable_drives,
+        commands::backup::backup_now,
+        commands::backup::restore_preview,
+        commands::backup::restore_apply,
+        commands::backup::verify_backup,
+        // BAK-005/HC-MVP1-035 "move to new computer" is DEFERRED (P1): the
+        // command is registered for a stable binding contract but is
+        // feature-flagged OFF (S17 button disabled, no dead end).
+        commands::backup::start_move_to_new_computer
     ])
 }

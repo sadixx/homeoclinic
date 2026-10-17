@@ -81,6 +81,7 @@ pub fn setup_set_pin(
     req: SetPinRequest,
 ) -> Result<SetPinResponse, UserFacingError> {
     let autolock = req.autolock_minutes;
+    let pin = req.pin.clone();
     let svc = service(&state);
 
     // Replay the staged doctor/clinic requests into the service so set_pin
@@ -97,12 +98,23 @@ pub fn setup_set_pin(
 
     let (resp, pool) = to_user_result(svc.set_pin(req))?;
 
+    // Re-derive the DEK provider from the just-initialised keystore so a later
+    // restore can re-key under THIS install's own DEK (design §5 / ADR 0014).
+    // Setup already minted + wrapped the DEK; unwrapping with the same PIN is
+    // the supported way to obtain a provider handle. The DEK never leaves the
+    // process and is never logged (R-SEC-006, R-PRIV-001).
+    let key = hc_storage::key::KeyHierarchy::new(state.keystore.as_ref())
+        .unlock_with_pin(&pin)
+        .ok()
+        .map(std::sync::Arc::new);
+
     // The DB is now open: record it unlocked in the lock flag so later commands
     // reuse it, and clear the staging buffer (profiles are persisted).
     {
         let mut lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
         lock.locked = false;
         lock.pool = Some(pool);
+        lock.key = key;
         lock.autolock_minutes = autolock;
     }
     *state.staging.lock().unwrap_or_else(|p| p.into_inner()) = Default::default();

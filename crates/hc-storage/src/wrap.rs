@@ -121,8 +121,39 @@ pub(crate) fn wrap_blob(plaintext: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, Sto
     Ok(out)
 }
 
-/// Unwrap a `nonce ∥ ciphertext ∥ tag` blob under `key`. A failed GCM auth tag
-/// (tamper / truncation / wrong key) returns [`StorageError::AttachmentTampered`]
+/// Derive the 32-byte backup body key from the backup password and the
+/// per-archive salt using Argon2id (HC-MVP1-030). Thin wrapper over
+/// [`derive_kek`] so the `.hcbak` format reuses the SAME audited Argon2id code
+/// as the DEK key hierarchy — no reinvented KDF. The salt is the per-archive
+/// random salt recorded (plaintext) in the header; no per-install secret is
+/// mixed in, because a backup must be restorable on a DIFFERENT install where
+/// that secret does not exist (restore-on-clean-install, design §5).
+pub(crate) fn derive_backup_key(
+    password: &[u8],
+    salt: &[u8],
+    params: Argon2Params,
+) -> Result<Zeroizing<[u8; 32]>, StorageError> {
+    derive_kek(password, salt, params)
+}
+
+/// Unwrap a `nonce ∥ ciphertext ∥ tag` blob under `key`, mapping a failed GCM
+/// tag to [`StorageError::WrongBackupPassword`] (HC-MVP1-030/033).
+///
+/// The backup body is sealed with [`wrap_blob`]; a wrong backup password fails
+/// the FIRST chunk's GCM tag, which the restore UI must distinguish from a
+/// damaged file (`BadArchive`) so it can show an inline "try again" (S17 AC4).
+pub(crate) fn open_backup_chunk(blob: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, StorageError> {
+    if blob.len() < NONCE_LEN + 16 {
+        return Err(StorageError::BadArchive);
+    }
+    let (nonce_bytes, ciphertext) = blob.split_at(NONCE_LEN);
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| StorageError::Crypto)?;
+    let nonce = Nonce::from_slice(nonce_bytes);
+    cipher
+        .decrypt(nonce, ciphertext)
+        .map_err(|_| StorageError::WrongBackupPassword)
+}
+
 /// so callers that read opaque blobs surface the right error; the keystore maps
 /// it to `Crypto` by context. Returns the plaintext bytes.
 pub(crate) fn unwrap_blob(blob: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, StorageError> {

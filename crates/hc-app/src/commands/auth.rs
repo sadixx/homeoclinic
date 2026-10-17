@@ -41,9 +41,21 @@ pub fn auth_unlock(
     req: UnlockRequest,
 ) -> Result<UnlockResponse, UserFacingError> {
     let pool = to_user_result(service(&state).unlock(&req.pin))?;
+    // Re-derive the DEK provider from the keystore so a later restore can re-key
+    // the restored DB under THIS install's own DEK without a second PIN prompt
+    // (design §5 / ADR 0014, SUX-011). This is the unlock path (not the hot
+    // path), so one extra Argon2id unwrap is acceptable; the DEK never leaves
+    // the process and is never logged (R-SEC-006, R-PRIV-001). A key that
+    // cannot be re-derived leaves `key = None`; restore then reports a generic
+    // error rather than failing unlock.
+    let key = hc_storage::key::KeyHierarchy::new(state.keystore.as_ref())
+        .unlock_with_pin(&req.pin)
+        .ok()
+        .map(std::sync::Arc::new);
     let mut lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
     lock.locked = false;
     lock.pool = Some(pool);
+    lock.key = key;
     Ok(UnlockResponse {
         ok: true,
         // Advisory only; there is no hard lockout (SUX-005).
@@ -59,6 +71,7 @@ pub fn auth_lock(state: State<'_, AppState>) -> Result<(), UserFacingError> {
     let mut lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
     lock.locked = true;
     lock.pool = None; // drops the pool → DEK zeroized on drop.
+    lock.key = None; // drops the retained DEK provider → zeroized on drop.
     Ok(())
 }
 

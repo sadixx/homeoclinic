@@ -13,8 +13,10 @@
 //! across command invocations safely. No field is ever logged (R-PRIV-001).
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::Mutex;
 
+use hc_storage::key::DekKeyProvider;
 use hc_storage::keystore::Keystore;
 use hc_storage::Pool;
 
@@ -32,6 +34,13 @@ pub struct LockFlag {
     pub locked: bool,
     /// The open encrypted pool while unlocked; dropped on lock (R-SEC-006).
     pub pool: Option<Pool>,
+    /// The target install's own DEK provider while unlocked, retained so a
+    /// restore can re-key the restored `clinic.db` under THIS install's DEK
+    /// without a second PIN prompt (design §5 / ADR 0014, SUX-011). Wrapped in
+    /// an [`Arc`] so a command can clone a handle out from under the lock and
+    /// pass `&dyn KeyProvider` to the engine. Dropped on lock with the pool so
+    /// the DEK is zeroized when sealed (R-SEC-006). Never logged (R-PRIV-001).
+    pub key: Option<Arc<DekKeyProvider>>,
     /// The configured idle auto-lock timeout in minutes (the UI runs the timer).
     pub autolock_minutes: u16,
 }
@@ -74,6 +83,7 @@ impl AppState {
                 // unlocks; the shell routes to /setup or /lock accordingly.
                 locked: true,
                 pool: None,
+                key: None,
                 autolock_minutes: 15,
             }),
             staging: Mutex::new(CommandStaging::default()),

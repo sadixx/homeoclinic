@@ -33,6 +33,24 @@ pub enum ErrorCode {
     WrongPin,
     /// The recovery code did not unlock the database (SET-004).
     WrongRecoveryCode,
+    /// The backup password did not decrypt the chosen archive (S17 restore
+    /// step 1 inline error; HC-MVP1-033, BAK-003). Distinct from
+    /// [`ErrorCode::BadBackup`] so the restore UI shows "try again" on the
+    /// password field, not a corrupt-file message (S17 AC4).
+    WrongBackupPassword,
+    /// The chosen `.hcbak` file is not a valid or is a damaged archive
+    /// (HC-MVP1-030). Plain-language; the UI offers a Details support code
+    /// (NFR-033).
+    BadBackup,
+    /// The archive was written by a newer app version than this build supports
+    /// (forward-only; HC-MVP1-030).
+    BackupTooNew,
+    /// The chosen backup destination (folder / USB) is not available, e.g. a
+    /// removed USB drive (OQ-S17-5; HC-MVP1-032).
+    BackupDestinationUnavailable,
+    /// The backup destination ran out of space mid-write; the previous good
+    /// backup is kept intact (OQ-S17-5; HC-MVP1-032).
+    BackupOutOfSpace,
     /// Anything not otherwise classified. The message stays generic.
     Unexpected,
 }
@@ -82,6 +100,28 @@ pub enum AppError {
     /// The recovery code did not unlock the database (SET-004).
     #[error("wrong recovery code")]
     WrongRecoveryCode,
+    /// The backup password did not decrypt the archive body (from
+    /// `StorageError::WrongBackupPassword`). Distinct so [`map_error`] surfaces
+    /// the `wrong_backup_password` code for the S17 inline retry (BAK-003).
+    #[error("wrong backup password")]
+    WrongBackupPassword,
+    /// The `.hcbak` archive is damaged or not valid (from
+    /// `StorageError::BadArchive` / `BackupVerifyFailed`). Kept distinct so the
+    /// UI shows a plain corrupt-file message with a Details code (NFR-033).
+    #[error("bad backup archive")]
+    BadBackup,
+    /// The archive was written by a newer app version (from
+    /// `StorageError::BackupTooNew`); forward-only.
+    #[error("backup too new")]
+    BackupTooNew,
+    /// The backup destination is unavailable (from
+    /// `StorageError::DestinationUnavailable`); e.g. a removed USB (OQ-S17-5).
+    #[error("backup destination unavailable")]
+    BackupDestinationUnavailable,
+    /// The backup destination ran out of space (from
+    /// `StorageError::OutOfSpace`); the previous good backup is kept (OQ-S17-5).
+    #[error("backup out of space")]
+    BackupOutOfSpace,
 }
 
 /// Map any internal error to the UI-facing value.
@@ -123,6 +163,33 @@ pub fn map_error(err: &AppError) -> UserFacingError {
             message: "That recovery code is not correct.".to_string(),
             suggested_action: "Check the code from your setup printout and try again.".to_string(),
         },
+        AppError::WrongBackupPassword => UserFacingError {
+            code: ErrorCode::WrongBackupPassword,
+            message: "That backup password is not correct.".to_string(),
+            suggested_action: "Check the password and try again.".to_string(),
+        },
+        AppError::BadBackup => UserFacingError {
+            code: ErrorCode::BadBackup,
+            message: "This backup file is not valid or is damaged.".to_string(),
+            suggested_action: "Choose a different backup file.".to_string(),
+        },
+        AppError::BackupTooNew => UserFacingError {
+            code: ErrorCode::BackupTooNew,
+            message: "This backup was made by a newer version of the app.".to_string(),
+            suggested_action: "Update the app, then restore again.".to_string(),
+        },
+        AppError::BackupDestinationUnavailable => UserFacingError {
+            code: ErrorCode::BackupDestinationUnavailable,
+            message: "The backup location is not available.".to_string(),
+            suggested_action: "Reconnect the drive or choose another folder, then try again."
+                .to_string(),
+        },
+        AppError::BackupOutOfSpace => UserFacingError {
+            code: ErrorCode::BackupOutOfSpace,
+            message: "There is not enough space at the backup location.".to_string(),
+            suggested_action: "Free up space or choose another location, then try again."
+                .to_string(),
+        },
     }
 }
 
@@ -141,6 +208,18 @@ impl From<hc_storage::StorageError> for AppError {
         match err {
             hc_storage::StorageError::WrongPin => AppError::WrongPin,
             hc_storage::StorageError::WrongRecoveryCode => AppError::WrongRecoveryCode,
+            hc_storage::StorageError::WrongBackupPassword => AppError::WrongBackupPassword,
+            // A damaged archive and a post-write verify failure are both "this
+            // archive is not usable" to the doctor (plain message + Details
+            // code, NFR-033); they share the BadBackup code.
+            hc_storage::StorageError::BadArchive | hc_storage::StorageError::BackupVerifyFailed => {
+                AppError::BadBackup
+            }
+            hc_storage::StorageError::BackupTooNew { .. } => AppError::BackupTooNew,
+            hc_storage::StorageError::DestinationUnavailable => {
+                AppError::BackupDestinationUnavailable
+            }
+            hc_storage::StorageError::OutOfSpace => AppError::BackupOutOfSpace,
             other => AppError::Storage(Box::new(other)),
         }
     }

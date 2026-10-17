@@ -6,5 +6,6 @@
 
 pub mod app_info;
 pub mod auth;
+pub mod backup;
 pub mod health;
 pub mod setup;

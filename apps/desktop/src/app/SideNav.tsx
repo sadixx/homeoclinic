@@ -15,6 +15,7 @@
 // the component unit-testable without a Router provider.
 import {
   CalendarDays,
+  DatabaseBackup,
   Settings as SettingsIcon,
   Users,
   type LucideIcon,
@@ -23,7 +24,7 @@ import {
 import { features } from '@/shared/features';
 import { t, type StringKey } from '@/shared/strings';
 
-export type NavRoute = '/today' | '/patients' | '/settings';
+export type NavRoute = '/today' | '/patients' | '/backup' | '/settings';
 
 export interface SideNavProps {
   /** The currently active route, highlighted in the nav. */
@@ -58,6 +59,14 @@ const ITEMS: readonly NavItem[] = [
     shortcut: 'F4',
     Icon: Users,
     enabled: features.patients,
+  },
+  {
+    route: '/backup',
+    labelKey: 'nav.backup',
+    testid: 'nav-backup',
+    shortcut: '',
+    Icon: DatabaseBackup,
+    enabled: features.backup,
   },
   {
     route: '/settings',

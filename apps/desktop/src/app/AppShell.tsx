@@ -23,8 +23,10 @@ import { LockScreen } from '@/app/LockScreen';
 import { SideNav, type NavRoute } from '@/app/SideNav';
 import { StatusBar } from '@/app/StatusBar';
 import { TopBar } from '@/app/TopBar';
+import { BackupScreen } from '@/backup/BackupScreen';
 import { TodayScreen } from '@/home/TodayScreen';
 import { SetupWizard } from '@/setup/SetupWizard';
+import { features } from '@/shared/features';
 
 /**
  * Default idle auto-lock timeout in minutes (SET-004). The shell runs the idle
@@ -44,6 +46,7 @@ function ShellFrame(): JSX.Element {
     (route: NavRoute) => navigate(route),
     [navigate],
   );
+  const goToBackup = useCallback(() => navigate('/backup'), [navigate]);
 
   // Idle auto-lock (SET-004): after the configured idle timeout with no user
   // activity, lock the app. Any clinical edit is already autosaved (CASE-005),
@@ -79,7 +82,9 @@ function ShellFrame(): JSX.Element {
   const activeRoute: NavRoute | undefined =
     location.pathname === '/today' || location.pathname === '/'
       ? '/today'
-      : undefined;
+      : location.pathname === '/backup'
+        ? '/backup'
+        : undefined;
 
   return (
     <div
@@ -96,11 +101,14 @@ function ShellFrame(): JSX.Element {
           <Routes>
             <Route path="/" element={<Navigate to="/today" replace />} />
             <Route path="/today" element={<TodayScreen />} />
+            {features.backup ? (
+              <Route path="/backup" element={<BackupScreen />} />
+            ) : null}
             <Route path="*" element={<Navigate to="/today" replace />} />
           </Routes>
         </main>
       </div>
-      <StatusBar />
+      <StatusBar onOpenBackup={goToBackup} />
     </div>
   );
 }
@@ -122,7 +130,11 @@ function SetupRoute(): JSX.Element {
     () => navigate('/today', { replace: true }),
     [navigate],
   );
-  return <SetupWizard onComplete={goHome} />;
+  const goToBackup = useCallback(
+    () => navigate('/backup', { replace: true }),
+    [navigate],
+  );
+  return <SetupWizard onComplete={goHome} onGoToBackup={goToBackup} />;
 }
 
 /** Top-level shell: provides the router and renders the chrome. */

@@ -30,6 +30,12 @@ import { t } from '@/shared/strings';
 /** Called by the wizard once setup completes, to route to Today. */
 export interface SetupWizardProps {
   readonly onComplete?: () => void;
+  /**
+   * Opens S17 backup/restore (the setup wizard links there once setup is
+   * complete — S17 entry points). Optional so the wizard stays unit-testable
+   * without a router.
+   */
+  readonly onGoToBackup?: () => void;
 }
 
 /** The four wizard steps (SET-001). */
@@ -52,7 +58,10 @@ const AUTOLOCK_OPTIONS = [5, 10, 15, 30, 60] as const;
 type FieldErrors = Record<string, string>;
 
 /** First-run setup wizard (4 steps). */
-export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
+export function SetupWizard({
+  onComplete,
+  onGoToBackup,
+}: SetupWizardProps): JSX.Element {
   const [step, setStep] = useState<Step>(1);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
@@ -732,6 +741,20 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
                 {t('setup.licence.devTrialNote')}
               </p>
             </div>
+
+            {/* Link to S17 backup/restore (S17 entry points: the setup wizard
+                links here once setup is complete). Rendered only when the host
+                provides navigation, so the wizard stays router-free in tests. */}
+            {onGoToBackup !== undefined ? (
+              <button
+                type="button"
+                data-testid="setup-backup-link"
+                onClick={onGoToBackup}
+                className="self-start text-sm text-blue-700 underline focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {t('setup.backup.link')}
+              </button>
+            ) : null}
           </>
         ) : null}
 

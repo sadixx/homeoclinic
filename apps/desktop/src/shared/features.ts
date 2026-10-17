@@ -21,6 +21,19 @@ export interface Features {
   /** Settings module. Turns on at M1. */
   readonly settings: boolean;
   /**
+   * Backup and restore module (S17 / BAK-001..004). Turns on at M1 Slice D:
+   * the nav item, the `/backup` route and the status-bar chip link become
+   * reachable.
+   */
+  readonly backup: boolean;
+  /**
+   * The "Move to a new computer" guided flow (BAK-005 / HC-MVP1-035, P1).
+   * DEFERRED at R1 (OQ-S17-4): the S17 button renders visibly disabled so
+   * there is no dead end, and the plain back-up-then-restore path already
+   * achieves the same result. Turns on when BAK-005 ships later in MVP1.
+   */
+  readonly backupMoveToNewComputer: boolean;
+  /**
    * Setup wizard P1 controls: font size (SET-005 / HC-MVP1-028) and the
    * data-folder chooser (SET-006 / HC-MVP1-029). DEFERRED this slice — the
    * controls may render disabled, and the wizard completes without them
