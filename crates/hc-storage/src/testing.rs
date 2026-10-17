@@ -10,7 +10,6 @@ use crate::audit::{write_audit, AuditAction, AuditEntry};
 use crate::key::DevKeyProvider;
 use crate::pool::Pool;
 use std::path::Path;
-
 /// A [`DevKeyProvider`] holding a fixed test key.
 pub fn test_key() -> DevKeyProvider {
     DevKeyProvider::new_test()
@@ -68,4 +67,21 @@ pub fn crash_child_main(db_path: &Path) -> Result<(), crate::error::StorageError
             Ok(())
         })?;
     }
+}
+
+// ---------------------------------------------------------------------------
+// HC-MVP1-021 / 024 Slice B helpers: everything on headless Linux via the
+// always-available encrypted-file fallback keystore (NFR-020). No DPAPI /
+// Secret Service here (those are UNVERIFIED; their tests are #[cfg]/#[ignore]).
+// ---------------------------------------------------------------------------
+
+use crate::keystore::FileKeystore;
+
+/// A [`FileKeystore`] rooted in a fresh temp dir (the headless-Linux fallback
+/// path). Returns the owning `TempDir` (kept alive for the keystore's lifetime)
+/// and the keystore.
+pub fn temp_file_keystore() -> (tempfile::TempDir, FileKeystore) {
+    let dir = tempfile::tempdir().expect("create tempdir for test keystore");
+    let store = FileKeystore::open(dir.path()).expect("open file keystore");
+    (dir, store)
 }

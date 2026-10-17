@@ -11,11 +11,14 @@
 //! (one transaction + one audit row with a diff). The [`key`] module is the
 //! `KeyProvider` seam; the real DEK/KEK hierarchy (HC-MVP1-021) wires in later.
 
+pub mod attachment;
 pub mod audit;
 pub mod error;
 pub mod key;
+pub mod keystore;
 pub mod migrate;
 pub mod pool;
+pub(crate) mod wrap;
 
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;

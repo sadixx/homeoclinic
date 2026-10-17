@@ -29,4 +29,30 @@ pub enum StorageError {
     /// JSON (de)serialization of a diff or value failed.
     #[error("data serialization failed")]
     Serde(#[from] serde_json::Error),
+    /// The PIN did not unwrap the DEK (GCM auth failed). HC-MVP1-021.
+    /// Distinct from a corrupt-store signal so the unlock UI can say "try
+    /// again" (SUX-007). Carries no key material (R-PRIV-001).
+    #[error("incorrect PIN")]
+    WrongPin,
+    /// The recovery code did not unwrap the DEK (SET-004).
+    #[error("incorrect recovery code")]
+    WrongRecoveryCode,
+    /// An unlock/change was attempted before the keystore was initialized.
+    #[error("keystore is not initialized")]
+    NotInitialized,
+    /// `initialize` was called on an already-initialized keystore.
+    #[error("keystore is already initialized")]
+    AlreadyInitialized,
+    /// A cryptographic operation (key derivation / wrap) failed unexpectedly.
+    /// Generic by design: never reflects attacker-controlled detail
+    /// (R-PRIV-001).
+    #[error("cryptographic operation failed")]
+    Crypto,
+    /// An attachment blob failed its AES-256-GCM authentication tag
+    /// (tampered or truncated). HC-MVP1-024, NFR-021.
+    #[error("attachment failed integrity check")]
+    AttachmentTampered,
+    /// An attachment blob was not found on disk.
+    #[error("attachment not found")]
+    AttachmentMissing,
 }
