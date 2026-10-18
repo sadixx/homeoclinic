@@ -6,7 +6,7 @@ license.workspace = true
 
 [dependencies]
 hc-domain = { path = "../hc-domain" }
-rusqlite = { version = "0.37", features = ["bundled-sqlcipher", "trace"] }
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl", "trace"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { version = "1.28", features = ["v7"] }
@@ -43,7 +43,7 @@ secret-service = { version = "5.0.0", default-features = false, features = [
 # `cargo test` / `cargo test --workspace`, without forcing the feature on for
 # normal library consumers (R-TEST-009; keeps the test seam out of prod builds).
 hc-storage = { path = ".", features = ["testing"] }
-rusqlite = { version = "0.37", features = ["bundled-sqlcipher"] }
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
 serde_json = { workspace = true }
 tempfile = "3"
 
