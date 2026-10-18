@@ -14,10 +14,34 @@
 //! from the collection or a renamed type makes an ASSERTION fail, catching the
 //! hc-build TS2307/TS2339 class of break before the UI compiles.
 
-use std::path::Path;
+use tempfile::TempDir;
 
-/// Where the generated binding is written, relative to the hc-app crate root.
-const BINDINGS_PATH: &str = "../../apps/desktop/src/bindings.ts";
+/// Export the real command collection to a UNIQUE per-test temp file and return
+/// its content.
+///
+/// Each test gets its own `tempfile::TempDir` (R-TEST, filesystem fake =
+/// `tempfile`), so parallel `cargo test` runs never share the destination
+/// file. This removes the non-atomic shared-write race that made two tests
+/// writing+reading the tracked `apps/desktop/src/bindings.ts` flake under
+/// default-parallel cargo test. The tracked `bindings.ts` is generated and
+/// committed by the build; these tests only need to assert on the EXPORTED
+/// CONTENT of `specta_builder()`, which a temp file captures exactly.
+///
+/// The returned `TempDir` is dropped (and its contents deleted) when it goes
+/// out of scope in the caller, so each test cleans up its own temp file.
+fn export_bindings_content() -> (String, TempDir) {
+    let dir = tempfile::tempdir().expect("failed to create temp dir for bindings export");
+    let bindings_path = dir.path().join("bindings.ts");
+
+    hc_app::specta_builder()
+        .export(specta_typescript::Typescript::default(), &bindings_path)
+        .expect("failed to export typed bindings");
+
+    let generated =
+        std::fs::read_to_string(&bindings_path).expect("bindings.ts must exist after export");
+
+    (generated, dir)
+}
 
 /// R-TEST-008: exporting the real command collection produces a `bindings.ts`
 /// that declares the frozen UI contract — the camelCase `appInfo` wrapper, the
@@ -25,12 +49,8 @@ const BINDINGS_PATH: &str = "../../apps/desktop/src/bindings.ts";
 /// generated file CONTENT (R-TEST-003), not merely that export returned Ok.
 #[test]
 fn r_test_008_export_bindings_contains_app_info_contract() {
-    hc_app::specta_builder()
-        .export(specta_typescript::Typescript::default(), BINDINGS_PATH)
-        .expect("failed to export typed bindings");
-
-    let generated = std::fs::read_to_string(Path::new(BINDINGS_PATH))
-        .expect("bindings.ts must exist after export");
+    // `_dir` keeps the temp dir alive for the body; dropping it cleans up.
+    let (generated, _dir) = export_bindings_content();
 
     assert!(
         generated.contains("appInfo"),
@@ -53,12 +73,8 @@ fn r_test_008_export_bindings_contains_app_info_contract() {
 /// generated file CONTENT (R-TEST-003).
 #[test]
 fn set026_027_export_bindings_contains_setup_and_auth_commands() {
-    hc_app::specta_builder()
-        .export(specta_typescript::Typescript::default(), BINDINGS_PATH)
-        .expect("failed to export typed bindings");
-
-    let generated = std::fs::read_to_string(Path::new(BINDINGS_PATH))
-        .expect("bindings.ts must exist after export");
+    // `_dir` keeps the temp dir alive for the body; dropping it cleans up.
+    let (generated, _dir) = export_bindings_content();
 
     for wrapper in [
         "setupGetState",
