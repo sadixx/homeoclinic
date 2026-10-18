@@ -1,6 +1,18 @@
 {
-  "generatedAt": "2026-10-17T18:00:12.493Z",
+  "generatedAt": "2026-10-18T06:03:10.223Z",
   "specs": [
+    {
+      "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
+      "reqs": [
+        "SET-001",
+        "SET-004"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
     {
       "path": "tests/e2e/specs/app/shell.e2e.ts",
       "reqs": [
