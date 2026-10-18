@@ -1,11 +1,95 @@
 {
-  "generatedAt": "2026-10-16T22:15:33.216Z",
+  "generatedAt": "2026-10-18T06:35:00.728Z",
   "specs": [
+    {
+      "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
+      "reqs": [
+        "SET-001",
+        "SET-004"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
     {
       "path": "tests/e2e/specs/app/shell.e2e.ts",
       "reqs": [
         "NFR-030",
         "NFR-032"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/backup/backup-now.e2e.ts",
+      "reqs": [
+        "BAK-001",
+        "BAK-002",
+        "BAK-004"
+      ],
+      "tier": "regression",
+      "area": "backup",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/backup/restore-clean-install.e2e.ts",
+      "reqs": [
+        "BAK-002",
+        "BAK-003"
+      ],
+      "tier": "regression",
+      "area": "backup",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/release/r1-demo.e2e.ts",
+      "reqs": [
+        "SET-001",
+        "SET-002",
+        "SET-003",
+        "SET-004",
+        "BAK-002",
+        "BAK-003",
+        "LIC-063"
+      ],
+      "tier": "regression",
+      "area": "release",
+      "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/release/upgrade-path.e2e.ts",
+      "reqs": [
+        "NFR-011",
+        "NFR-042"
+      ],
+      "tier": "regression",
+      "area": "release",
+      "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/setup/first-run.e2e.ts",
+      "reqs": [
+        "SET-001",
+        "SET-002",
+        "SET-003",
+        "SET-004",
+        "LIC-063"
       ],
       "tier": "regression",
       "area": "settings",

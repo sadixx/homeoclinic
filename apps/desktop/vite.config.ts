@@ -14,6 +14,10 @@ import { fileURLToPath, URL } from 'node:url';
 const FEATURES = {
   patients: false, // turns on at M1
   settings: false, // turns on at M1
+  backup: true, // S17 backup/restore ships at M1 Slice D (BAK-001..004)
+  backupMoveToNewComputer: false, // BAK-005 move-to-new-computer: DEFERRED (OQ-S17-4)
+  setupP1Controls: false, // SET-005 font + SET-006 data-folder: DEFERRED (R-DEL-002/006)
+  licenceImport: false, // "I already have a licence" import path: hidden until R8
 };
 
 export default defineConfig({

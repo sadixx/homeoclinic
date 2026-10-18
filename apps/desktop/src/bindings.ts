@@ -21,6 +21,92 @@ export const commands = {
 	 *  UI; a raw error, SQL or stack trace never crosses (R-UI-008).
 	 */
 	healthCheck: () => typedError<HealthStatus, UserFacingError>(__TAURI_INVOKE("health_check")),
+	/**  Current wizard state (`setup_get_state`). */
+	setupGetState: () => typedError<SetupState, UserFacingError>(__TAURI_INVOKE("setup_get_state")),
+	/**  Validate and stage the doctor profile (SET-002). */
+	setupSaveDoctorProfile: (req: SaveDoctorProfileRequest) => typedError<SaveDoctorProfileResponse, UserFacingError>(__TAURI_INVOKE("setup_save_doctor_profile", { req })),
+	/**  Validate and stage the clinic profile (SET-003). */
+	setupSaveClinicProfile: (req: SaveClinicProfileRequest) => typedError<SaveClinicProfileResponse, UserFacingError>(__TAURI_INVOKE("setup_save_clinic_profile", { req })),
+	/**
+	 *  Set the app PIN (SET-004): mint the DEK + recovery code, open + migrate the
+	 *  encrypted DB, flush staged profiles + the autolock setting, and stash the
+	 *  open pool (unlocked) in the lock flag. Returns the one-time recovery code.
+	 */
+	setupSetPin: (req: SetPinRequest) => typedError<SetPinResponse, UserFacingError>(__TAURI_INVOKE("setup_set_pin", { req })),
+	/**  Persist the chosen data dir (P1/DEFERRED minimal, A2). */
+	setupSetDataDir: (req: SetDataDirRequest) => typedError<SetDataDirResponse, UserFacingError>(__TAURI_INVOKE("setup_set_data_dir", { req })),
+	/**  Persist the chosen font size (P1/DEFERRED minimal, A2). */
+	setupSetFontSize: (req: SetFontSizeRequest) => typedError<null, UserFacingError>(__TAURI_INVOKE("setup_set_font_size", { req })),
+	/**  Start the local 30-day trial (LIC-063) in the open DB. */
+	setupStartTrial: () => typedError<StartTrialResponse, UserFacingError>(__TAURI_INVOKE("setup_start_trial")),
+	/**  Mark setup complete and return the home route (`/today`). */
+	setupComplete: () => typedError<CompleteSetupResponse, UserFacingError>(__TAURI_INVOKE("setup_complete")),
+	/**  Report the current lock state (`auth_get_lock_state`). */
+	authGetLockState: () => typedError<LockState, UserFacingError>(__TAURI_INVOKE("auth_get_lock_state")),
+	/**
+	 *  Unlock by PIN (SUX-003): open the encrypted DB and stash it unlocked. A
+	 *  wrong PIN maps to a `wrong_pin` error and leaves the app locked, never
+	 *  restricting the next attempt (SUX-005).
+	 */
+	authUnlock: (req: UnlockRequest) => typedError<UnlockResponse, UserFacingError>(__TAURI_INVOKE("auth_unlock", { req })),
+	/**
+	 *  Lock the app (`auth_lock`): drop the open pool, sealing the DB and zeroizing
+	 *  the DEK (R-SEC-006). Idempotent.
+	 */
+	authLock: () => typedError<null, UserFacingError>(__TAURI_INVOKE("auth_lock")),
+	/**
+	 *  Forgot-PIN recovery (SET-004): reset the PIN via the recovery code. A wrong
+	 *  code maps to `wrong_recovery_code`. Leaves the app locked; the user then
+	 *  unlocks with the new PIN.
+	 */
+	authRecoverWithCode: (req: RecoverRequest) => typedError<RecoverResponse, UserFacingError>(__TAURI_INVOKE("auth_recover_with_code", { req })),
+	/**
+	 *  (`get_backup_status`) Backup health + the auto toggle for S17 and the
+	 *  status-bar chip (BAK-001/004).
+	 */
+	getBackupStatus: () => typedError<BackupStatus, UserFacingError>(__TAURI_INVOKE("get_backup_status")),
+	/**
+	 *  (`set_auto_backup`) Toggle the automatic daily backup (BAK-001). One audited
+	 *  `app_setting` write (R-DATA-001).
+	 */
+	setAutoBackup: (enabled: boolean) => typedError<SetAutoBackupResponse, UserFacingError>(__TAURI_INVOKE("set_auto_backup", { enabled })),
+	/**
+	 *  (`list_removable_drives`) Enumerate mounted removable drives for the USB
+	 *  picker (BAK-002). A typed command returning chosen mount paths — NOT a broad
+	 *  FS scope or the shell plugin (R-SEC-002/003). No DB access required.
+	 */
+	listRemovableDrives: () => typedError<RemovableDrives, UserFacingError>(__TAURI_INVOKE("list_removable_drives")),
+	/**
+	 *  (`backup_now`) Manual backup to a chosen folder or USB with a password
+	 *  (BAK-002/004, SUX-011). The password is required and ≥ 8 chars (OQ-S17-2).
+	 *  `remember_password` is accepted for the S17 contract; persisting it to the
+	 *  remembered-credential keystore is wired by the shell/keystore path (SUX-011)
+	 *  and not by this command, so the DEK-backed store stays the single owner.
+	 */
+	backupNow: (outDir: string, password: string, rememberPassword: boolean) => typedError<BackupNowResponse, UserFacingError>(__TAURI_INVOKE("backup_now", { outDir, password, rememberPassword })),
+	/**
+	 *  (`restore_preview`) Read the archive counts/dates WITHOUT the password and
+	 *  WITHOUT mutating anything (BAK-003, S17 step 2 / AC4).
+	 */
+	restorePreview: (filePath: string, password: string) => typedError<RestorePreview, UserFacingError>(__TAURI_INVOKE("restore_preview", { filePath, password })),
+	/**
+	 *  (`restore_apply`) Apply a restore (BAK-003): safety copy → atomic swap →
+	 *  re-key under THIS install's DEK → migrate-if-older. Requires the app to be
+	 *  unlocked so the retained target DEK is available (design §5 / ADR 0014); a
+	 *  wrong backup password is refused before anything live changes (AC4).
+	 */
+	restoreApply: (filePath: string, password: string) => typedError<RestoreApplyResponse, UserFacingError>(__TAURI_INVOKE("restore_apply", { filePath, password })),
+	/**  (`verify_backup`) Checksum + decrypt-test an existing archive (BAK-004). */
+	verifyBackup: (filePath: string, password: string) => typedError<VerifyBackupResponse, UserFacingError>(__TAURI_INVOKE("verify_backup", { filePath, password })),
+	/**
+	 *  (`start_move_to_new_computer`) DEFERRED (BAK-005 / HC-MVP1-035 is P1,
+	 *  OQ-S17-4). The command exists so the S17 binding contract is stable, but the
+	 *  real guided flow is feature-flagged OFF: it returns a generic error so the
+	 *  UI keeps the button disabled with no dead end. The plain backup→restore path
+	 *  already achieves the same result for R1 (S17 release-slices note). Flip
+	 *  [`MOVE_TO_NEW_COMPUTER_ENABLED`] when BAK-005 is implemented.
+	 */
+	startMoveToNewComputer: (outDir: string, password: string, rememberPassword: boolean) => typedError<null, UserFacingError>(__TAURI_INVOKE("start_move_to_new_computer", { outDir, password, rememberPassword })),
 };
 
 /* Types */
@@ -41,6 +127,48 @@ export type AppInfo = {
 };
 
 /**
+ *  Result of `backup_now` (BAK-002/004, SUX-011). On success `ok` is true and
+ *  the path/size/verified are set; the error path is mapped to a
+ *  `UserFacingError` at the command boundary, so this struct carries no error
+ *  member (R-ARCH-006).
+ */
+export type BackupNowResponse = {
+	/**  Whether the backup + verify succeeded. */
+	ok: boolean,
+	/**  Absolute path of the written `.hcbak`. */
+	filePath: string,
+	/**
+	 *  Size in bytes of the written archive. Exported as a TS `number` via the
+	 *  `Number` override (well within JS safe-integer range for a clinic DB).
+	 */
+	sizeBytes: number,
+	/**  Whether the post-backup integrity check passed (BAK-004). */
+	verified: boolean,
+};
+
+/**  Backup health for S17 `get_backup_status` + the status-bar chip (BAK-004). */
+export type BackupStatus = {
+	/**  RFC3339 UTC of the last good (verified) backup, or `None` if never. */
+	lastBackupAt: string | null,
+	/**
+	 *  Whether the last recorded backup was verified good. `false` when there
+	 *  is no backup yet (empty state).
+	 */
+	lastBackupOk: boolean,
+	/**  Whole days since the last good backup, or `None` if never. */
+	daysSinceGood: number | null,
+	/**  Whether the automatic daily backup is enabled (BAK-001). */
+	autoEnabled: boolean,
+	/**  Retention counts (14/8/12). */
+	retention: Retention,
+	/**
+	 *  `true` when there is no good backup or the last one is > 7 days old
+	 *  (drives the warning banner + status-bar colour — BAK-004).
+	 */
+	stale: boolean,
+};
+
+/**
  *  Which Cargo/Vite profile produced this build.
  * 
  *  Serialises as the lowercase string `"debug"` / `"release"`, which `specta`
@@ -51,6 +179,12 @@ export type BuildProfile =
 "debug" | 
 /**  Compiled in release mode (an optimised, shipped build). */
 "release";
+
+/**  Result of completing setup. */
+export type CompleteSetupResponse = {
+	/**  Route to open after setup (`"/today"`). */
+	homeRoute: string,
+};
 
 /**
  *  Stable machine code for a mapped error.
@@ -68,8 +202,53 @@ export type ErrorCode =
 "not_found" | 
 /**  A conflicting edit (optimistic concurrency / `row_version`). */
 "conflict" | 
+/**
+ *  The PIN did not unlock the database (SET-004, SUX-007). Distinct so the
+ *  lock UI shows a precise inline message; NEVER restricts the app
+ *  (SUX-005).
+ */
+"wrong_pin" | 
+/**  The recovery code did not unlock the database (SET-004). */
+"wrong_recovery_code" | 
+/**
+ *  The backup password did not decrypt the chosen archive (S17 restore
+ *  step 1 inline error; HC-MVP1-033, BAK-003). Distinct from
+ *  [`ErrorCode::BadBackup`] so the restore UI shows "try again" on the
+ *  password field, not a corrupt-file message (S17 AC4).
+ */
+"wrong_backup_password" | 
+/**
+ *  The chosen `.hcbak` file is not a valid or is a damaged archive
+ *  (HC-MVP1-030). Plain-language; the UI offers a Details support code
+ *  (NFR-033).
+ */
+"bad_backup" | 
+/**
+ *  The archive was written by a newer app version than this build supports
+ *  (forward-only; HC-MVP1-030).
+ */
+"backup_too_new" | 
+/**
+ *  The chosen backup destination (folder / USB) is not available, e.g. a
+ *  removed USB drive (OQ-S17-5; HC-MVP1-032).
+ */
+"backup_destination_unavailable" | 
+/**
+ *  The backup destination ran out of space mid-write; the previous good
+ *  backup is kept intact (OQ-S17-5; HC-MVP1-032).
+ */
+"backup_out_of_space" | 
 /**  Anything not otherwise classified. The message stays generic. */
 "unexpected";
+
+/**  Global font size (SET-005, DEFERRED/P1 — minimal persist only). */
+export type FontSize = 
+/**  14px base. */
+"normal" | 
+/**  16px base. */
+"large" | 
+/**  18px base. */
+"xlarge";
 
 /**
  *  Read-only health summary returned by [`health_check`].
@@ -80,6 +259,220 @@ export type ErrorCode =
 export type HealthStatus = {
 	/**  Whether structured logging has been initialised this session. */
 	loggingReady: boolean,
+};
+
+/**  Lock-screen state (`auth_get_lock_state`). */
+export type LockState = {
+	/**  Whether the app is currently locked. */
+	locked: boolean,
+	/**  Idle auto-lock timeout in minutes (the UI runs the idle timer). */
+	autolockMinutes: number,
+};
+
+/**  Forgot-PIN recovery input (`auth_recover_with_code`, SET-004). */
+export type RecoverRequest = {
+	/**  The recovery code shown once at setup. */
+	recoveryCode: string,
+	/**  The new PIN to set. */
+	newPin: string,
+	/**  Confirmation; must equal `new_pin`. */
+	confirmPin: string,
+};
+
+/**  Recovery result. */
+export type RecoverResponse = {
+	/**  Whether the recovery + PIN reset succeeded. */
+	ok: boolean,
+};
+
+/**
+ *  One removable drive for the USB picker (BAK-002). `free_bytes` is best
+ *  effort; `None` when the platform does not report it here.
+ */
+export type RemovableDrive = {
+	/**  Mount path to back up into (e.g. `/run/media/<user>/USB`, `E:\\`). */
+	path: string,
+	/**  Human label for the drive, or the path when no label is known. */
+	label: string,
+	/**  Free space in bytes, if known. */
+	freeBytes: number | null,
+};
+
+/**  Result of `list_removable_drives`. */
+export type RemovableDrives = {
+	/**  The mounted removable drives found, newest-first order not guaranteed. */
+	drives: RemovableDrive[],
+};
+
+/**  Result of `restore_apply` (BAK-003). */
+export type RestoreApplyResponse = {
+	/**  Whether the restore + atomic swap succeeded. */
+	ok: boolean,
+	/**  Path of the pre-restore safety copy of the previous data (BAK-003). */
+	preRestoreBackupPath: string,
+};
+
+/**
+ *  The restore preview counts/dates shown on S17 step 2 BEFORE any change
+ *  (BAK-003). Read from the plaintext header without the password; no patient
+ *  data (R-PRIV-001).
+ */
+export type RestorePreview = {
+	/**  Patient row count in the archive (0 in M1). */
+	patientCount: number,
+	/**  Visit row count in the archive (0 in M1). */
+	visitCount: number,
+	/**  Last visit date (RFC3339 date) or `None`. */
+	lastVisitDate: string | null,
+	/**  RFC3339 UTC time the backup was made (S17 "Backup made"). */
+	createdAt: string,
+	/**  App version that wrote the archive (S17 "App version"). */
+	appVersion: string,
+};
+
+/**  Retention counts for the S17 retention line (BAK-001). */
+export type Retention = {
+	/**  Daily copies kept (14). */
+	daily: number,
+	/**  Weekly copies kept (8). */
+	weekly: number,
+	/**  Monthly copies kept (12). */
+	monthly: number,
+};
+
+/**  Clinic profile input (SET-003). Fees are integer paise (R-DATA-004). */
+export type SaveClinicProfileRequest = {
+	/**  Clinic name (required). */
+	name: string,
+	/**  Clinic address (required). */
+	address: string,
+	/**  Optional phone. */
+	phone: string | null,
+	/**  Optional timings. */
+	timings: string | null,
+	/**
+	 *  Default consultation fee, integer paise (required).
+	 * 
+	 *  Kept as `i64` in Rust (R-DATA-004); exported as a TS `number` via the
+	 *  `Number` override because paise amounts are always within JS
+	 *  safe-integer range, so no precision is lost.
+	 */
+	feeFirstPaise: number,
+	/**  Default follow-up fee, integer paise (required). */
+	feeFollowupPaise: number,
+	/**  Optional GSTIN. */
+	gstin: string | null,
+};
+
+/**  Result of staging the clinic profile. */
+export type SaveClinicProfileResponse = {
+	/**  The UUIDv7 assigned to the clinic profile. */
+	clinicId: string,
+};
+
+/**  Doctor profile input (SET-002). */
+export type SaveDoctorProfileRequest = {
+	/**  Full name (required). */
+	name: string,
+	/**  Qualification (required). */
+	qualification: string,
+	/**  Registration number (required). */
+	regNo: string,
+	/**  Registration council (required). */
+	regCouncil: string,
+	/**  Optional phone. */
+	phone: string | null,
+	/**  Optional email. */
+	email: string | null,
+	/**  Optional signature image source path (opaque; stored as attachment ref). */
+	signatureImagePath: string | null,
+	/**  Optional clinic logo source path. */
+	clinicLogoPath: string | null,
+};
+
+/**  Result of staging the doctor profile. */
+export type SaveDoctorProfileResponse = {
+	/**  The UUIDv7 assigned to the doctor profile. */
+	doctorId: string,
+};
+
+/**  Result of `set_auto_backup`. */
+export type SetAutoBackupResponse = {
+	/**  Whether the toggle was applied. */
+	ok: boolean,
+};
+
+/**  Data-folder chooser input (SET-006, DEFERRED/P1 — minimal persist only). */
+export type SetDataDirRequest = {
+	/**  The chosen data directory. */
+	path: string,
+};
+
+/**  Resolved data directory. */
+export type SetDataDirResponse = {
+	/**  The data directory now in effect. */
+	dataDir: string,
+};
+
+/**  Font size input. */
+export type SetFontSizeRequest = {
+	/**  The chosen font size. */
+	size: FontSize,
+};
+
+/**
+ *  PIN set input (SET-004). `pin` must be 4–6 numeric digits and equal
+ *  `confirm_pin`.
+ */
+export type SetPinRequest = {
+	/**  The chosen PIN (request-only secret; never echoed or logged). */
+	pin: string,
+	/**  Confirmation; must equal `pin`. */
+	confirmPin: string,
+	/**  Idle auto-lock timeout in minutes (default 15). */
+	autolockMinutes: number,
+};
+
+/**  Result of setting the PIN: the one-time recovery code (shown once, SET-004). */
+export type SetPinResponse = {
+	/**  Grouped recovery code to show once and print; never shown again. */
+	recoveryCode: string,
+};
+
+/**  Wizard progress snapshot (`setup_get_state`). */
+export type SetupState = {
+	/**  Whether first-run setup has completed. */
+	completed: boolean,
+	/**  The step the wizard should resume on (1..=4). */
+	currentStep: number,
+	/**  The resolved data directory (display only; UI never builds paths). */
+	dataDir: string,
+};
+
+/**  Result of starting the local trial (LIC-063). */
+export type StartTrialResponse = {
+	/**  RFC3339 UTC expiry. */
+	trialValidUntil: string,
+	/**  Whole days remaining in the trial (30 at start). */
+	trialDaysRemaining: number,
+};
+
+/**  Unlock input (`auth_unlock`). `pin` is a request-only secret. */
+export type UnlockRequest = {
+	/**  The entered PIN. */
+	pin: string,
+};
+
+/**
+ *  Unlock result. `attempts_remaining` is a soft, non-restricting hint
+ *  (SUX-005 forbids false lockouts); a wrong PIN returns an error, not
+ *  `ok:false`.
+ */
+export type UnlockResponse = {
+	/**  Whether the unlock succeeded. */
+	ok: boolean,
+	/**  Advisory remaining-attempts hint; never gates access. */
+	attemptsRemaining: number,
 };
 
 /**
@@ -97,6 +490,16 @@ export type UserFacingError = {
 	message: string,
 	/**  One concrete next step, e.g. `"Try again"` / `"Check the details"`. */
 	suggestedAction: string,
+};
+
+/**  Result of `verify_backup` (BAK-004). */
+export type VerifyBackupResponse = {
+	/**  Whether both the checksum and the decrypt-test passed. */
+	ok: boolean,
+	/**  The body bytes matched the recorded checksum. */
+	checksumOk: boolean,
+	/**  The first chunk decrypted under the given password. */
+	decryptOk: boolean,
 };
 
 /* Tauri Specta runtime */

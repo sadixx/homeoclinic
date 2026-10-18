@@ -29,6 +29,13 @@ pub fn run() {
             let guard = hc_app::logging::init(&data_dir, hc_app::logging::RotationPolicy::DEFAULT)?;
             app.manage(guard);
 
+            // Build the shell-managed application state (HC-MVP1-026/027):
+            // the data dir, a keystore backend, and the runtime clock. On
+            // headless Linux / E2E the keystore resolves to the always-present
+            // encrypted-file fallback (NFR-020); no network, no socket.
+            let state = hc_app::state::AppState::with_file_keystore(data_dir)?;
+            app.manage(state);
+
             builder.mount_events(app);
             Ok(())
         })

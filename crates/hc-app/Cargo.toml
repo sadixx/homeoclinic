@@ -14,6 +14,11 @@ hc-docs = { path = "../hc-docs" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 specta = { workspace = true }
+# Type-override marker (`Number`) for the i64 money fields so the default
+# Typescript exporter emits `number` instead of rejecting BigInt-style ints.
+# Paise amounts are always within JS safe-integer range (see setup/mod.rs),
+# so `number` is lossless for this domain (R-DATA-004 kept as i64 in Rust).
+specta-typescript = { workspace = true }
 tauri = { workspace = true }
 tauri-specta = { workspace = true }
 thiserror = { workspace = true }
@@ -21,6 +26,16 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
 sha2 = { workspace = true }
+# UUIDv7 ids for profile/trial rows (R-DATA-005); same pin as hc-storage.
+uuid = { version = "1.28", features = ["v7"] }
+# RFC3339 parse/format + 30-day trial math through the injected clock (LIC-063).
+# Pinned to the version already resolved in the workspace lockfile.
+time = { version = "=0.3.55", features = ["formatting", "parsing", "macros"] }
 
 [dev-dependencies]
 specta-typescript = { workspace = true }
+# Self-dependency-style: pull hc-storage's `testing` seam (temp_file_keystore,
+# temp_db) into hc-app's integration tests without forcing the feature on for
+# normal consumers (R-TEST-009).
+hc-storage = { path = "../hc-storage", features = ["testing"] }
+tempfile = "3"

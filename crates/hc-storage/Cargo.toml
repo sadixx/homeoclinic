@@ -6,3 +6,48 @@ license.workspace = true
 
 [dependencies]
 hc-domain = { path = "../hc-domain" }
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher", "trace"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { version = "1.28", features = ["v7"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+zeroize = { version = "1.8", features = ["derive"] }
+# HC-MVP1-021 key hierarchy (NFR-020, R-SEC-006). All pinned + audited (R-SEC-008).
+argon2 = { version = "0.5.3", features = ["zeroize"] } # KEK from PIN (Argon2id)
+aes-gcm = { version = "0.10.3", features = ["aes"] }   # DEK wrap + attachment blobs (NFR-021)
+hkdf = "0.12.4"                                        # attachment subkey from DEK (domain separation)
+sha2 = { workspace = true }                            # HKDF hash + attachment sha256 (0.10.9, shared)
+rand = "0.8.5"                                         # CSPRNG: DEK, salts, nonces, recovery code
+hex = "0.4.3"                                          # recovery-code grouping (not SQL/key material)
+# Available in the library only under the `testing` feature (temp_db seam).
+tempfile = { version = "3", optional = true }
+
+# Linux OS secure store (NFR-020). default-features=false + tokio runtime avoids
+# the async-io zbus backend that fails to compile on this toolchain; COMPILES
+# but UNVERIFIED at runtime here (no D-Bus/keyring in the headless sandbox).
+[target.'cfg(target_os = "linux")'.dependencies]
+secret-service = { version = "5.0.0", default-features = false, features = [
+  "rt-tokio-crypto-rust",
+] }
+
+# Windows DPAPI (NFR-020). The real CryptProtectData/CryptUnprotectData binding
+# is deferred to R1-close: it needs a small reviewed `unsafe` FFI block + an ADR
+# (the crate declares #![forbid(unsafe_code)], R-RUST-004). Until then the DPAPI
+# backend COMPILES as a safe stub and the encrypted-file fallback is the
+# operational path, so no Windows-only dependency is pulled in yet.
+
+[dev-dependencies]
+# Self-dependency with the `testing` feature enabled so the crate's own
+# integration tests (tests/*.rs) see `hc_storage::testing::*` under a plain
+# `cargo test` / `cargo test --workspace`, without forcing the feature on for
+# normal library consumers (R-TEST-009; keeps the test seam out of prod builds).
+hc-storage = { path = ".", features = ["testing"] }
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher"] }
+serde_json = { workspace = true }
+tempfile = "3"
+
+[features]
+# Exposes hc_storage::testing::* (DevKeyProvider, temp_db, crash_child_main) to
+# other crates' tests and to this crate's integration tests.
+testing = ["dep:tempfile"]
