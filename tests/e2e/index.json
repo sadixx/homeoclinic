@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-18T06:03:10.223Z",
+  "generatedAt": "2026-10-18T06:35:00.728Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -49,6 +49,37 @@
       "area": "backup",
       "targets": [
         "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/release/r1-demo.e2e.ts",
+      "reqs": [
+        "SET-001",
+        "SET-002",
+        "SET-003",
+        "SET-004",
+        "BAK-002",
+        "BAK-003",
+        "LIC-063"
+      ],
+      "tier": "regression",
+      "area": "release",
+      "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/release/upgrade-path.e2e.ts",
+      "reqs": [
+        "NFR-011",
+        "NFR-042"
+      ],
+      "tier": "regression",
+      "area": "release",
+      "targets": [
+        "linux",
+        "windows"
       ]
     },
     {
