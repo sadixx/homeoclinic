@@ -238,6 +238,17 @@ export type ErrorCode =
  *  backup is kept intact (OQ-S17-5; HC-MVP1-032).
  */
 "backup_out_of_space" | 
+/**
+ *  A boot-time command read (`setup_get_state` / `auth_get_lock_state`)
+ *  failed at the IPC transport/serialisation layer rather than returning a
+ *  mapped `UserFacingError` (SET-001, SET-004; handoff 46). Produced by the
+ *  UI command adapter (`shared/command.ts` `run()`), never by
+ *  [`map_error`], so the boot-gate can tell a genuine transport failure
+ *  apart from a `locked` state and never strand a fresh, PIN-less install
+ *  on the lock screen. Carried in the frozen contract so the code is a real
+ *  `t()` key (R-UI-007) with one source of truth (R-ARCH-006).
+ */
+"boot_read_failed" | 
 /**  Anything not otherwise classified. The message stays generic. */
 "unexpected";
 

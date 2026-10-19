@@ -14,10 +14,14 @@
 // AppShell reads commands.setupGetState() + commands.authGetLockState() once
 // and decides the launch route by first-match order — /setup when setup is
 // not completed (SET-001), else /lock when locked (SET-004), else /today. An
-// `app-boot` splash is shown while the two reads are in flight so Today never
-// flashes, and a failed read fails safe to /lock. The resolved
-// autolockMinutes is threaded into ShellFrame's idle timer (replacing the
-// hardcoded fallback when a value is present). UI -> typed commands only.
+// `app-boot` splash is shown while the reads are in flight so Today never
+// flashes. The fail-safe to /lock is NARROWED to a KNOWN-provisioned install:
+// a fresh/unknown install (setup not completed, or the setup read itself
+// failing) always goes to /setup so a brand-new, PIN-less user is never
+// stranded on the lock screen; only a provisioned install whose lock read is
+// uncertain fails safe to /lock (handoff 46). The resolved autolockMinutes is
+// threaded into ShellFrame's idle timer (replacing the hardcoded fallback when
+// a value is present). UI -> typed commands only.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   HashRouter,
@@ -62,10 +66,27 @@ interface BootDecision {
 /**
  * Read setup + lock state once on mount and decide the launch route.
  *
- * First-match order: /setup when setup is not completed (SET-001), else /lock
- * when locked (SET-004), else /today. Either read failing fails safe to /lock
- * (a configured install should never be left unlocked by an error). Returns
- * `undefined` until both reads settle so the caller can show the splash.
+ * `setup_get_state().completed` is the PRIMARY signal (SET-001): a fresh,
+ * unprovisioned install (no keystore record) must always reach the first-run
+ * wizard, never the PIN-less dead end that is the lock screen. The fail-safe to
+ * `/lock` is therefore NARROWED to a KNOWN-provisioned install (SET-004): it
+ * only applies once `completed === true` is actually observed.
+ *
+ * First-match order and failure handling (handoff 46):
+ * - setup read throws -> provisioning UNKNOWN -> `/setup` (a brand-new user is
+ *   never stranded on `/lock`; a transport blip must not look like a lock).
+ * - not completed -> `/setup` (SET-001), regardless of the lock read.
+ * - completed + lock read throws -> `/lock` (SET-004 fail-safe, provisioned
+ *   install stays sealed on an uncertain read).
+ * - completed + locked -> `/lock`; completed + unlocked -> `/today`.
+ *
+ * The two reads are awaited INDEPENDENTLY (not a single `Promise.all`) so a
+ * failed lock read never discards an already-known setup signal. `run()`
+ * normalises any IPC transport reject into a typed `UserFacingError`
+ * (`boot_read_failed`); here only the pass/fail of each read matters, so the
+ * error value is caught and discarded — no patient data, SQL or stack is read
+ * or logged (R-PRIV-001, R-UI-008). Returns `undefined` until the decision is
+ * made so the caller can show the splash.
  */
 function useBootDecision(): BootDecision | undefined {
   const [decision, setDecision] = useState<BootDecision | undefined>(undefined);
@@ -73,23 +94,41 @@ function useBootDecision(): BootDecision | undefined {
   useEffect(() => {
     let cancelled = false;
     void (async (): Promise<void> => {
+      // Provisioning is the primary signal. If the setup read fails,
+      // provisioning is UNKNOWN and a fresh user must not be stranded on the
+      // lock screen, so default to the wizard (SET-001).
+      let completed: boolean;
       try {
-        const [setup, lock] = await Promise.all([
-          run(commands.setupGetState()),
-          run(commands.authGetLockState()),
-        ]);
-        if (cancelled) {
-          return;
-        }
-        const route: BootRoute = !setup.completed
-          ? '/setup'
-          : lock.locked
-            ? '/lock'
-            : '/today';
-        setDecision({ route, autolockMinutes: lock.autolockMinutes });
+        const setup = await run(commands.setupGetState());
+        completed = setup.completed;
       } catch {
-        // Fail safe: never leave a configured install unlocked on a read
-        // error. No patient data is logged.
+        if (!cancelled) {
+          setDecision({ route: '/setup', autolockMinutes: null });
+        }
+        return;
+      }
+
+      // Not provisioned -> first-run wizard, never /lock (SET-001). The lock
+      // read is irrelevant for a fresh install, so it is not even awaited.
+      if (!completed) {
+        if (!cancelled) {
+          setDecision({ route: '/setup', autolockMinutes: null });
+        }
+        return;
+      }
+
+      // KNOWN-provisioned: now the lock read decides, and an uncertain read
+      // fails safe to /lock (SET-004) — a configured install is never left
+      // unlocked by a transport error.
+      try {
+        const lock = await run(commands.authGetLockState());
+        if (!cancelled) {
+          setDecision({
+            route: lock.locked ? '/lock' : '/today',
+            autolockMinutes: lock.autolockMinutes,
+          });
+        }
+      } catch {
         if (!cancelled) {
           setDecision({ route: '/lock', autolockMinutes: null });
         }
