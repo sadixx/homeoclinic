@@ -98,6 +98,11 @@ impl DekKeyProvider {
     /// attachment GCM key from the raw SQLCipher key (NFR-021).
     const ATTACHMENT_INFO: &'static [u8] = b"hc-attachment-v1";
 
+    /// HKDF-SHA256 info string for the LIC-005 clock-guard HMAC key. Domain
+    /// separates the max-seen MAC key from the SQLCipher key AND the attachment
+    /// key, so the same DEK yields independent subkeys per purpose.
+    const CLOCK_GUARD_INFO: &'static [u8] = b"hc-licence-clock-guard-v1";
+
     /// Construct from a freshly unwrapped DEK. Crate-internal: only the
     /// hierarchy produces one.
     pub(crate) fn from_dek(dek: Zeroizing<[u8; 32]>) -> Self {
@@ -117,6 +122,31 @@ impl DekKeyProvider {
         // impossible error path return a zero key, which cannot decrypt any
         // real blob (fail-closed) rather than panicking (R-RUST-002).
         if hk.expand(Self::ATTACHMENT_INFO, out.as_mut()).is_err() {
+            return Zeroizing::new([0u8; 32]);
+        }
+        out
+    }
+
+    /// The HKDF-SHA256 LIC-005 clock-guard HMAC key (domain-separated from the
+    /// SQLCipher key and the attachment key; info = `"hc-licence-clock-guard-v1"`).
+    /// Used by the max-seen MAC in [`crate::licence`]; never returns the raw DEK.
+    ///
+    /// Mirrors [`Self::attachment_key`]: IKM = the DEK, no salt, the info string
+    /// domain-separates this subkey from the raw SQLCipher key AND the
+    /// attachment key, so the same DEK yields an independent per-purpose key
+    /// (R-SEC-006). Held in `Zeroizing`; never logged (R-PRIV-001).
+    pub fn licence_hmac_key(&self) -> Zeroizing<[u8; 32]> {
+        use hkdf::Hkdf;
+        use sha2::Sha256;
+        // IKM = the DEK; no salt; info domain-separates from the SQLCipher key
+        // and the attachment subkey.
+        let hk = Hkdf::<Sha256>::new(None, self.dek.as_ref());
+        let mut out = Zeroizing::new([0u8; 32]);
+        // expand() only fails for an absurd output length (32 is fine); on the
+        // impossible error path return a zero key, which produces a MAC that
+        // cannot match any real tag (fail-closed) rather than panicking
+        // (R-RUST-002).
+        if hk.expand(Self::CLOCK_GUARD_INFO, out.as_mut()).is_err() {
             return Zeroizing::new([0u8; 32]);
         }
         out

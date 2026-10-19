@@ -17,6 +17,7 @@ zeroize = { version = "1.8", features = ["derive"] }
 argon2 = { version = "0.5.3", features = ["zeroize"] } # KEK from PIN (Argon2id)
 aes-gcm = { version = "0.10.3", features = ["aes"] }   # DEK wrap + attachment blobs (NFR-021)
 hkdf = "0.12.4"                                        # attachment subkey from DEK (domain separation)
+hmac = "0.12.1"                                        # LIC-005 clock-guard max-seen MAC (HMAC-SHA256)
 sha2 = { workspace = true }                            # HKDF hash + attachment sha256 (0.10.9, shared)
 rand = "0.8.5"                                         # CSPRNG: DEK, salts, nonces, recovery code
 hex = "0.4.3"                                          # recovery-code grouping (not SQL/key material)
@@ -46,6 +47,8 @@ hc-storage = { path = ".", features = ["testing"] }
 rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
 serde_json = { workspace = true }
 tempfile = "3"
+# RFC3339 parse in the clock-guard test helper (deterministic instant math).
+time = { version = "=0.3.55", features = ["formatting", "parsing"] }
 
 [features]
 # Exposes hc_storage::testing::* (DevKeyProvider, temp_db, crash_child_main) to

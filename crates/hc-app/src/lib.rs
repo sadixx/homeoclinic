@@ -13,6 +13,7 @@ pub mod backup;
 pub mod clock;
 pub mod commands;
 pub mod error;
+pub mod licence;
 pub mod logging;
 pub mod setup;
 pub mod state;
@@ -54,6 +55,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         // BAK-005/HC-MVP1-035 "move to new computer" is DEFERRED (P1): the
         // command is registered for a stable binding contract but is
         // feature-flagged OFF (S17 button disabled, no dead end).
-        commands::backup::start_move_to_new_computer
+        commands::backup::start_move_to_new_computer,
+        // Licence status read (Feature 1 + LIC-005, HC-MVP1-M1a).
+        commands::licence::get_licence_status
     ])
 }
