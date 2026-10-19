@@ -34,6 +34,7 @@ import { expect } from '@wdio/globals';
 
 import { bootPage } from '../../pages/boot.page.js';
 import { setupPage } from '../../pages/setup.page.js';
+import { relaunchInto } from '../../helpers/launch.js';
 
 const PIN = '4321';
 
@@ -71,9 +72,18 @@ describe('R1 boot-gate PHASE A: fresh install launches into the wizard (SET-001)
 });
 
 describe('R1 boot-gate PHASE B: reopening a provisioned install launches into lock (SET-004)', () => {
+  // PHASE B is a SEPARATE app launch against the SAME data dir PHASE A
+  // provisioned. In one `wdio run` the app launches once per spec, so relaunch
+  // the app here against the SAME 'main' dir (now completed + sealed). This is
+  // the in-spec equivalent of the orchestrator's second process pointed at
+  // PHASE A's XDG_DATA_HOME. 'main' is the primary dir PHASE A ran against, so
+  // reusing the name reuses the provisioned dir (no fresh wipe).
+  before(async () => {
+    await relaunchInto('main');
+  });
+
   it('auto-routes a provisioned + locked data dir to #/lock on relaunch with no forced navigation', async () => {
-    // This phase is a SEPARATE app launch whose XDG_DATA_HOME is the data dir
-    // phase A provisioned. A fresh process starts locked; setup is completed.
+    // A fresh process starts locked; setup is completed on disk (PHASE A).
     const decided = await bootPage.waitForDecidedScreen();
 
     const hash = await bootPage.launchHash();

@@ -42,6 +42,7 @@ import { expect } from '@wdio/globals';
 import { backupPage } from '../../pages/backup.page.js';
 import { setupPage } from '../../pages/setup.page.js';
 import { shellPage } from '../../pages/shell.page.js';
+import { relaunchInto } from '../../helpers/launch.js';
 
 const PIN = '7788';
 const SOURCE_BACKUP_PASSWORD = 'clinic-backup-1';
@@ -59,7 +60,51 @@ function sourceArchive(): string {
   return path.join(dir, found[0] as string);
 }
 
+describe('R1 demo step 3 — PHASE A (self-provision): back up a source install into the shared folder', () => {
+  // Self-contained: this spec provisions its OWN source backup rather than
+  // depending on another spec having run first (the orchestrator ran the
+  // backup-now spec into a shared folder before this one; in a single
+  // `wdio run` each spec has its OWN per-spec backup folder, so the source
+  // .hcbak must be created here). Runs on the spec's initial 'main' launch — a
+  // fresh install — then backs up to HC_E2E_BACKUP_DIR for PHASE B to restore.
+  it('provisions a source install and writes a verified .hcbak to the shared folder', async () => {
+    expect(BACKUP_DIR).toBeDefined();
+
+    // Fresh source install (different PIN/password than the clean install
+    // below, so the restore genuinely replaces data rather than passing
+    // trivially). Reach the wizard the same way the clean phase does.
+    await setupPage.open();
+    await setupPage.fillDoctorAndNext();
+    await setupPage.fillClinicAndNext();
+    await setupPage.setPinAndRevealRecovery('4321');
+    await setupPage.ackRecoveryAndNext();
+    await setupPage.finishSetup();
+    await shellPage.waitForShell();
+
+    await backupPage.open();
+    await expect(backupPage.screen).toBeDisplayed();
+    const res = await backupPage.backupNow(
+      BACKUP_DIR as string,
+      SOURCE_BACKUP_PASSWORD,
+    );
+    expect(res.ok).toBe(true);
+    expect(res.verified).toBe(true);
+    expect(res.filePath).toContain('.hcbak');
+    expect(existsSync(res.filePath)).toBe(true);
+    const archives = readdirSync(BACKUP_DIR as string).filter((f) =>
+      f.endsWith('.hcbak'),
+    );
+    expect(archives.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
 describe('R1 demo step 3 — PHASE B: restore on a clean install (HC-MVP1-033)', () => {
+  // A SEPARATE clean install ('clean' dir != the source's 'main' dir), sharing
+  // the same per-spec backup folder PHASE A wrote into. Relaunch the app here.
+  before(async () => {
+    await relaunchInto('clean');
+  });
+
   it('sets up a fresh install with a different profile, then restores the source backup and ends operable', async () => {
     expect(BACKUP_DIR).toBeDefined();
     const archive = sourceArchive();
