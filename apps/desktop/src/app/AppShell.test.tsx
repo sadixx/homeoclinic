@@ -133,6 +133,64 @@ describe('AppShell', () => {
       expect(authGetLockState).toHaveBeenCalledTimes(1);
     });
 
+    // Regression (handoff 46): a fresh/unprovisioned install that hits a
+    // boot-read REJECT must still land on /setup, never /lock. The generated
+    // bindings' typedError re-throws a transport/serialization IPC reject as a
+    // plain Error; run() propagates it; the boot-gate catch currently routes
+    // ANY thrown read to /lock — stranding a brand-new (PIN-less) user on the
+    // lock screen. These reproduce the exact user-reported defect (SET-001).
+    it('routes a fresh install to /setup when the lock read rejects with a transport error', async () => {
+      // Fresh install: setup not completed...
+      setupGetState.mockResolvedValue({
+        completed: false,
+        currentStep: 1,
+        dataDir: '/tmp/hc',
+      });
+      // ...and the lock read rejects like the real cold-launch transport
+      // reject (typedError re-throw of an `instanceof Error`).
+      authGetLockState.mockRejectedValue(new Error('IPC transport closed'));
+
+      render(<AppShell />);
+
+      // Not provisioned (no keystore record) => wizard, never the PIN-less
+      // dead end. Current code dumps this on /lock (the defect).
+      expect(await screen.findByTestId('setup-wizard')).toBeInTheDocument();
+      expect(screen.queryByTestId('lock-screen')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+    });
+
+    it('routes a fresh install to /setup when the setup read itself rejects', async () => {
+      // Provisioning is UNKNOWN because the setup read threw; the lock read is
+      // irrelevant. A brand-new user must never be stranded on /lock, so an
+      // uncertain provisioning state must default to /setup.
+      setupGetState.mockRejectedValue(new Error('IPC transport closed'));
+      authGetLockState.mockResolvedValue({ locked: true, autolockMinutes: 15 });
+
+      render(<AppShell />);
+
+      expect(await screen.findByTestId('setup-wizard')).toBeInTheDocument();
+      expect(screen.queryByTestId('lock-screen')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+    });
+
+    it('keeps a provisioned, locked install on /lock when the lock read rejects', async () => {
+      // Security-intent guard (SET-004): a KNOWN-provisioned install whose
+      // lock read is uncertain must still fail safe to /lock. The fix must
+      // NARROW the fail-safe to provisioned installs, not remove it.
+      setupGetState.mockResolvedValue({
+        completed: true,
+        currentStep: 4,
+        dataDir: '/tmp/hc',
+      });
+      authGetLockState.mockRejectedValue(new Error('IPC transport closed'));
+
+      render(<AppShell />);
+
+      expect(await screen.findByTestId('lock-screen')).toBeInTheDocument();
+      expect(screen.queryByTestId('setup-wizard')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+    });
+
     it('shows the app-boot splash while the boot reads are pending', () => {
       // Hold both reads in flight: the decision cannot be made yet.
       setupGetState.mockReturnValue(pending());

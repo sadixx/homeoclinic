@@ -44,13 +44,40 @@ export function isUserFacingError(value: unknown): value is UserFacingError {
  * Await a generated command call and return its data, throwing the mapped
  * {@link UserFacingError} on failure.
  *
+ * Resolved shapes (the normal success/error contract):
  * - resolved envelope `{ status: 'ok', data }` -> `data`
  * - resolved envelope `{ status: 'error', error }` -> throws `error`
  * - resolved bare value (unit-test fake) -> the value as-is
- * - rejected promise (unit-test fake) -> the rejection propagates
+ *
+ * Rejected shapes (the IPC boundary; handoff 46). The generated
+ * `typedError()` RE-THROWS a transport/serialisation IPC reject (an
+ * `instanceof Error`) instead of returning the `{status:'error'}` envelope, and
+ * the backend's own `Err(UserFacingError)` arrives as a rejection too. `run()`
+ * normalises BOTH so a caller only ever catches a {@link UserFacingError}:
+ * - rejected `UserFacingError` -> propagates unchanged (the mapped-domain-error
+ *   path; never relabelled)
+ * - any other rejection (a genuine transport `Error`, a string, etc.) -> mapped
+ *   to a `boot_read_failed` {@link UserFacingError} so a transport failure is an
+ *   explicit, code-bearing value the boot-gate can branch on, instead of a raw
+ *   `Error` that gets silently routed to the lock screen (SET-001, SET-004).
+ *
+ * No patient data, SQL, file path or stack trace is read from the rejection
+ * (R-PRIV-001, R-UI-008); only a fixed, safe code/message/action is produced.
  */
 export async function run<T>(call: Promise<T | ResultEnvelope<T>>): Promise<T> {
-  const resolved = await call;
+  let resolved: T | ResultEnvelope<T>;
+  try {
+    resolved = await call;
+  } catch (rejection: unknown) {
+    // A mapped domain error flows through untouched.
+    if (isUserFacingError(rejection)) {
+      throw rejection;
+    }
+    // Anything else is a transport/serialisation failure at the IPC boundary:
+    // surface it as an explicit, code-bearing typed error. The raw rejection
+    // (which may carry a stack or internal text) is deliberately NOT read.
+    throw transportError();
+  }
   if (isEnvelope<T>(resolved)) {
     if (resolved.status === 'ok') {
       return resolved.data;
@@ -58,4 +85,19 @@ export async function run<T>(call: Promise<T | ResultEnvelope<T>>): Promise<T> {
     throw resolved.error;
   }
   return resolved;
+}
+
+/**
+ * The fixed, patient-data-free {@link UserFacingError} used for a genuine IPC
+ * transport/serialisation failure (handoff 46). `code` is `'boot_read_failed'`,
+ * a real {@link ErrorCode} in the generated contract, so it resolves through
+ * `t()` like any other code (R-UI-007) and the boot-gate can branch on it.
+ */
+function transportError(): UserFacingError {
+  return {
+    code: 'boot_read_failed',
+    message: 'The app could not finish starting up.',
+    suggestedAction:
+      'Please try again. If it keeps happening, restart the app.',
+  };
 }
