@@ -29,8 +29,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { expect } from '@wdio/globals';
 
 import { backupPage } from '../../pages/backup.page.js';
-import { setupPage } from '../../pages/setup.page.js';
-import { shellPage } from '../../pages/shell.page.js';
+import { provisionAndEnterApp } from '../../helpers/setup-flow.js';
 
 const PIN = '4321';
 const BACKUP_PASSWORD = 'clinic-backup-1';
@@ -41,15 +40,14 @@ describe('R1 demo step 3 — PHASE A: back up the source install (HC-MVP1-030/03
   it('sets up the source install, renders the real S17 screen, and backs up to a folder with a password producing a .hcbak', async () => {
     expect(BACKUP_DIR).toBeDefined();
 
-    // 1. Real first-run setup -> Today, unlocked. Doctor + clinic are the
-    //    source profile that phase B must see come back.
-    await setupPage.open();
-    await setupPage.fillDoctorAndNext();
-    await setupPage.fillClinicAndNext();
-    await setupPage.setPinAndRevealRecovery(PIN);
-    await setupPage.ackRecoveryAndNext();
-    await setupPage.finishSetup();
-    await shellPage.waitForShell();
+    // 1. Real first-run setup, then reach the unlocked shell. The completion
+    //    route-guard (commit 216cfed) keeps /backup unreachable until setup is
+    //    completed; under the SET-001 fix the wizard's Finish flips the live
+    //    completion signal before navigating to /today, so completing the
+    //    wizard lands on Today, unlocked, on THIS launch and the guard then
+    //    admits /backup — no relaunch/PIN round-trip. Doctor + clinic are the
+    //    source profile.
+    await provisionAndEnterApp('main', PIN);
 
     // 2. Real S17 screen + real health status.
     await backupPage.open();

@@ -40,11 +40,11 @@ import path from 'node:path';
 import { expect } from '@wdio/globals';
 
 import { backupPage } from '../../pages/backup.page.js';
-import { setupPage } from '../../pages/setup.page.js';
-import { shellPage } from '../../pages/shell.page.js';
 import { relaunchInto } from '../../helpers/launch.js';
+import { provisionAndEnterApp } from '../../helpers/setup-flow.js';
 
 const PIN = '7788';
+const SOURCE_PIN = '4321';
 const SOURCE_BACKUP_PASSWORD = 'clinic-backup-1';
 const WRONG_PASSWORD = 'not-the-password';
 
@@ -72,14 +72,12 @@ describe('R1 demo step 3 — PHASE A (self-provision): back up a source install 
 
     // Fresh source install (different PIN/password than the clean install
     // below, so the restore genuinely replaces data rather than passing
-    // trivially). Reach the wizard the same way the clean phase does.
-    await setupPage.open();
-    await setupPage.fillDoctorAndNext();
-    await setupPage.fillClinicAndNext();
-    await setupPage.setPinAndRevealRecovery('4321');
-    await setupPage.ackRecoveryAndNext();
-    await setupPage.finishSetup();
-    await shellPage.waitForShell();
+    // trivially). The completion route-guard (commit 216cfed) keeps /backup
+    // unreachable until setup is completed; under the SET-001 fix the wizard's
+    // Finish flips the live completion signal before navigating to /today, so
+    // completing the wizard on this fresh 'main' launch lands on Today,
+    // unlocked, and the guard then admits /backup — no relaunch needed.
+    await provisionAndEnterApp('main', SOURCE_PIN);
 
     await backupPage.open();
     await expect(backupPage.screen).toBeDisplayed();
@@ -110,14 +108,15 @@ describe('R1 demo step 3 — PHASE B: restore on a clean install (HC-MVP1-033)',
     const archive = sourceArchive();
     expect(existsSync(archive)).toBe(true);
 
-    // 1. Clean install: fresh setup with a DIFFERENT doctor + clinic, unlocked.
-    await setupPage.open();
-    await setupPage.fillDoctorAndNext();
-    await setupPage.fillClinicAndNext();
-    await setupPage.setPinAndRevealRecovery(PIN);
-    await setupPage.ackRecoveryAndNext();
-    await setupPage.finishSetup();
-    await shellPage.waitForShell();
+    // 1. Clean install: fresh setup with a DIFFERENT doctor + clinic, then
+    //    reach the unlocked shell. The 'before' hook already launched this
+    //    separate 'clean' dir fresh (self-routed to #/setup). Under the SET-001
+    //    fix, completing the wizard flips the live completion signal before
+    //    navigating to /today, so it lands on Today, unlocked, on this launch
+    //    (completion route-guard, commit 216cfed) — no relaunch. restore_apply
+    //    below needs the app unlocked (retained target DEK), which this
+    //    freshly-completed, unlocked session provides.
+    await provisionAndEnterApp('clean', PIN);
 
     // This install is its own completed setup before any restore.
     const before = await backupPage.setupState();

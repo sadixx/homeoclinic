@@ -65,8 +65,8 @@ import { expect } from '@wdio/globals';
 
 import { backupPage } from '../../pages/backup.page.js';
 import { bootPage } from '../../pages/boot.page.js';
-import { setupPage } from '../../pages/setup.page.js';
 import { shellPage } from '../../pages/shell.page.js';
+import { provisionAndEnterApp } from '../../helpers/setup-flow.js';
 
 const PIN = '4321';
 const BACKUP_PASSWORD = 'upgrade-backup-1';
@@ -96,12 +96,14 @@ describe('HC-MVP1-226 upgrade-path PHASE A: R1 opens an R0-equivalent (empty/bas
     // The "upgrade install" step: complete the real first-run wizard. This runs
     // setup_set_pin, which opens the encrypted DB over the R0 data dir and runs
     // migrations 0001_init + 0002_setup (user_version 0 → 2 at the Rust layer).
-    await setupPage.fillDoctorAndNext();
-    await setupPage.fillClinicAndNext();
-    await setupPage.setPinAndRevealRecovery(PIN);
-    await setupPage.ackRecoveryAndNext();
-    await setupPage.finishSetup();
-    await shellPage.waitForShell();
+    //
+    // Under the SET-001 fix (AppShell BootRouter live completion signal)
+    // finishing the wizard flips completion before navigating to /today, so the
+    // completion route-guard (commit 216cfed) admits the shell on THIS launch:
+    // the migrated + unlocked shell (Today) is reached in place, no relaunch.
+    // The migrated clinic.db is written into the R0-baseline dir, proving "R1
+    // opens over the R0 data dir and the migrated schema serves".
+    await provisionAndEnterApp('main', PIN);
     await expect(shellPage.todayScreen).toBeDisplayed();
 
     // R1 opened over the R0 dir: setup is now completed and the migrated schema

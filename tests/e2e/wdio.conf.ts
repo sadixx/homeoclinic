@@ -52,6 +52,11 @@ if (!existsSync(appBinary)) {
   );
 }
 
+// Expose the resolved binary path so helpers/driver.ts can reap a lingering app
+// process by its ABSOLUTE path (a string the wdio runner's own command line
+// never contains), without a broad pkill that could hit the runner.
+process.env.HC_APP_BINARY = appBinary;
+
 // Fail fast with a clear message if the native driver cannot be resolved,
 // rather than deep inside the first beforeSession.
 resolveNativeDriver();

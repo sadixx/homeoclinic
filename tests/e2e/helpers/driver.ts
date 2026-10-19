@@ -118,6 +118,82 @@ async function waitForPort(port: number, timeoutMs = 20000): Promise<void> {
 }
 
 /**
+ * Force-kill ANY stray process in the tauri-driver chain — tauri-driver, the
+ * native WebKitWebDriver, and the app binary (homeoclinic-desktop) — regardless
+ * of who spawned it.
+ *
+ * WHY THIS IS NEEDED: tauri-driver spawns WebKitWebDriver, which spawns the app.
+ * SIGTERM to the tauri-driver parent does NOT reap those grandchildren (they are
+ * not in the parent's signalled group), so without this sweep a spec's app can
+ * outlive its session. The next spec's new WebDriver session then connects to
+ * the SAME native-driver port and attaches to the LINGERING app — which is still
+ * pointed at the PREVIOUS spec's (provisioned) data dir — so a "fresh install"
+ * spec sees #/lock instead of #/setup. That is exactly the flake that made the
+ * suite pass once and fail the next run. Reaping by name before every start (and
+ * after every stop) guarantees each spec launches its OWN app in its OWN dir.
+ *
+ * Best-effort: pkill is not fatal if there is nothing to kill (exit 1).
+ *
+ * IMPORTANT: never do a broad `pkill -f` on a substring that also appears in
+ * the wdio runner's own command line/env. The runner is launched with
+ * `HC_NATIVE_DRIVER=/usr/bin/WebKitWebDriver ... wdio.conf.ts`, so a `-f` match
+ * on "WebKitWebDriver"/"wdio" would also kill the runner. We therefore:
+ *   - match the driver binaries by EXACT process (comm) name with `pkill -x`
+ *     (`tauri-driver`, and `WebKitWebDriver` which is exactly 15 chars so it is
+ *     not truncated); and
+ *   - match the app by its ABSOLUTE binary path with `pkill -f`, a string the
+ *     runner's command line never contains (the runner references the binary
+ *     only via the tauri:options config, not on argv).
+ */
+function reapDriverChain(appBinary?: string): void {
+  for (const name of ['tauri-driver', 'WebKitWebDriver']) {
+    try {
+      execFileSync('pkill', ['-9', '-x', name], { stdio: 'ignore' });
+    } catch {
+      // pkill exits non-zero when no process matched; that is fine.
+    }
+  }
+  const binary = appBinary ?? process.env.HC_APP_BINARY;
+  if (binary) {
+    try {
+      execFileSync('pkill', ['-9', '-f', binary], { stdio: 'ignore' });
+    } catch {
+      // nothing matched
+    }
+  }
+}
+
+/** Poll until a TCP port is FREE (no listener), or time out. */
+async function waitForPortFree(port: number, timeoutMs = 10000): Promise<void> {
+  const net = await import('node:net');
+  const deadline = Date.now() + timeoutMs;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const inUse = await new Promise<boolean>((resolve) => {
+      const socket = net.connect({ host: '127.0.0.1', port }, () => {
+        socket.end();
+        resolve(true);
+      });
+      socket.on('error', () => resolve(false));
+      socket.setTimeout(500, () => {
+        socket.destroy();
+        resolve(false);
+      });
+    });
+    if (!inUse) {
+      return;
+    }
+    if (Date.now() > deadline) {
+      // Last resort: reap again and return; startDriver will surface a clear
+      // error if the port is still contended.
+      reapDriverChain();
+      return;
+    }
+    await sleep(150);
+  }
+}
+
+/**
  * Start the tauri-driver chain with the given environment overrides (notably
  * XDG_DATA_HOME / HOME). The app the native driver launches on each session
  * will inherit these, so this is the single lever that sets the app's data dir.
@@ -127,6 +203,12 @@ export async function startDriver(
   envOverrides: NodeJS.ProcessEnv,
 ): Promise<void> {
   await stopDriver();
+  // Belt-and-braces: reap any stray chain (e.g. from a previously crashed run
+  // or a non-graceful teardown) and wait for the proxy + native ports to be
+  // free, so this spec never attaches to a lingering app in another data dir.
+  reapDriverChain();
+  await waitForPortFree(TAURI_DRIVER_PORT);
+  await waitForPortFree(NATIVE_DRIVER_PORT);
 
   const nativeDriver = resolveNativeDriver();
   tauriDriver = spawn(
@@ -162,9 +244,13 @@ export async function startDriver(
   }
 }
 
-/** Stop the running tauri-driver chain (and its WebKitWebDriver child). */
+/** Stop the running tauri-driver chain (and its WebKitWebDriver + app children). */
 export async function stopDriver(): Promise<void> {
   if (!tauriDriver) {
+    // No tracked child, but a chain may still be stray (crashed run, abrupt
+    // teardown). Reap by name so a later start is not sabotaged by a lingering
+    // app bound to the native-driver port.
+    reapDriverChain();
     return;
   }
   const proc = tauriDriver;
@@ -187,6 +273,10 @@ export async function stopDriver(): Promise<void> {
       done();
     }, 3000);
   });
+  // Killing the tauri-driver parent does NOT reap the WebKitWebDriver + app
+  // grandchildren; sweep them by name so the next spec cannot attach to a
+  // lingering app in the previous spec's data dir.
+  reapDriverChain();
   // Give the OS a moment to release the proxy port before a respawn.
   await sleep(300);
 }

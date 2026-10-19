@@ -260,13 +260,28 @@ function LockRoute(): JSX.Element {
   return <LockScreen onUnlocked={goHome} />;
 }
 
-/** `/setup` route: finishing the wizard opens Today unlocked (S01). */
-function SetupRoute(): JSX.Element {
+/**
+ * `/setup` route: finishing the wizard opens Today unlocked (S01).
+ *
+ * Finishing the wizard flips the LIVE completion signal (`markCompleted`)
+ * BEFORE navigating to `/today`, so the completion route-guard (`ShellRoute`)
+ * admits the shell on this same process. Without this the guard would still
+ * read the frozen boot-time `completed === false` and bounce `/today` back to
+ * `/setup`, stranding a brand-new doctor until a close/reopen + PIN unlock
+ * (the user-reported SET-001 defect).
+ */
+function SetupRoute({
+  onCompleted,
+}: {
+  readonly onCompleted: () => void;
+}): JSX.Element {
   const navigate = useNavigate();
-  const goHome = useCallback(
-    () => navigate('/today', { replace: true }),
-    [navigate],
-  );
+  const goHome = useCallback(() => {
+    // Flip the live completion signal first so the guard lets the shell mount,
+    // THEN navigate — order matters (guard reads completion synchronously).
+    onCompleted();
+    navigate('/today', { replace: true });
+  }, [navigate, onCompleted]);
   return <SetupWizard onComplete={goHome} />;
 }
 
@@ -342,17 +357,29 @@ function BootRouter({
     seeded.current = true;
   }
 
+  // The completion route-guard must use a LIVE signal, not the frozen boot
+  // value (SET-001, user-reported defect). Seed it from the boot decision; the
+  // wizard's completion (`markCompleted`) flips it to true in THIS process so
+  // ShellRoute admits the shell immediately after Finish — no close/reopen +
+  // PIN round-trip. A guard reading the frozen boot `completed === false` would
+  // bounce the post-Finish `/today` navigation straight back to `/setup`.
+  const [liveCompleted, setLiveCompleted] = useState(completed);
+  const markCompleted = useCallback(() => setLiveCompleted(true), []);
+
   return (
     <HashRouter>
       <Routes>
-        <Route path="/setup" element={<SetupRoute />} />
+        <Route
+          path="/setup"
+          element={<SetupRoute onCompleted={markCompleted} />}
+        />
         <Route path="/lock" element={<LockRoute />} />
         <Route
           path="*"
           element={
             <ShellRoute
               autolockMinutes={autolockMinutes}
-              completed={completed}
+              completed={liveCompleted}
             />
           }
         />

@@ -10,21 +10,22 @@
 // before any navigation, so a pass can only mean AppShell's BootRouter seeded
 // the route itself from setup_get_state + auth_get_lock_state.
 //
-// Two phases, run as two separate app launches (the executor gives each phase
-// its own XDG_DATA_HOME so the Tauri app resolves a distinct data dir, which is
-// how a "fresh install" vs a "provisioned install relaunch" is simulated — a
-// real tauri-driver session launches the app exactly once):
+// Two phases, run as two app launches against ONE data dir (the primary 'main'
+// dir; PHASE B relaunches it in-spec):
 //
-//   PHASE A — fresh data dir -> #/setup (SET-001):
+//   PHASE A — fresh data dir -> #/setup -> finish wizard -> Today (SET-001):
 //     a brand-new data dir has no initialised key hierarchy, so setup_get_state
 //     reports completed=false and the gate self-routes to the first-run wizard.
 //     We assert the app chose #/setup WITHOUT navigating, then run the REAL
-//     first-run wizard to PROVISION this same data dir (initialises the key
-//     hierarchy + sets the PIN) so phase B can relaunch against it.
+//     first-run wizard through Finish. Under the SET-001 fix the wizard's Finish
+//     flips the LIVE completion signal before navigating to /today, so the
+//     completion route-guard admits the shell on THIS launch: finishing the
+//     wizard lands on Today, unlocked — the user-reported defect (bounced back
+//     to /setup) is gone. This also provisions 'main' for PHASE B's relaunch.
 //
 //   PHASE B — provisioned + locked data dir relaunch -> #/lock (SET-004):
-//     the executor relaunches the app with XDG_DATA_HOME pointing at the data
-//     dir phase A provisioned. A fresh process starts LOCKED
+//     the app relaunches with XDG_DATA_HOME pointing at the data dir PHASE A
+//     provisioned. A fresh process starts LOCKED
 //     (hc-app/state.rs: "Fresh process starts locked until setup completes or
 //     the user [unlocks]") and setup_get_state reports completed=true (key
 //     hierarchy is initialised on disk), so the gate self-routes to the lock
@@ -34,12 +35,13 @@ import { expect } from '@wdio/globals';
 
 import { bootPage } from '../../pages/boot.page.js';
 import { setupPage } from '../../pages/setup.page.js';
+import { shellPage } from '../../pages/shell.page.js';
 import { relaunchInto } from '../../helpers/launch.js';
 
 const PIN = '4321';
 
-describe('R1 boot-gate PHASE A: fresh install launches into the wizard (SET-001)', () => {
-  it('auto-routes a fresh data dir to #/setup on launch with no forced navigation, then provisions the install', async () => {
+describe('R1 boot-gate PHASE A: fresh install launches into the wizard, finishing it reaches Today (SET-001)', () => {
+  it('auto-routes a fresh data dir to #/setup on launch with no forced navigation, then finishing the wizard lands on Today unlocked', async () => {
     // Observe the app's OWN launch decision. No page object here touches the
     // hash — bootPage only reads it.
     const decided = await bootPage.waitForDecidedScreen();
@@ -53,9 +55,8 @@ describe('R1 boot-gate PHASE A: fresh install launches into the wizard (SET-001)
     expect(hash).toBe('#/setup');
     await expect(bootPage.setupWizard).toBeDisplayed();
 
-    // Provision THIS data dir with the real first-run wizard so phase B can
-    // relaunch a "completed + locked" install against it. The wizard is already
-    // on screen (the app put us here); run it through the real typed commands.
+    // Run the real first-run wizard through Finish. The wizard is already on
+    // screen (the app put us here); drive it through the real typed commands.
     await expect(setupPage.wizard).toBeDisplayed();
     await setupPage.fillDoctorAndNext();
     await setupPage.fillClinicAndNext();
@@ -65,9 +66,15 @@ describe('R1 boot-gate PHASE A: fresh install launches into the wizard (SET-001)
     await expect(setupPage.licenceDevTrial).toBeDisplayed();
     await setupPage.finishSetup();
 
-    // After finish the app is unlocked on Today; the key hierarchy is now
-    // initialised on disk in this data dir (completed=true persists).
-    await expect(bootPage.todayScreen).toBeDisplayed();
+    // COMPLETION ROUTE-GUARD under the SET-001 fix (AppShell BootRouter): Finish
+    // persists setup_complete + setup_start_trial and flips the LIVE completion
+    // signal (markCompleted) BEFORE navigating to /today, so ShellRoute admits
+    // the shell on THIS launch. Finishing the wizard therefore lands on Today,
+    // unlocked — the user-reported defect (bounced back to /setup until a
+    // close/reopen + PIN) is fixed. Assert we are genuinely in the shell.
+    await shellPage.waitForShell();
+    await expect(shellPage.todayScreen).toBeDisplayed();
+    await expect(bootPage.setupWizard).not.toBeDisplayed();
   });
 });
 

@@ -12,11 +12,13 @@
 // BOOT-GATE NOTE (commit e1cd2cb): since R1 the launch boot-gate auto-routes a
 // FRESH/unprovisioned data dir to #/setup, not straight to the shell. The R0
 // demo's "app shell renders" step is therefore reached by first completing the
-// real first-run wizard (which ends unlocked on Today inside the app-shell) —
-// the same way a doctor reaches Today on a real first launch. This keeps the R0
-// demo gate (shell + nav + Today empty + F2 search) honest against the way the
-// app actually launches now, instead of assuming a cold launch lands on the
-// shell. The shell/Today/nav markup itself is unchanged from R0.
+// real first-run wizard, which — under the SET-001 fix (AppShell BootRouter
+// live completion signal) — ends unlocked on Today inside the app-shell on the
+// SAME launch, exactly the way a doctor reaches Today on a real first launch.
+// This keeps the R0 demo gate (shell + nav + Today empty + F2 search) honest
+// against the way the app actually launches now, instead of assuming a cold
+// launch lands on the shell. The shell/Today/nav markup itself is unchanged
+// from R0.
 //
 // Opening-time < 4 s (NFR aspiration) is observed and logged but, per the
 // round brief, a slow cold start in a debug build under xvfb is NOT a blocking
@@ -26,6 +28,7 @@ import { expect } from '@wdio/globals';
 import { bootPage } from '../../pages/boot.page.js';
 import { setupPage } from '../../pages/setup.page.js';
 import { shellPage } from '../../pages/shell.page.js';
+import { completeFirstRunWizard } from '../../helpers/setup-flow.js';
 
 const PIN = '2468';
 
@@ -35,19 +38,15 @@ describe('R0 walking skeleton: app shell renders', () => {
 
     // The boot-gate self-routes a fresh data dir to the wizard (R1+); reach the
     // shell the way the app launches now by completing the real first-run
-    // wizard, which ends unlocked on Today inside the app-shell.
+    // wizard. Under the SET-001 fix (completion route-guard live signal)
+    // finishing the wizard flips completion before navigating to /today, so the
+    // guard admits the shell and we land on Today, unlocked, on THIS launch —
+    // no relaunch/PIN round-trip.
     const decided = await bootPage.waitForDecidedScreen();
     expect(decided).toBe('#/setup');
-    await expect(setupPage.wizard).toBeDisplayed();
-    await setupPage.fillDoctorAndNext();
-    await setupPage.fillClinicAndNext();
-    const recoveryCode = await setupPage.setPinAndRevealRecovery(PIN);
-    expect(recoveryCode.length).toBeGreaterThan(0);
-    await setupPage.ackRecoveryAndNext();
-    await expect(setupPage.licenceDevTrial).toBeDisplayed();
-    await setupPage.finishSetup();
+    await completeFirstRunWizard(PIN);
 
-    // Step 1: shell renders (now on Today, unlocked).
+    // Step 1: shell renders (now on Today, unlocked, same launch).
     await shellPage.waitForShell();
     const openMs = Date.now() - t0;
     // eslint-disable-next-line no-console
