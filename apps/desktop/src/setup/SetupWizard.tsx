@@ -31,9 +31,13 @@ import { t } from '@/shared/strings';
 export interface SetupWizardProps {
   readonly onComplete?: () => void;
   /**
-   * Opens S17 backup/restore (the setup wizard links there once setup is
-   * complete — S17 entry points). Optional so the wizard stays unit-testable
-   * without a router.
+   * @deprecated Accepted but intentionally IGNORED. The S01->S17 link belongs
+   * on the completed app (Today / StatusBar), never mid-wizard: routing to
+   * Backup before Finish would bypass setup_complete + setup_start_trial and
+   * leave the licence inactive (SET-001; the user-reported defect). The
+   * wizard's only forward exit is Finish (`onComplete`). The prop is retained
+   * on the type so a host that still passes it type-checks; the wizard never
+   * invokes it and renders no jump-to-Backup control.
    */
   readonly onGoToBackup?: () => void;
 }
@@ -58,10 +62,7 @@ const AUTOLOCK_OPTIONS = [5, 10, 15, 30, 60] as const;
 type FieldErrors = Record<string, string>;
 
 /** First-run setup wizard (4 steps). */
-export function SetupWizard({
-  onComplete,
-  onGoToBackup,
-}: SetupWizardProps): JSX.Element {
+export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
   const [step, setStep] = useState<Step>(1);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
@@ -741,20 +742,6 @@ export function SetupWizard({
                 {t('setup.licence.devTrialNote')}
               </p>
             </div>
-
-            {/* Link to S17 backup/restore (S17 entry points: the setup wizard
-                links here once setup is complete). Rendered only when the host
-                provides navigation, so the wizard stays router-free in tests. */}
-            {onGoToBackup !== undefined ? (
-              <button
-                type="button"
-                data-testid="setup-backup-link"
-                onClick={onGoToBackup}
-                className="self-start text-sm text-blue-700 underline focus:outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                {t('setup.backup.link')}
-              </button>
-            ) : null}
           </>
         ) : null}
 

@@ -61,6 +61,14 @@ type BootRoute = '/setup' | '/lock' | '/today';
 interface BootDecision {
   readonly route: BootRoute;
   readonly autolockMinutes: number | null;
+  /**
+   * Whether setup is completed (SET-001). Threaded through so the in-session
+   * completion route-guard can keep shell routes unreachable until the
+   * licence/trial is activated — consistent with the boot decision, which
+   * already sends `!completed -> /setup`. `false` whenever provisioning is
+   * not observed as complete (including an uncertain/failed setup read).
+   */
+  readonly completed: boolean;
 }
 
 /**
@@ -103,7 +111,11 @@ function useBootDecision(): BootDecision | undefined {
         completed = setup.completed;
       } catch {
         if (!cancelled) {
-          setDecision({ route: '/setup', autolockMinutes: null });
+          setDecision({
+            route: '/setup',
+            autolockMinutes: null,
+            completed: false,
+          });
         }
         return;
       }
@@ -112,7 +124,11 @@ function useBootDecision(): BootDecision | undefined {
       // read is irrelevant for a fresh install, so it is not even awaited.
       if (!completed) {
         if (!cancelled) {
-          setDecision({ route: '/setup', autolockMinutes: null });
+          setDecision({
+            route: '/setup',
+            autolockMinutes: null,
+            completed: false,
+          });
         }
         return;
       }
@@ -126,11 +142,16 @@ function useBootDecision(): BootDecision | undefined {
           setDecision({
             route: lock.locked ? '/lock' : '/today',
             autolockMinutes: lock.autolockMinutes,
+            completed: true,
           });
         }
       } catch {
         if (!cancelled) {
-          setDecision({ route: '/lock', autolockMinutes: null });
+          setDecision({
+            route: '/lock',
+            autolockMinutes: null,
+            completed: true,
+          });
         }
       }
     })();
@@ -246,11 +267,7 @@ function SetupRoute(): JSX.Element {
     () => navigate('/today', { replace: true }),
     [navigate],
   );
-  const goToBackup = useCallback(
-    () => navigate('/backup', { replace: true }),
-    [navigate],
-  );
-  return <SetupWizard onComplete={goHome} onGoToBackup={goToBackup} />;
+  return <SetupWizard onComplete={goHome} />;
 }
 
 /** Top-level shell: runs the launch boot-gate, then provides the router. */
@@ -276,8 +293,32 @@ export function AppShell(): JSX.Element {
     <BootRouter
       route={decision.route}
       autolockMinutes={decision.autolockMinutes}
+      completed={decision.completed}
     />
   );
+}
+
+/**
+ * Completion route-guard (SET-001): the shell (`/today`, `/backup`, any shell
+ * path) is only reachable once setup is completed. While `completed === false`
+ * — the same signal the boot decision uses to send a fresh install to the
+ * wizard — any in-session navigation to a shell route (a stray in-app link, a
+ * stale hash, a deep link) is redirected to `/setup`, so nothing in the app is
+ * accessible before the licence/trial is activated. `/setup` and `/lock` are
+ * dedicated routes and are never wrapped by this guard, so the wizard itself
+ * and the lock screen stay reachable.
+ */
+function ShellRoute({
+  autolockMinutes,
+  completed,
+}: {
+  readonly autolockMinutes: number | null;
+  readonly completed: boolean;
+}): JSX.Element {
+  if (!completed) {
+    return <Navigate to="/setup" replace />;
+  }
+  return <ShellFrame autolockMinutes={autolockMinutes} />;
 }
 
 /**
@@ -288,9 +329,11 @@ export function AppShell(): JSX.Element {
 function BootRouter({
   route,
   autolockMinutes,
+  completed,
 }: {
   readonly route: BootRoute;
   readonly autolockMinutes: number | null;
+  readonly completed: boolean;
 }): JSX.Element {
   // Seed exactly once, on first render, before HashRouter reads the hash.
   const seeded = useRef(false);
@@ -306,7 +349,12 @@ function BootRouter({
         <Route path="/lock" element={<LockRoute />} />
         <Route
           path="*"
-          element={<ShellFrame autolockMinutes={autolockMinutes} />}
+          element={
+            <ShellRoute
+              autolockMinutes={autolockMinutes}
+              completed={completed}
+            />
+          }
         />
       </Routes>
     </HashRouter>
