@@ -110,8 +110,14 @@ Click **Next**.
   **Development trial**; buying and importing a real licence arrives in a
   later release.
 
-Click **Finish setup**. The app creates your encrypted database and opens the
-**Today** screen, unlocked and ready.
+Click **Finish setup**. The app creates your encrypted database, starts the
+trial, and opens the **Today** screen, unlocked and ready.
+
+> **Setup must be finished before anything else is available.** The rest of
+> the app — including Backup — cannot be reached until you complete the wizard
+> and start the trial here. **Finish setup** is the only way out of the wizard;
+> there is no shortcut that skips the trial. (If you close the app mid-setup,
+> it reopens on the wizard where you left off.)
 
 ---
 
@@ -146,8 +152,9 @@ Your data sits behind a single PIN entry.
 
 ## 4. Backing up your data (R1)
 
-Open **Backup** from the left navigation (or click the "Last backup" chip in
-the status bar).
+Backup becomes available **after** you finish the first-run setup (section 2).
+Once setup is complete, open **Backup** from the left navigation (or click the
+"Last backup" chip in the status bar).
 
 ### Back up now (to a folder or USB drive)
 
