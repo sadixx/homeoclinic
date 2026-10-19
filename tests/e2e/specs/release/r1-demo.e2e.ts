@@ -58,6 +58,7 @@ import { bootPage } from '../../pages/boot.page.js';
 import { lockPage } from '../../pages/lock.page.js';
 import { setupPage } from '../../pages/setup.page.js';
 import { shellPage } from '../../pages/shell.page.js';
+import { relaunchInto } from '../../helpers/launch.js';
 
 /** PIN used for the step 1+2 install (set in phase 1, verified in phase 2). */
 const PIN = '4321';
@@ -124,11 +125,17 @@ describe('R1 demo STEP 1 — PHASE 1: fresh install first-run wizard (SET-001/00
 });
 
 describe('R1 demo STEP 2 — PHASE 2: reopen and unlock with the PIN (SET-004, SUX-003/005)', () => {
+  // Separate app launch against the SAME dir PHASE 1 provisioned ('main'). In a
+  // single `wdio run` the app launches once per spec, so relaunch here against
+  // the provisioned 'main' dir — the in-spec equivalent of the orchestrator's
+  // PHASE 2 process pointed at PHASE 1's XDG_DATA_HOME.
+  before(async () => {
+    await relaunchInto('main');
+  });
+
   it('auto-routes the provisioned install to lock on reopen, refuses a wrong PIN inline without lockout, then unlocks with the correct PIN in one entry', async () => {
-    // Separate launch, SAME data dir as phase 1 (the executor points
-    // XDG_DATA_HOME at the provisioned dir). A fresh process starts LOCKED and
-    // setup is completed on disk, so the app self-routes to #/lock — the real
-    // "close and reopen" path, not a forced route.
+    // A fresh process starts LOCKED and setup is completed on disk, so the app
+    // self-routes to #/lock — the real "close and reopen" path.
     const decided = await bootPage.waitForDecidedScreen();
     const hash = await bootPage.launchHash();
     // eslint-disable-next-line no-console
@@ -154,6 +161,13 @@ describe('R1 demo STEP 2 — PHASE 2: reopen and unlock with the PIN (SET-004, S
 });
 
 describe('R1 demo STEP 3 — PHASE 3A: back up the source install to a folder with a password (BAK-002)', () => {
+  // Fresh, SEPARATE clean install for the source profile ('source' dir). The
+  // per-spec shared backup folder (HC_E2E_BACKUP_DIR, set by the harness) is
+  // the same for 3A and 3B, so 3B can restore what 3A wrote.
+  before(async () => {
+    await relaunchInto('source');
+  });
+
   it('provisions a source install on a fresh launch and backs up to the shared folder with a password, producing a verified .hcbak', async () => {
     expect(BACKUP_DIR).toBeDefined();
 
@@ -193,6 +207,12 @@ describe('R1 demo STEP 3 — PHASE 3A: back up the source install to a folder wi
 });
 
 describe('R1 demo STEP 3 — PHASE 3B: restore on a clean install; the install comes back operable (BAK-003)', () => {
+  // A SEPARATE clean install ('clean' dir, != 'source'), so the restore
+  // genuinely replaces this install's data with the source's.
+  before(async () => {
+    await relaunchInto('clean');
+  });
+
   it('provisions a separate clean install, restores the shared backup, and ends operable with backup status serving', async () => {
     expect(BACKUP_DIR).toBeDefined();
     const archive = sharedArchive();
