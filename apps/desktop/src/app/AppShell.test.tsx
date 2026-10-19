@@ -14,7 +14,7 @@
 // mocked so the shell chrome renders once routed to Today.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 
 // Mock fns created via `vi.hoisted` so they are reachable inside the hoisted
 // `vi.mock` factory (Vitest hoists vi.mock to the top of the module) — the
@@ -44,6 +44,11 @@ vi.mock('@/bindings', () => ({
       retention: { daily: 14, weekly: 8, monthly: 12 },
       stale: true,
     })),
+    // BackupScreen enumerates drives on mount; mock it so that under the
+    // CURRENT (unguarded) code the BackupScreen actually renders and the
+    // guard assertions fail on the assertion (backup-screen present) rather
+    // than on an unmocked binding reject.
+    listRemovableDrives: vi.fn(async () => ({ drives: [] })),
   },
 }));
 
@@ -57,6 +62,9 @@ function pending<T>(): Promise<T> {
 beforeEach(() => {
   setupGetState.mockReset();
   authGetLockState.mockReset();
+  // BootRouter seeds window.location.hash; reset it so a prior test's decision
+  // route does not leak into the next render.
+  window.location.hash = '';
   // Default happy path: setup done, unlocked. Individual tests override.
   setupGetState.mockResolvedValue({
     completed: true,
@@ -203,6 +211,105 @@ describe('AppShell', () => {
       expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
       expect(screen.queryByTestId('setup-wizard')).not.toBeInTheDocument();
       expect(screen.queryByTestId('lock-screen')).not.toBeInTheDocument();
+    });
+  });
+
+  // Completion route-guard (defect: /backup and /today render even when
+  // setup_get_state().completed === false). The boot-gate seeds the launch
+  // route, but nothing re-checks completion once the router is mounted, so an
+  // in-app navigation (the premature wizard link), a stale hash, or a deep
+  // link can reach the shell BEFORE the licence/trial is activated. Rule
+  // (user): until setup is finished, nothing else is accessible. A completion
+  // guard must redirect shell routes to /setup while completed === false,
+  // consistent with useBootDecision. These FAIL on current code (no guard:
+  // the shell renders BackupScreen / TodayScreen on the stale hash).
+  describe('completion route-guard (SET-001)', () => {
+    /**
+     * Drive an in-app navigation the way a stale hash / deep link / stray
+     * in-wizard link would: push the hash and fire the hashchange the
+     * HashRouter listens for. Wrapped in act() so React flushes the resulting
+     * navigation + guard effects.
+     */
+    async function navigateViaHash(hash: string): Promise<void> {
+      await act(async () => {
+        window.location.hash = hash;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      });
+    }
+
+    it('redirects /backup back to /setup when setup is not completed', async () => {
+      setupGetState.mockResolvedValue({
+        completed: false,
+        currentStep: 1,
+        dataDir: '/tmp/hc',
+      });
+      authGetLockState.mockResolvedValue({
+        locked: false,
+        autolockMinutes: 15,
+      });
+
+      render(<AppShell />);
+
+      // Boot lands on the wizard (not provisioned).
+      expect(await screen.findByTestId('setup-wizard')).toBeInTheDocument();
+
+      // A stale hash / deep link / stray link tries to open Backup directly.
+      await navigateViaHash('#/backup');
+
+      // The guard must hold the user on the wizard; Backup must NOT render.
+      await waitFor(() => {
+        expect(screen.getByTestId('setup-wizard')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('backup-screen')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
+    });
+
+    it('redirects /today back to /setup when setup is not completed', async () => {
+      setupGetState.mockResolvedValue({
+        completed: false,
+        currentStep: 1,
+        dataDir: '/tmp/hc',
+      });
+      authGetLockState.mockResolvedValue({
+        locked: false,
+        autolockMinutes: 15,
+      });
+
+      render(<AppShell />);
+
+      expect(await screen.findByTestId('setup-wizard')).toBeInTheDocument();
+
+      await navigateViaHash('#/today');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('setup-wizard')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
+    });
+
+    it('allows /backup once setup is completed (guard only blocks the incomplete case)', async () => {
+      // Completed + unlocked: the guard must NOT interfere with the shell.
+      setupGetState.mockResolvedValue({
+        completed: true,
+        currentStep: 4,
+        dataDir: '/tmp/hc',
+      });
+      authGetLockState.mockResolvedValue({
+        locked: false,
+        autolockMinutes: 15,
+      });
+
+      render(<AppShell />);
+
+      // Boots into the shell on Today.
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/backup');
+
+      // Setup is complete, so Backup is reachable — no redirect to the wizard.
+      expect(await screen.findByTestId('backup-screen')).toBeInTheDocument();
+      expect(screen.queryByTestId('setup-wizard')).not.toBeInTheDocument();
     });
   });
 });

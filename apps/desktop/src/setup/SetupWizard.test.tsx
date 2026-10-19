@@ -148,4 +148,44 @@ describe('SetupWizard (S01)', () => {
     expect(complete).toHaveBeenCalledOnce();
     expect(onComplete).toHaveBeenCalledOnce();
   });
+
+  // Regression (defect: premature in-wizard Backup link bypasses completion).
+  // The licence step must NOT render a "go to Backup" control: the wizard's
+  // only forward exit is Finish, which runs setup_complete + setup_start_trial
+  // and routes to Today. The S01 spec links to S17 only ONCE setup is complete,
+  // so the link belongs on Today/StatusBar, never mid-wizard (before the trial
+  // is activated). An onGoToBackup prop is deliberately passed here: even when
+  // the host offers navigation, the licence step must not expose a pre-
+  // completion jump to Backup. FAILS on current code (the button renders
+  // whenever onGoToBackup is defined).
+  it('does not render a go-to-Backup link on the licence step (completion is the only forward exit)', async () => {
+    const user = userEvent.setup();
+    const onGoToBackup = vi.fn();
+    render(<SetupWizard onGoToBackup={onGoToBackup} />);
+
+    // Walk to the licence step (step 4).
+    await user.type(screen.getByTestId('setup-doctor-name'), 'Test Doctor 001');
+    await user.type(screen.getByTestId('setup-doctor-qualification'), 'BHMS');
+    await user.type(screen.getByTestId('setup-doctor-regno'), 'REG-0001');
+    await user.type(screen.getByTestId('setup-doctor-council'), 'Test Council');
+    await user.click(screen.getByTestId('setup-next'));
+    await user.type(screen.getByTestId('setup-clinic-name'), 'Test Clinic 001');
+    await user.type(screen.getByTestId('setup-clinic-address'), '1 Test Road');
+    await user.type(screen.getByTestId('setup-clinic-fee-first'), '1250');
+    await user.type(screen.getByTestId('setup-clinic-fee-followup'), '500');
+    await user.click(screen.getByTestId('setup-next'));
+    await user.type(screen.getByTestId('setup-pin'), '1234');
+    await user.type(screen.getByTestId('setup-pin-confirm'), '1234');
+    await user.click(screen.getByTestId('setup-next'));
+    await user.click(screen.getByTestId('setup-recovery-ack'));
+    await user.click(screen.getByTestId('setup-next'));
+
+    // We are on the licence step (Finish is shown).
+    expect(screen.getByTestId('setup-finish')).toBeInTheDocument();
+
+    // The premature Backup jump must be gone — no control, no wiring path.
+    expect(screen.queryByTestId('setup-backup-link')).not.toBeInTheDocument();
+    expect(screen.queryByText(en['setup.backup.link'])).not.toBeInTheDocument();
+    expect(onGoToBackup).not.toHaveBeenCalled();
+  });
 });
