@@ -59,6 +59,7 @@ import { lockPage } from '../../pages/lock.page.js';
 import { setupPage } from '../../pages/setup.page.js';
 import { shellPage } from '../../pages/shell.page.js';
 import { relaunchInto } from '../../helpers/launch.js';
+import { provisionAndEnterApp } from '../../helpers/setup-flow.js';
 
 /** PIN used for the step 1+2 install (set in phase 1, verified in phase 2). */
 const PIN = '4321';
@@ -115,12 +116,17 @@ describe('R1 demo STEP 1 — PHASE 1: fresh install first-run wizard (SET-001/00
     // LIC-063: the licence step shows the development-trial choice.
     await expect(setupPage.licenceDevTrial).toBeDisplayed();
 
-    // Finish → setup_start_trial + setup_complete → Today, unlocked.
+    // Finish -> setup_start_trial + setup_complete. Under the SET-001 fix
+    // (AppShell BootRouter live completion signal) the wizard flips completion
+    // to true BEFORE navigating to /today, so the completion route-guard
+    // (commit 216cfed) admits the shell on THIS launch: finishing the wizard
+    // lands on Today, unlocked — the user-reported defect (bounced back to
+    // /setup until a close/reopen + PIN) is fixed. STEP 2 then separately
+    // proves the real SET-004 reopen -> lock -> unlock path.
     await setupPage.finishSetup();
     await shellPage.waitForShell();
-    await expect(shellPage.appShell).toBeDisplayed();
     await expect(shellPage.todayScreen).toBeDisplayed();
-    await expect(shellPage.todayEmpty).toBeDisplayed();
+    await expect(bootPage.setupWizard).not.toBeDisplayed();
   });
 });
 
@@ -173,15 +179,13 @@ describe('R1 demo STEP 3 — PHASE 3A: back up the source install to a folder wi
 
     // Fresh launch → wizard (boot-gate self-route). Provision the SOURCE
     // profile — this is the doctor + clinic that step 3 restores on a clean
-    // install.
+    // install. Under the SET-001 fix, completing the wizard flips the live
+    // completion signal before navigating to /today, so it lands on Today,
+    // unlocked, on THIS launch and the completion route-guard (commit 216cfed)
+    // then admits /backup — no relaunch.
     const decided = await bootPage.waitForDecidedScreen();
     expect(decided).toBe('#/setup');
-    await setupPage.fillDoctorAndNext();
-    await setupPage.fillClinicAndNext();
-    await setupPage.setPinAndRevealRecovery(SOURCE_PIN);
-    await setupPage.ackRecoveryAndNext();
-    await setupPage.finishSetup();
-    await shellPage.waitForShell();
+    await provisionAndEnterApp('source', SOURCE_PIN);
 
     // Real S17 backup screen + real health status.
     await backupPage.open();
@@ -221,15 +225,12 @@ describe('R1 demo STEP 3 — PHASE 3B: restore on a clean install; the install c
     // Fresh launch → wizard (boot-gate self-route). A SEPARATE clean install
     // (its own XDG_DATA_HOME) with a DIFFERENT PIN, so the restore genuinely
     // replaces this install's data with the source's rather than passing
-    // trivially.
+    // trivially. Under the SET-001 fix, completing the wizard lands on Today,
+    // unlocked, on THIS launch — no relaunch; restore_apply then runs against
+    // this unlocked clean install.
     const decided = await bootPage.waitForDecidedScreen();
     expect(decided).toBe('#/setup');
-    await setupPage.fillDoctorAndNext();
-    await setupPage.fillClinicAndNext();
-    await setupPage.setPinAndRevealRecovery(CLEAN_PIN);
-    await setupPage.ackRecoveryAndNext();
-    await setupPage.finishSetup();
-    await shellPage.waitForShell();
+    await provisionAndEnterApp('clean', CLEAN_PIN);
 
     // This clean install is its own completed setup before any restore.
     await backupPage.open();

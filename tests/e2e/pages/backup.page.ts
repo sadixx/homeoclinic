@@ -72,12 +72,33 @@ export class BackupPage {
   }
 
   /**
-   * Navigate the HashRouter to #/backup and wait for the real screen. The app
-   * is served from a tauri:// origin, so we drive the route by setting
-   * location.hash in-page (browser.url rejects a bare "#/backup"), matching the
-   * Slice C pattern.
+   * Navigate the HashRouter to #/backup and wait for the real S17 screen.
+   *
+   * COMPLETION ROUTE-GUARD (AppShell.tsx, commit 216cfed; SET-001): /backup is
+   * only reachable once setup is completed AND the running launch booted with
+   * `completed === true`. The boot decision is seeded ONCE per launch and never
+   * re-read, so this page object CANNOT itself navigate a `completed === false`
+   * launch into Backup — the guard would bounce the hash straight back to
+   * /setup. A spec must therefore reach a completed + unlocked session first
+   * (helpers/setup-flow.ts `provisionAndEnterApp` / `enterUnlockedApp`) before
+   * calling open().
+   *
+   * To fail fast with a clear message instead of a confusing timeout on the
+   * wrong screen, open() first asserts, through the real setup_get_state typed
+   * command, that setup is persisted as completed; only then does it drive the
+   * route (the app is served from a tauri:// origin, so navigation is done by
+   * setting location.hash in-page — browser.url rejects a bare "#/backup").
    */
   async open(timeout = 20000): Promise<void> {
+    const state = await this.setupState();
+    if (!state.completed) {
+      throw new Error(
+        'BackupPage.open(): setup is not completed, so the completion ' +
+          'route-guard will redirect /backup -> /setup. Complete setup and ' +
+          'enter the unlocked app first (helpers/setup-flow.ts: ' +
+          'provisionAndEnterApp / enterUnlockedApp) before opening Backup.',
+      );
+    }
     await browser.execute(() => {
       window.location.hash = '#/backup';
     });
