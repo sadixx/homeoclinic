@@ -18,6 +18,7 @@ pub mod clock;
 pub mod error;
 pub mod key;
 pub mod keystore;
+pub mod licence;
 pub mod migrate;
 pub mod pool;
 pub mod profile;

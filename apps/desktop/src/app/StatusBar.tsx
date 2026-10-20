@@ -6,9 +6,14 @@
 // colour alone (00-conventions §5). Clicking the chip opens S17 (/backup).
 import { useEffect, useState } from 'react';
 
-import { commands, type BackupStatus } from '@/bindings';
+import {
+  commands,
+  type BackupStatus,
+  type LicenceKind,
+  type LicenceStatus,
+} from '@/bindings';
 import { run } from '@/shared/command';
-import { formatDateTime } from '@/shared/datetime';
+import { formatDate, formatDateTime } from '@/shared/datetime';
 import { t } from '@/shared/strings';
 import { useAppInfo } from '@/shared/useAppInfo';
 
@@ -17,10 +22,48 @@ export interface StatusBarProps {
   onOpenBackup?: () => void;
 }
 
+/** Resolve the i18n label for a licence kind. */
+function licenceKindLabel(kind: LicenceKind): string {
+  switch (kind) {
+    case 'trial':
+      return t('status.licence.kind.trial');
+    case 'active':
+      return t('status.licence.kind.active');
+    case 'readonly':
+      return t('status.licence.kind.readonly');
+    case 'unlicensed':
+      return t('status.licence.kind.unlicensed');
+  }
+}
+
+/**
+ * Compose the licence chip text from a {@link LicenceStatus}, e.g.
+ * `Licence: Trial — expires 31-01-2026 (29 days left)`. Falls back to the
+ * static `Licence: —` placeholder when the status is missing or carries an
+ * unformattable expiry date (R-UI-006 date helper owns the format). The
+ * days-remaining count and expiry are already computed by the backend from the
+ * clock-guarded effective now (LIC-005), so the UI only displays them.
+ */
+function licenceLabel(status: LicenceStatus | null): string {
+  if (status === null) {
+    return t('status.licence');
+  }
+  const expiry = formatDate(status.validUntil);
+  if (expiry === null) {
+    return t('status.licence');
+  }
+  const kind = licenceKindLabel(status.kind);
+  const tail = status.expired
+    ? `(${t('status.licence.expired')})`
+    : `(${status.daysRemaining} ${t('status.licence.daysLeftSuffix')})`;
+  return `${t('status.licence.prefix')} ${kind} — ${t('status.licence.expiresPrefix')} ${expiry} ${tail}`;
+}
+
 /** Thin bottom status bar (~24px). */
 export function StatusBar({ onOpenBackup }: StatusBarProps): JSX.Element {
   const info = useAppInfo();
   const [backup, setBackup] = useState<BackupStatus | null>(null);
+  const [licence, setLicence] = useState<LicenceStatus | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -37,6 +80,28 @@ export function StatusBar({ onOpenBackup }: StatusBarProps): JSX.Element {
         .catch(() => undefined);
     } catch {
       // getBackupStatus unavailable: keep the placeholder.
+    }
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    // Licence chip (Feature 1): read the clock-guarded trial status. A failed
+    // read (no licence, transport error) must leave the static "Licence: —"
+    // placeholder and never throw into the shell (SUX: never lock out or scare
+    // a genuine doctor over a chrome read).
+    try {
+      void run(commands.getLicenceStatus())
+        .then((status) => {
+          if (active) {
+            setLicence(status);
+          }
+        })
+        .catch(() => undefined);
+    } catch {
+      // getLicenceStatus unavailable: keep the placeholder.
     }
     return () => {
       active = false;
@@ -80,7 +145,7 @@ export function StatusBar({ onOpenBackup }: StatusBarProps): JSX.Element {
           </span>
         ) : null}
       </button>
-      <span data-testid="status-licence">{t('status.licence')}</span>
+      <span data-testid="status-licence">{licenceLabel(licence)}</span>
       <span className="flex-1" />
       <span data-testid="status-appinfo">
         {info

@@ -8,4 +8,5 @@ pub mod app_info;
 pub mod auth;
 pub mod backup;
 pub mod health;
+pub mod licence;
 pub mod setup;

@@ -107,6 +107,8 @@ export const commands = {
 	 *  [`MOVE_TO_NEW_COMPUTER_ENABLED`] when BAK-005 is implemented.
 	 */
 	startMoveToNewComputer: (outDir: string, password: string, rememberPassword: boolean) => typedError<null, UserFacingError>(__TAURI_INVOKE("start_move_to_new_computer", { outDir, password, rememberPassword })),
+	/**  Read the current licence status (`get_licence_status`). */
+	getLicenceStatus: () => typedError<LicenceStatus, UserFacingError>(__TAURI_INVOKE("get_licence_status")),
 };
 
 /* Types */
@@ -270,6 +272,36 @@ export type FontSize =
 export type HealthStatus = {
 	/**  Whether structured logging has been initialised this session. */
 	loggingReady: boolean,
+};
+
+/**
+ *  The licence kind the UI renders. `Trial` is the only R1 value; the others
+ *  leave room for the full `Active`/`ReadOnly`/`Unlicensed` states (design §6)
+ *  without a later binding break.
+ */
+export type LicenceKind = 
+/**  Local 30-day trial (LIC-063). */
+"trial" | 
+/**  A verified paid licence (M9+). */
+"active" | 
+/**  Expired / grace-exhausted: view, search, print, export only (design §6). */
+"readonly" | 
+/**  No trial and no licence (defensive; R1 always has a trial after setup). */
+"unlicensed";
+
+/**
+ *  Current licence status (`get_licence_status`). All time fields are derived
+ *  from the clock-guarded effective now (LIC-005).
+ */
+export type LicenceStatus = {
+	/**  The licence kind (`"trial"` in R1). */
+	kind: LicenceKind,
+	/**  Whole days remaining from effective now to `valid_until` (0 if expired). */
+	daysRemaining: number,
+	/**  RFC3339 UTC expiry (trial start + 30 days). */
+	validUntil: string,
+	/**  Whether the trial/licence has expired at the effective now. */
+	expired: boolean,
 };
 
 /**  Lock-screen state (`auth_get_lock_state`). */

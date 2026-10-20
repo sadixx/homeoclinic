@@ -32,6 +32,10 @@ pub fn migrations() -> &'static [Migration] {
             target: 2,
             sql: include_str!("migrations/0002_setup.sql"),
         },
+        Migration {
+            target: 3,
+            sql: include_str!("migrations/0003_licence_state.sql"),
+        },
     ]
 }
 
