@@ -113,3 +113,43 @@ fn set026_027_export_bindings_contains_setup_and_auth_commands() {
         "ErrorCode union must include wrong_pin and wrong_recovery_code (Slice C)"
     );
 }
+
+/// HC-MVP1-036..043 (R-TEST-008, R-ARCH-004): exporting the collection declares
+/// the eleven patient command wrappers and their key types, so a patient
+/// command dropped from `specta_builder()` or a renamed request/response type
+/// fails HERE (an assertion) rather than later as a UI TS2307/TS2339. Asserts
+/// on the generated file CONTENT (R-TEST-003).
+#[test]
+fn m2c_export_bindings_contains_patient_commands() {
+    // `_dir` keeps the temp dir alive for the body; dropping it cleans up.
+    let (generated, _dir) = export_bindings_content();
+
+    for wrapper in [
+        "patientNextCode",
+        "patientCheckDuplicate",
+        "patientCreate",
+        "patientUpdate",
+        "patientGetDashboard",
+        "patientSoftDelete",
+        "patientRestore",
+        "patientPermanentDelete",
+        "patientLinkFamily",
+        "patientExportPdf",
+        "patientExportJson",
+    ] {
+        assert!(
+            generated.contains(wrapper),
+            "bindings.ts must expose the {wrapper} command wrapper (M2-C contract)"
+        );
+    }
+
+    // Key camelCase field names the M2-D UI depends on must survive to TS.
+    assert!(
+        generated.contains("patientId") && generated.contains("recycleUntil"),
+        "patient response types expose patientId + recycleUntil (PAT-002/008)"
+    );
+    assert!(
+        generated.contains("duesPaise"),
+        "the dashboard exposes the integer-paise duesPaise field (PAT-005, R-DATA-004)"
+    );
+}

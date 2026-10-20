@@ -15,6 +15,7 @@ pub mod commands;
 pub mod error;
 pub mod licence;
 pub mod logging;
+pub mod patient;
 pub mod setup;
 pub mod state;
 
@@ -57,6 +58,19 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         // feature-flagged OFF (S17 button disabled, no dead end).
         commands::backup::start_move_to_new_computer,
         // Licence status read (Feature 1 + LIC-005, HC-MVP1-M1a).
-        commands::licence::get_licence_status
+        commands::licence::get_licence_status,
+        // Patient use-case commands (HC-MVP1-036..043, S06/S07). Register all
+        // eleven here (one source of truth for the collection + bindings.ts).
+        commands::patient::patient_next_code,
+        commands::patient::patient_check_duplicate,
+        commands::patient::patient_create,
+        commands::patient::patient_update,
+        commands::patient::patient_get_dashboard,
+        commands::patient::patient_soft_delete,
+        commands::patient::patient_restore,
+        commands::patient::patient_permanent_delete,
+        commands::patient::patient_link_family,
+        commands::patient::patient_export_pdf,
+        commands::patient::patient_export_json
     ])
 }

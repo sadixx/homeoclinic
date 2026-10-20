@@ -109,6 +109,28 @@ export const commands = {
 	startMoveToNewComputer: (outDir: string, password: string, rememberPassword: boolean) => typedError<null, UserFacingError>(__TAURI_INVOKE("start_move_to_new_computer", { outDir, password, rememberPassword })),
 	/**  Read the current licence status (`get_licence_status`). */
 	getLicenceStatus: () => typedError<LicenceStatus, UserFacingError>(__TAURI_INVOKE("get_licence_status")),
+	/**  Preview the next patient code (PAT-002). */
+	patientNextCode: () => typedError<NextCodeResponse, UserFacingError>(__TAURI_INVOKE("patient_next_code")),
+	/**  Check for duplicate patients on name + mobile / name + DOB (PAT-004). */
+	patientCheckDuplicate: (req: CheckDuplicateRequest) => typedError<CheckDuplicateResponse, UserFacingError>(__TAURI_INVOKE("patient_check_duplicate", { req })),
+	/**  Register a new patient (PAT-001/002). */
+	patientCreate: (req: CreatePatientRequest) => typedError<CreatePatientResponse, UserFacingError>(__TAURI_INVOKE("patient_create", { req })),
+	/**  Edit an existing patient (PAT-001). */
+	patientUpdate: (req: UpdatePatientRequest) => typedError<null, UserFacingError>(__TAURI_INVOKE("patient_update", { req })),
+	/**  Load the single-patient dashboard (PAT-005). */
+	patientGetDashboard: (req: GetDashboardRequest) => typedError<PatientDashboard, UserFacingError>(__TAURI_INVOKE("patient_get_dashboard", { req })),
+	/**  Move a patient to the 30-day recycle bin (PAT-008). */
+	patientSoftDelete: (req: SoftDeleteRequest) => typedError<SoftDeleteResponse, UserFacingError>(__TAURI_INVOKE("patient_soft_delete", { req })),
+	/**  Restore a patient from the recycle bin (PAT-008). */
+	patientRestore: (req: RestoreRequest) => typedError<null, UserFacingError>(__TAURI_INVOKE("patient_restore", { req })),
+	/**  Permanently delete a patient, re-verifying the PIN (PAT-008, R-DATA-003). */
+	patientPermanentDelete: (req: PermanentDeleteRequest) => typedError<null, UserFacingError>(__TAURI_INVOKE("patient_permanent_delete", { req })),
+	/**  Link a family member (PAT-006). */
+	patientLinkFamily: (req: LinkFamilyRequest) => typedError<LinkFamilyResponse, UserFacingError>(__TAURI_INVOKE("patient_link_family", { req })),
+	/**  Export the single patient as PDF (PAT-011). */
+	patientExportPdf: (req: ExportRequest) => typedError<ExportResponse, UserFacingError>(__TAURI_INVOKE("patient_export_pdf", { req })),
+	/**  Export the single patient as JSON (PAT-011). */
+	patientExportJson: (req: ExportRequest) => typedError<ExportResponse, UserFacingError>(__TAURI_INVOKE("patient_export_json", { req })),
 };
 
 /* Types */
@@ -182,10 +204,114 @@ export type BuildProfile =
 /**  Compiled in release mode (an optimised, shipped build). */
 "release";
 
+/**
+ *  Duplicate-check input (`patient_check_duplicate`, PAT-004). At least a name;
+ *  mobile and/or dob narrow the match. Never blocks.
+ */
+export type CheckDuplicateRequest = {
+	/**  Entered name (drives name_norm + phonetic). */
+	name: string,
+	/**  Entered mobile, or `None`. */
+	mobile: string | null,
+	/**  Entered DOB (RFC3339 date), or `None`. */
+	dob: string | null,
+};
+
+/**  Duplicate-check result: zero or more warnings (PAT-004). */
+export type CheckDuplicateResponse = {
+	/**  The candidate matches (empty = no duplicate warning). */
+	matches: DuplicateMatch[],
+};
+
 /**  Result of completing setup. */
 export type CompleteSetupResponse = {
 	/**  Route to open after setup (`"/today"`). */
 	homeRoute: string,
+};
+
+/**
+ *  Create-patient input (`patient_create`, PAT-001). `name` is required and
+ *  either `dob` or `age_years` must be present.
+ */
+export type CreatePatientRequest = {
+	/**  Full name (required). */
+	name: string,
+	/**  Sex, or `None`. */
+	sex: string | null,
+	/**  RFC3339 DOB, or `None` when only age is known. */
+	dob: string | null,
+	/**  Age in years when DOB is unknown, or `None`. */
+	ageYears: number | null,
+	/**  Whether the stored DOB was estimated from the age (PAT-001). */
+	dobIsEstimated: boolean | null,
+	/**  Mobile, or `None`. */
+	mobile: string | null,
+	/**  Alternate mobile, or `None`. */
+	mobileAlt: string | null,
+	/**  Address, or `None`. */
+	address: string | null,
+	/**  City, or `None`. */
+	city: string | null,
+	/**  Occupation, or `None`. */
+	occupation: string | null,
+	/**  Marital status, or `None`. */
+	maritalStatus: string | null,
+	/**  Blood group, or `None`. */
+	bloodGroup: string | null,
+	/**  Referred-by, or `None`. */
+	referredBy: string | null,
+	/**  Opaque photo attachment ref, or `None`. */
+	photoPath: string | null,
+	/**  Allergies (alerts banner, PAT-005), or `None`. */
+	allergies: string | null,
+	/**  Other alerts, or `None`. */
+	alerts: string | null,
+	/**  Tags (PAT-007; persisted this slice, filter UI is P1), or `None`. */
+	tags: string[] | null,
+	/**  DPDP consent instant (R-PRIV-003), or `None`. */
+	consentAt: string | null,
+};
+
+/**  Create-patient result (PAT-001/002). */
+export type CreatePatientResponse = {
+	/**  The new patient's UUIDv7 id. */
+	patientId: string,
+	/**  The assigned code (PAT-002), e.g. `HC-000123`. */
+	code: string,
+};
+
+/**  Demographics block (PAT-005). */
+export type Demographics = {
+	/**  Patient code. */
+	code: string,
+	/**  Display name. */
+	name: string,
+	/**  Human age label, e.g. `34y` (from DOB preferred, else age_years). */
+	ageLabel: string,
+	/**  Sex, or `None`. */
+	sex: string | null,
+	/**  Mobile, or `None`. */
+	mobile: string | null,
+	/**  City, or `None`. */
+	city: string | null,
+	/**  Referred-by, or `None`. */
+	referredBy: string | null,
+	/**  Opaque photo ref, or `None`. */
+	photoPath: string | null,
+};
+
+/**  One candidate duplicate (PAT-004). */
+export type DuplicateMatch = {
+	/**  Matched patient id. */
+	patientId: string,
+	/**  Matched patient code. */
+	code: string,
+	/**  Matched patient name. */
+	name: string,
+	/**  Matched patient mobile, or `None`. */
+	mobile: string | null,
+	/**  Matched patient DOB, or `None`. */
+	dob: string | null,
 };
 
 /**
@@ -254,6 +380,28 @@ export type ErrorCode =
 /**  Anything not otherwise classified. The message stays generic. */
 "unexpected";
 
+/**  Export input (`patient_export_pdf` / `patient_export_json`, PAT-011). */
+export type ExportRequest = {
+	/**  The patient to export. */
+	patientId: string,
+};
+
+/**  Export result: the written file path (revealed in the folder, PAT-011). */
+export type ExportResponse = {
+	/**  The absolute path of the written export file. */
+	filePath: string,
+};
+
+/**  A linked family member (PAT-006). */
+export type FamilyMember = {
+	/**  Related patient id. */
+	patientId: string,
+	/**  Related patient name. */
+	name: string,
+	/**  Relation (e.g. `Wife`). */
+	relation: string,
+};
+
 /**  Global font size (SET-005, DEFERRED/P1 — minimal persist only). */
 export type FontSize = 
 /**  14px base. */
@@ -262,6 +410,12 @@ export type FontSize =
 "large" | 
 /**  18px base. */
 "xlarge";
+
+/**  Dashboard request (`patient_get_dashboard`, PAT-005). */
+export type GetDashboardRequest = {
+	/**  The patient to load. */
+	patientId: string,
+};
 
 /**
  *  Read-only health summary returned by [`health_check`].
@@ -304,12 +458,72 @@ export type LicenceStatus = {
 	expired: boolean,
 };
 
+/**  Family-link input (`patient_link_family`, PAT-006). */
+export type LinkFamilyRequest = {
+	/**  The patient the link hangs off. */
+	patientId: string,
+	/**  The related patient. */
+	relatedPatientId: string,
+	/**  The relation (e.g. `Wife`). */
+	relation: string,
+	/**  Whether the related patient shares this patient's address. */
+	shareAddress: boolean,
+};
+
+/**  Family-link result (PAT-006). */
+export type LinkFamilyResponse = {
+	/**  The new family-link id. */
+	familyLinkId: string,
+};
+
 /**  Lock-screen state (`auth_get_lock_state`). */
 export type LockState = {
 	/**  Whether the app is currently locked. */
 	locked: boolean,
 	/**  Idle auto-lock timeout in minutes (the UI runs the idle timer). */
 	autolockMinutes: number,
+};
+
+/**
+ *  Preview of the next patient code (`patient_next_code`, PAT-002). The
+ *  sequence is consumed only on create, so Cancel leaves no gap (S06 open-Q).
+ */
+export type NextCodeResponse = {
+	/**  The code that would be assigned next, e.g. `HC-000123`. */
+	code: string,
+};
+
+/**
+ *  The single patient dashboard payload (PAT-005). For R2 the visits list is
+ *  empty, `last_prescription` is `None` and `dues_paise` is 0 (visits/Rx/billing
+ *  are R3/R4/R5, R-DEL-002); demographics, alerts and family are REAL.
+ */
+export type PatientDashboard = {
+	/**  Real demographics. */
+	demographics: Demographics,
+	/**  Allergies (alerts banner), or `None`. */
+	allergies: string | null,
+	/**  Other alerts, or `None`. */
+	alerts: string | null,
+	/**  Outstanding dues, integer paise. ALWAYS 0 for R2 (billing is R5). */
+	duesPaise: number,
+	/**  Visit timeline (newest first). ALWAYS empty for R2. */
+	visits: VisitSummary[],
+	/**  Most recent prescription. ALWAYS `None` for R2. */
+	lastPrescription: RxSummary | null,
+	/**  Linked family (REAL, PAT-006). */
+	family: FamilyMember[],
+};
+
+/**
+ *  Permanent-delete input (`patient_permanent_delete`, PAT-008). Requires the
+ *  app PIN (re-verified). `pin` is a request-only secret; never logged.
+ */
+export type PermanentDeleteRequest = {
+	/**  The patient to erase. */
+	patientId: string,
+	/**  The app PIN, re-verified before the hard delete (PAT-008, R-DATA-003). */
+	pin: string,
 };
 
 /**  Forgot-PIN recovery input (`auth_recover_with_code`, SET-004). */
@@ -373,6 +587,12 @@ export type RestorePreview = {
 	appVersion: string,
 };
 
+/**  Restore input (`patient_restore`, PAT-008). */
+export type RestoreRequest = {
+	/**  The patient to restore from the recycle bin. */
+	patientId: string,
+};
+
 /**  Retention counts for the S17 retention line (BAK-001). */
 export type Retention = {
 	/**  Daily copies kept (14). */
@@ -381,6 +601,16 @@ export type Retention = {
 	weekly: number,
 	/**  Monthly copies kept (12). */
 	monthly: number,
+};
+
+/**  Last-prescription card (PAT-005). R4+; `None` for R2. */
+export type RxSummary = {
+	/**  Prescription id. */
+	prescriptionId: string,
+	/**  RFC3339 printed instant, or `None`. */
+	printedAt: string | null,
+	/**  One-line items preview. */
+	itemsPreview: string,
 };
 
 /**  Clinic profile input (SET-003). Fees are integer paise (R-DATA-004). */
@@ -492,6 +722,18 @@ export type SetupState = {
 	dataDir: string,
 };
 
+/**  Soft-delete input (`patient_soft_delete`, PAT-008). */
+export type SoftDeleteRequest = {
+	/**  The patient to move to the recycle bin. */
+	patientId: string,
+};
+
+/**  Soft-delete result: the recycle-bin expiry (`deleted_at` + 30 days, PAT-008). */
+export type SoftDeleteResponse = {
+	/**  RFC3339 instant until which the patient is recoverable (+30 days). */
+	recycleUntil: string,
+};
+
 /**  Result of starting the local trial (LIC-063). */
 export type StartTrialResponse = {
 	/**  RFC3339 UTC expiry. */
@@ -519,6 +761,51 @@ export type UnlockResponse = {
 };
 
 /**
+ *  Update-patient input (`patient_update`, PAT-001). Same editable fields plus
+ *  the target id.
+ */
+export type UpdatePatientRequest = {
+	/**  The patient to update. */
+	patientId: string,
+	/**  Full name (required). */
+	name: string,
+	/**  Sex, or `None`. */
+	sex: string | null,
+	/**  RFC3339 DOB, or `None`. */
+	dob: string | null,
+	/**  Age in years, or `None`. */
+	ageYears: number | null,
+	/**  Whether DOB is estimated. */
+	dobIsEstimated: boolean | null,
+	/**  Mobile, or `None`. */
+	mobile: string | null,
+	/**  Alternate mobile, or `None`. */
+	mobileAlt: string | null,
+	/**  Address, or `None`. */
+	address: string | null,
+	/**  City, or `None`. */
+	city: string | null,
+	/**  Occupation, or `None`. */
+	occupation: string | null,
+	/**  Marital status, or `None`. */
+	maritalStatus: string | null,
+	/**  Blood group, or `None`. */
+	bloodGroup: string | null,
+	/**  Referred-by, or `None`. */
+	referredBy: string | null,
+	/**  Opaque photo attachment ref, or `None`. */
+	photoPath: string | null,
+	/**  Allergies, or `None`. */
+	allergies: string | null,
+	/**  Other alerts, or `None`. */
+	alerts: string | null,
+	/**  Tags, or `None`. */
+	tags: string[] | null,
+	/**  Consent instant, or `None`. */
+	consentAt: string | null,
+};
+
+/**
  *  The ONLY error shape the UI ever receives.
  * 
  *  Contains no raw error text, no SQL, no file path and no stack trace — only
@@ -543,6 +830,18 @@ export type VerifyBackupResponse = {
 	checksumOk: boolean,
 	/**  The first chunk decrypted under the given password. */
 	decryptOk: boolean,
+};
+
+/**  A visit timeline entry (PAT-005). R3+; EMPTY list for R2. */
+export type VisitSummary = {
+	/**  Visit id. */
+	visitId: string,
+	/**  RFC3339 visit instant. */
+	visitAt: string,
+	/**  Visit kind label. */
+	kind: string,
+	/**  Headline remedy label, or `None`. */
+	headlineRemedyLabel: string | null,
 };
 
 /* Tauri Specta runtime */

@@ -9,4 +9,5 @@ pub mod auth;
 pub mod backup;
 pub mod health;
 pub mod licence;
+pub mod patient;
 pub mod setup;

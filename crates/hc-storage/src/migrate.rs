@@ -48,6 +48,13 @@ pub fn migrations() -> &'static [Migration] {
             target: 5,
             sql: include_str!("migrations/0005_patient_diagnosis.sql"),
         },
+        // HC-MVP1-036..043: patient registration demographic columns, the
+        // family_link table (PAT-006) and the never-reused patient_sequence
+        // counter (PAT-002). Additive; does not touch the 0004 FTS triggers.
+        Migration {
+            target: 6,
+            sql: include_str!("migrations/0006_patient_registration.sql"),
+        },
     ]
 }
 
