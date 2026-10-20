@@ -153,3 +153,52 @@ fn m2c_export_bindings_contains_patient_commands() {
         "the dashboard exposes the integer-paise duesPaise field (PAT-005, R-DATA-004)"
     );
 }
+
+/// HC-MVP1-050/052 (R-TEST-008, R-ARCH-004): exporting the collection declares
+/// the five new M2-D search/list command wrappers and the SearchRow /
+/// PatientFilter field names the S04/S05 UI depends on, so a command dropped
+/// from `specta_builder()` or a renamed type fails HERE (an assertion) rather
+/// than later as a UI TS2307/TS2339. Asserts on generated CONTENT (R-TEST-003).
+#[test]
+fn m2d_export_bindings_contains_search_and_list_commands() {
+    // `_dir` keeps the temp dir alive for the body; dropping it cleans up.
+    let (generated, _dir) = export_bindings_content();
+
+    for wrapper in [
+        "patientSearch",
+        "patientRecent",
+        "patientTouchRecent",
+        "patientListQuery",
+        "patientListExportCsv",
+    ] {
+        assert!(
+            generated.contains(wrapper),
+            "bindings.ts must expose the {wrapper} command wrapper (M2-D contract)"
+        );
+    }
+
+    // SearchRow field names the S04 row renders (PSR-005; MVP1 no masking).
+    assert!(
+        generated.contains("ageLabel") && generated.contains("matchType"),
+        "SearchRow exposes ageLabel + matchType for the S04 row + ranking tag (PSR-004/005)"
+    );
+    assert!(
+        generated.contains("nextCursor"),
+        "search/list responses expose nextCursor for keyset paging (PSR-005, R-DATA-007)"
+    );
+    // PatientFilter facets the S05 panel binds (PSR-008). R3/R4 filters are in
+    // the type (rendered disabled) too; assert a couple of the R2-active ones.
+    assert!(
+        generated.contains("ageMin") && generated.contains("ageMax"),
+        "PatientFilter exposes the R2 age-range facet (PSR-008)"
+    );
+    assert!(
+        generated.contains("duesPositive"),
+        "PatientFilter exposes the dues>0 facet (PSR-008; matches nothing at R2)"
+    );
+    // CSV export returns a file path only (UI reveals it; no SQL crosses).
+    assert!(
+        generated.contains("filePath"),
+        "patientListExportCsv returns a filePath (PSR-011)"
+    );
+}

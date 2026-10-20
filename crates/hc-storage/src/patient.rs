@@ -578,3 +578,332 @@ pub fn list_family(conn: &Connection, patient_id: &str) -> Result<Vec<FamilyMemb
         .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
+
+// ---------------------------------------------------------------------------
+// Row demographics for the S04 search row and S05 list row (HC-MVP1-050/052).
+// Read-only projection of the columns those rows render; no secrets, full
+// mobile in MVP1 (no masking — PSR-005 open-Q, single doctor).
+// ---------------------------------------------------------------------------
+
+/// The patient columns the S04 search row and S05 list row render (PSR-005,
+/// PSR-008). A read-only projection; `dues_paise`/`match_type` are added by the
+/// service (0 for R2, the rank tag from the search engine).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PatientListRow {
+    /// UUIDv7 id.
+    pub patient_id: String,
+    /// Patient code (e.g. `HC-000123`).
+    pub code: String,
+    /// Display name as stored.
+    pub name: String,
+    /// Sex, or `None`.
+    pub sex: Option<String>,
+    /// RFC3339 DOB, or `None` (drives the age label with `age_years`).
+    pub dob: Option<String>,
+    /// Age in years when DOB is unknown, or `None`.
+    pub age_years: Option<i64>,
+    /// Mobile as entered (FULL, MVP1 no masking), or `None`.
+    pub mobile: Option<String>,
+    /// City, or `None`.
+    pub city: Option<String>,
+    /// RFC3339 most-recent-visit instant, or `None` (NULL at R2).
+    pub last_visit_at: Option<String>,
+    /// RFC3339 next-follow-up date, or `None` (NULL at R2).
+    pub next_followup_on: Option<String>,
+    /// Opaque photo attachment ref, or `None`.
+    pub photo_path: Option<String>,
+}
+
+/// Column list for the list/search row projection (keeps the SELECTs aligned).
+const LIST_ROW_COLUMNS: &str = "id, code, name, sex, dob, age_years, mobile, city, \
+     last_visit_at, next_followup_on, photo_path";
+
+/// Map a row selected with [`LIST_ROW_COLUMNS`] into a [`PatientListRow`].
+fn map_list_row(r: &rusqlite::Row<'_>) -> Result<PatientListRow, rusqlite::Error> {
+    Ok(PatientListRow {
+        patient_id: r.get(0)?,
+        code: r.get(1)?,
+        name: r.get(2)?,
+        sex: r.get(3)?,
+        dob: r.get(4)?,
+        age_years: r.get(5)?,
+        mobile: r.get(6)?,
+        city: r.get(7)?,
+        last_visit_at: r.get(8)?,
+        next_followup_on: r.get(9)?,
+        photo_path: r.get(10)?,
+    })
+}
+
+/// Read the list-row projection for one non-deleted patient by id, or `None`.
+/// Used by `patient_search` / `patient_recent` to enrich the id-only hits from
+/// the search engine / recent list with the demographics the row renders.
+pub fn get_list_row(conn: &Connection, id: &str) -> Result<Option<PatientListRow>, StorageError> {
+    let sql =
+        format!("SELECT {LIST_ROW_COLUMNS} FROM patient WHERE id = ?1 AND deleted_at IS NULL");
+    let row = conn.query_row(&sql, params![id], map_list_row).optional()?;
+    Ok(row)
+}
+
+// ---------------------------------------------------------------------------
+// Recently-opened patient list (PSR-007) — NON-CLINICAL UI convenience list.
+// R-DATA-005 exemption (like `setting`); no audit row, bounded to 20.
+// ---------------------------------------------------------------------------
+
+/// How many recently-opened patients the list keeps (PSR-007 "last 20").
+pub const RECENT_LIMIT: usize = 20;
+
+/// Record that `patient_id` was just opened: upsert its `opened_at` to `now`,
+/// then prune so only the newest [`RECENT_LIMIT`] rows remain. Runs in the
+/// caller's transaction. NO audit row: the recent list is a non-clinical UI
+/// convenience list (R-DATA-005 exemption, as for `setting`/`app_setting`), and
+/// auditing every patient-open would flood the clinical audit trail for no
+/// governance value. Parameterised SQL only (R-SEC-001).
+pub fn touch_recent(tx: &Transaction<'_>, patient_id: &str, now: &str) -> Result<(), StorageError> {
+    // Upsert: a re-open moves the row to the front by bumping opened_at.
+    tx.execute(
+        "INSERT INTO patient_recent (patient_id, opened_at) VALUES (?1, ?2) \
+         ON CONFLICT(patient_id) DO UPDATE SET opened_at = excluded.opened_at",
+        params![patient_id, now],
+    )?;
+    // Prune to the newest RECENT_LIMIT by opened_at (ties broken by patient_id
+    // so the delete is deterministic). The LIMIT is a compile-time constant we
+    // control, never external input.
+    tx.execute(
+        &format!(
+            "DELETE FROM patient_recent WHERE patient_id NOT IN (\
+               SELECT patient_id FROM patient_recent \
+               ORDER BY opened_at DESC, patient_id ASC LIMIT {RECENT_LIMIT}\
+             )"
+        ),
+        [],
+    )?;
+    Ok(())
+}
+
+/// List the recently-opened patient ids, most-recent first, capped at `limit`
+/// (itself capped at [`RECENT_LIMIT`]). Only ids of still-live patients are
+/// returned (a soft-deleted patient drops out of the recent list). Bounded
+/// (R-DATA-007); parameterised (R-SEC-001).
+pub fn list_recent_ids(conn: &Connection, limit: usize) -> Result<Vec<String>, StorageError> {
+    let capped = limit.min(RECENT_LIMIT);
+    let mut stmt = conn.prepare(
+        "SELECT r.patient_id FROM patient_recent r \
+         JOIN patient p ON p.id = r.patient_id \
+         WHERE p.deleted_at IS NULL \
+         ORDER BY r.opened_at DESC, r.patient_id ASC \
+         LIMIT ?1",
+    )?;
+    let ids = stmt
+        .query_map(params![capped as i64], |r| r.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(ids)
+}
+
+// ---------------------------------------------------------------------------
+// Filtered, sorted, keyset-paginated patient list (HC-MVP1-052, PSR-008).
+// R2 filters over EXISTING patient columns only; keyset, never OFFSET.
+// ---------------------------------------------------------------------------
+
+/// The R2-available patient-list filters (PSR-008). Only the facets that need
+/// patient columns that EXIST at R2 are honoured here; visit/remedy/potency/
+/// diagnosis/case-note/tag facets are R3/R4 and are not part of this struct
+/// (the service's typed request carries them for the frozen UI contract but
+/// does not pass them down). All fields optional / AND-combined.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ListFilter {
+    /// Minimum age in years (inclusive), or `None`.
+    pub age_min: Option<i64>,
+    /// Maximum age in years (inclusive), or `None`.
+    pub age_max: Option<i64>,
+    /// Exact sex match, or `None`.
+    pub sex: Option<String>,
+    /// City prefix (case/diacritic-insensitive via name_norm-style match is not
+    /// needed here; an exact city equality is the R2 facet), or `None`.
+    pub city: Option<String>,
+    /// `last_visit_at` strictly older than this RFC3339 cutoff, or `None`
+    /// (rows with NULL last_visit never match an "older than" cutoff).
+    pub last_visit_before: Option<String>,
+    /// `next_followup_on` within `[from, to]` (inclusive), or `None` bounds.
+    pub followup_from: Option<String>,
+    /// Upper bound for the follow-up window, or `None`.
+    pub followup_to: Option<String>,
+    /// When `Some(true)`, require `balance_paise > 0` (always 0 at R2 ⇒ no
+    /// match; honest, never fabricated — R-DEL-002).
+    pub dues_positive: Option<bool>,
+}
+
+/// The sort key for the list (PSR-008: name, id, last visit, next follow-up).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListSortField {
+    /// Sort by display name.
+    Name,
+    /// Sort by patient code / id.
+    Id,
+    /// Sort by most-recent-visit instant.
+    LastVisit,
+    /// Sort by next-follow-up date.
+    NextFollowup,
+}
+
+/// Sort direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListSortDir {
+    /// Ascending.
+    Asc,
+    /// Descending.
+    Desc,
+}
+
+/// The keyset cursor for the list: the sort key + id of the last row returned,
+/// so the next page resumes WITHOUT an OFFSET scan (R-DATA-007).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListCursor {
+    /// The ordering value of the last row (name / code / last_visit /
+    /// next_followup, as a string; NULLs fold to the empty string).
+    pub sort_value: String,
+    /// The id of the last row (final stable tiebreak).
+    pub patient_id: String,
+}
+
+/// NULL sort values fold to this key so they order deterministically. Empty
+/// string sorts before any real value under ASC (last under DESC). A constant,
+/// never external input.
+const LIST_NULL_KEY: &str = "";
+
+/// The SQL column expression for a sort field (the value also forms the cursor
+/// key). `COALESCE(..,'')` folds NULLs so keyset comparison is total.
+fn sort_column_expr(field: ListSortField) -> &'static str {
+    match field {
+        ListSortField::Name => "p.name",
+        ListSortField::Id => "p.code",
+        ListSortField::LastVisit => "COALESCE(p.last_visit_at, '')",
+        ListSortField::NextFollowup => "COALESCE(p.next_followup_on, '')",
+    }
+}
+
+/// Push a bound value and return its 1-based `?N` placeholder, advancing the
+/// counter. Keeps every list-query value parameter-bound (R-SEC-001).
+fn push_bind(
+    binds: &mut Vec<Box<dyn rusqlite::ToSql>>,
+    n: &mut usize,
+    v: Box<dyn rusqlite::ToSql>,
+) -> String {
+    *n += 1;
+    binds.push(v);
+    format!("?{n}")
+}
+
+/// Run the filtered, sorted, keyset-paginated patient list (PSR-008). Returns up
+/// to `limit` live rows. All predicates are parameter-bound (R-SEC-001) over
+/// indexed columns where possible (R-DATA-008); keyset, never OFFSET
+/// (R-DATA-007). `after` resumes after the given cursor row.
+pub fn list_query(
+    conn: &Connection,
+    filter: &ListFilter,
+    field: ListSortField,
+    dir: ListSortDir,
+    after: Option<&ListCursor>,
+    limit: usize,
+) -> Result<Vec<PatientListRow>, StorageError> {
+    // Assemble the AND predicate from the active facets. Each clause binds a
+    // parameter; a disabled facet contributes no clause (and no parameter).
+    let mut clauses: Vec<String> = vec!["p.deleted_at IS NULL".to_string()];
+    let mut binds: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+    let mut n = 0usize;
+
+    if let Some(v) = filter.age_min {
+        let ph = push_bind(&mut binds, &mut n, Box::new(v));
+        clauses.push(format!("p.age_years IS NOT NULL AND p.age_years >= {ph}"));
+    }
+    if let Some(v) = filter.age_max {
+        let ph = push_bind(&mut binds, &mut n, Box::new(v));
+        clauses.push(format!("p.age_years IS NOT NULL AND p.age_years <= {ph}"));
+    }
+    if let Some(v) = filter.sex.clone() {
+        let ph = push_bind(&mut binds, &mut n, Box::new(v));
+        clauses.push(format!("p.sex = {ph}"));
+    }
+    if let Some(v) = filter.city.clone() {
+        let ph = push_bind(&mut binds, &mut n, Box::new(v));
+        clauses.push(format!("p.city = {ph}"));
+    }
+    if let Some(v) = filter.last_visit_before.clone() {
+        let ph = push_bind(&mut binds, &mut n, Box::new(v));
+        clauses.push(format!(
+            "p.last_visit_at IS NOT NULL AND p.last_visit_at < {ph}"
+        ));
+    }
+    if let Some(v) = filter.followup_from.clone() {
+        let ph = push_bind(&mut binds, &mut n, Box::new(v));
+        clauses.push(format!(
+            "p.next_followup_on IS NOT NULL AND p.next_followup_on >= {ph}"
+        ));
+    }
+    if let Some(v) = filter.followup_to.clone() {
+        let ph = push_bind(&mut binds, &mut n, Box::new(v));
+        clauses.push(format!(
+            "p.next_followup_on IS NOT NULL AND p.next_followup_on <= {ph}"
+        ));
+    }
+    if filter.dues_positive == Some(true) {
+        // No parameter: balance_paise is a real column; >0 is honest (0 at R2).
+        clauses.push("p.balance_paise > 0".to_string());
+    }
+
+    let sort_expr = sort_column_expr(field);
+    let order = match dir {
+        ListSortDir::Asc => "ASC",
+        ListSortDir::Desc => "DESC",
+    };
+
+    // Keyset predicate: resume strictly after the cursor row in the sort order.
+    if let Some(c) = after {
+        let sv = push_bind(&mut binds, &mut n, Box::new(c.sort_value.clone()));
+        let id = push_bind(&mut binds, &mut n, Box::new(c.patient_id.clone()));
+        let cmp = match dir {
+            ListSortDir::Asc => (">", ">"),
+            ListSortDir::Desc => ("<", ">"),
+        };
+        // (sort_value, id) strictly after the cursor. Ties on the sort value
+        // break by id ascending in both directions for a stable total order.
+        clauses.push(format!(
+            "({sort_expr} {op} {sv} OR ({sort_expr} = {sv} AND p.id {idop} {id}))",
+            op = cmp.0,
+            idop = cmp.1,
+        ));
+    }
+
+    // Bind the LIMIT (a bounded value we control) last.
+    let limit_ph = push_bind(&mut binds, &mut n, Box::new(limit as i64));
+
+    let sql = format!(
+        "SELECT {LIST_ROW_COLUMNS} FROM patient p WHERE {where_clause} \
+         ORDER BY {sort_expr} {order}, p.id ASC LIMIT {limit_ph}",
+        where_clause = clauses.join(" AND "),
+    );
+
+    let params_ref: Vec<&dyn rusqlite::ToSql> = binds.iter().map(|b| b.as_ref()).collect();
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map(params_ref.as_slice(), map_list_row)?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// The sort value of a row for a given sort field (forms the keyset cursor).
+/// NULLs fold to [`LIST_NULL_KEY`] so it matches the SQL `COALESCE`.
+pub fn row_sort_value(row: &PatientListRow, field: ListSortField) -> String {
+    match field {
+        ListSortField::Name => row.name.clone(),
+        ListSortField::Id => row.code.clone(),
+        ListSortField::LastVisit => row
+            .last_visit_at
+            .clone()
+            .unwrap_or_else(|| LIST_NULL_KEY.to_string()),
+        ListSortField::NextFollowup => row
+            .next_followup_on
+            .clone()
+            .unwrap_or_else(|| LIST_NULL_KEY.to_string()),
+    }
+}

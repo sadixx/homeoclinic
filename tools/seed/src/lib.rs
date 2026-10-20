@@ -25,7 +25,10 @@
 pub mod diseases;
 pub mod names;
 
+use std::io::Write;
 use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
 
 /// Minimum patient count for the functional fixture (USER REQUIREMENT: >= 200).
 pub const FIXTURE_MIN_PATIENTS: usize = 200;
@@ -144,6 +147,9 @@ pub enum SeedError {
     /// Invalid CLI / config (e.g. fixture below the minimum).
     #[error("invalid configuration: {0}")]
     Config(String),
+    /// Writing the plaintext JSONL fixture failed (filesystem / serialisation).
+    #[error("fixture export failed")]
+    Export(#[from] std::io::Error),
 }
 
 /// Build the patient set deterministically from `cfg`, WITHOUT touching a DB.
@@ -351,4 +357,113 @@ pub fn generate_and_open(
     debug_assert_eq!(inserted, patients.len());
 
     Ok((pool, patients))
+}
+
+// ---------------------------------------------------------------------------
+// Plaintext JSONL fixture export (OPTION A E2E seeding path).
+// ---------------------------------------------------------------------------
+//
+// The provisioned, boot-gated app opens `clinic.db` with a RANDOM, PIN-derived
+// DEK (`KeyHierarchy::initialize`), so a seed-produced SQLCipher DB keyed with
+// the fixed dev/test key cannot be opened by it (keys differ). Instead of
+// sharing keys (which would touch production key security), the seed emits a
+// portable, UNENCRYPTED, line-delimited JSON dataset that the app imports
+// through its real `patient_create` path (feature `e2e-test-keys`), so FTS /
+// trigram / phonetic stay in sync and NO key sharing is needed.
+//
+// The file carries SYNTHETIC data only (R-PRIV-001): the same fields a doctor
+// would type into the S06 register form. It is not encrypted because it holds
+// no real patient data and is consumed only by the E2E harness.
+
+/// One synthetic patient as a portable, plaintext fixture record: exactly the
+/// subset of fields the app's `patient_create` use case accepts (S06 register
+/// form). Serialised one-per-line as JSON (JSONL) so the app can stream-import
+/// a large fixture without loading it all into memory.
+///
+/// Field names are camelCase to match the app's `CreatePatientRequest` wire
+/// contract, so the importer can deserialise straight into it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FixtureRecord {
+    /// Display name (required; drives name_norm + phonetic on import).
+    pub name: String,
+    /// "M" | "F".
+    pub sex: String,
+    /// RFC3339 date of birth (YYYY-MM-DD).
+    pub dob: String,
+    /// Age in years (derived; carried so an import without a DOB still has age).
+    pub age_years: u32,
+    /// Mobile as entered ("+91 " + 10 digits).
+    pub mobile: String,
+    /// City (synthetic).
+    pub city: String,
+    /// Diagnosis (one of [`diseases::DISEASES`]); carried for coverage. Stored
+    /// by the app as free-text in the alerts/notes-free register path is NOT
+    /// applicable — the importer maps it onto the request's optional fields
+    /// only where a column exists, so this is advisory for the fixture shape.
+    pub diagnosis: String,
+}
+
+impl FixtureRecord {
+    /// Build a fixture record from a generated patient. Lossy by design: only
+    /// the register-form fields cross into the app (the normalised columns are
+    /// recomputed by the real write path, never trusted from the file).
+    pub fn from_generated(p: &GeneratedPatient) -> Self {
+        FixtureRecord {
+            name: p.name.clone(),
+            sex: p.sex.to_string(),
+            dob: p.dob.clone(),
+            age_years: p.age_years,
+            mobile: p.mobile.clone(),
+            city: p.city.clone(),
+            diagnosis: p.diagnosis.to_string(),
+        }
+    }
+}
+
+/// Serialise the fixture for `cfg` as JSONL (one [`FixtureRecord`] per line) to
+/// `writer`, WITHOUT touching a DB or any key. Deterministic for a given
+/// `(seed, mode)` because it is a pure function of [`build_patients`]. Returns
+/// the number of records written.
+///
+/// This is the plaintext dataset the app imports through its real
+/// `patient_create` path (OPTION A). No SQLCipher, no DEK: the file is
+/// synthetic data only (R-PRIV-001).
+pub fn export_fixture_jsonl<W: Write>(cfg: &GenConfig, writer: &mut W) -> Result<usize, SeedError> {
+    // Honour the fixture minimum so the E2E always has >= 200 patients.
+    if let GenMode::Fixture(n) = cfg.mode {
+        if n < FIXTURE_MIN_PATIENTS {
+            return Err(SeedError::Config(format!(
+                "fixture size {n} is below the minimum {FIXTURE_MIN_PATIENTS}"
+            )));
+        }
+    }
+
+    let patients = build_patients(cfg);
+    let mut written = 0usize;
+    for p in &patients {
+        let rec = FixtureRecord::from_generated(p);
+        // serde_json::to_string never fails for this plain struct; map any
+        // theoretical error onto an IO error rather than unwrapping (R-RUST-002).
+        let line = serde_json::to_string(&rec).map_err(std::io::Error::other)?;
+        writer.write_all(line.as_bytes())?;
+        writer.write_all(b"\n")?;
+        written += 1;
+    }
+    writer.flush()?;
+    // Counts only, never names (R-PRIV-001).
+    tracing::info!(records = written, "hc-seed exported JSONL fixture");
+    Ok(written)
+}
+
+/// Write the JSONL fixture for `cfg` to the file at `path`, creating/truncating
+/// it. Convenience over [`export_fixture_jsonl`] for the CLI. Returns the
+/// number of records written.
+pub fn write_fixture_jsonl_file(
+    cfg: &GenConfig,
+    path: &std::path::Path,
+) -> Result<usize, SeedError> {
+    let file = std::fs::File::create(path)?;
+    let mut buf = std::io::BufWriter::new(file);
+    export_fixture_jsonl(cfg, &mut buf)
 }

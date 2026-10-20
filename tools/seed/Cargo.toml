@@ -31,6 +31,12 @@ thiserror = { workspace = true }   # SeedError (R-RUST-001)
 tracing = { workspace = true }     # counts only, opaque ids (R-PRIV-001)
 # Same pin as hc-storage; UUIDv7 patient ids (R-DATA-005).
 uuid = { version = "1.28", features = ["v7"] }
+# Plaintext JSONL fixture export (OPTION A E2E seeding): one synthetic patient
+# per line, imported by the app through the real patient_create path. Same pins
+# as the workspace. No key, no SQLCipher — the file carries SYNTHETIC data only
+# (R-PRIV-001), so it never needs the app's DEK.
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 # Temp output DB for the integration test (already in the workspace lock).

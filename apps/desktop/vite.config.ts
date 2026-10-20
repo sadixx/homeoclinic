@@ -12,7 +12,7 @@ import { fileURLToPath, URL } from 'node:url';
 // each flag names the release that turns it on in src/shared/features.ts
 // (R-DEL-006).
 const FEATURES = {
-  patients: false, // turns on at M1
+  patients: true, // S04/S05/S06/S07 patient UI ships at M2 Slice D (R2)
   settings: false, // turns on at M1
   backup: true, // S17 backup/restore ships at M1 Slice D (BAK-001..004)
   backupMoveToNewComputer: false, // BAK-005 move-to-new-computer: DEFERRED (OQ-S17-4)

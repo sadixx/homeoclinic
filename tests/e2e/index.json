@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-19T10:53:50.234Z",
+  "generatedAt": "2026-10-20T23:47:37.078Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -52,6 +52,34 @@
       ]
     },
     {
+      "path": "tests/e2e/specs/patients/dashboard-edit-recycle.e2e.ts",
+      "reqs": [
+        "PAT-005",
+        "PAT-006",
+        "PAT-008",
+        "PAT-001"
+      ],
+      "tier": "stable",
+      "area": "patients",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/patients/register-photo.e2e.ts",
+      "reqs": [
+        "PAT-001",
+        "PAT-002",
+        "PAT-038",
+        "PSR-001"
+      ],
+      "tier": "stable",
+      "area": "patients",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
       "path": "tests/e2e/specs/release/r1-demo.e2e.ts",
       "reqs": [
         "SET-001",
@@ -80,6 +108,20 @@
       "targets": [
         "linux",
         "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/search/global-search.e2e.ts",
+      "reqs": [
+        "PSR-001",
+        "PSR-004",
+        "PSR-005",
+        "PSR-006"
+      ],
+      "tier": "stable",
+      "area": "search",
+      "targets": [
+        "linux"
       ]
     },
     {

@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* Shared text/select/textarea input style used across the patient screens
+     (S05/S06). Font sizing is in rem so the SET-005 font-size setting scales
+     it (00-conventions §1). */
+  .input {
+    @apply w-full rounded border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600;
+  }
+}
+
 :root {
   /* Normal font size baseline (SET-005 / 00-conventions §1): 14px. */
   font-size: 14px;

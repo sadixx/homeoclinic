@@ -55,6 +55,13 @@ pub fn migrations() -> &'static [Migration] {
             target: 6,
             sql: include_str!("migrations/0006_patient_registration.sql"),
         },
+        // HC-MVP1-050: the non-clinical "recently opened" patient list (PSR-007)
+        // shown when the S04 search box is empty. Additive; no FTS trigger
+        // impact. R-DATA-005 exemption (UI convenience list, like `setting`).
+        Migration {
+            target: 7,
+            sql: include_str!("migrations/0007_patient_recent.sql"),
+        },
     ]
 }
 

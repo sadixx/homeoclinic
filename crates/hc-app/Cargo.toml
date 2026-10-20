@@ -4,6 +4,18 @@ edition.workspace = true
 version.workspace = true
 license.workspace = true
 
+[features]
+# DEV/E2E ONLY — never enabled in a release/public build. Gates test-only
+# capabilities that must never ship: the E2E public licence key (hc-e2e-testing)
+# and the `patient_import_fixture` command, which bulk-imports a SYNTHETIC
+# plaintext JSONL fixture through the real patient_create path so the E2E
+# orchestrator can seed the provisioned, boot-gated app (OPTION A, no key
+# sharing). The production/release build never sets this feature, so the
+# command is not compiled in and not registered (verified by the
+# bindings-export surface). Named to match the documented E2E build:
+# `tauri build --debug --features e2e-test-keys` (hc-e2e-testing SKILL).
+e2e-test-keys = []
+
 [dependencies]
 hc-domain = { path = "../hc-domain" }
 hc-storage = { path = "../hc-storage" }
@@ -38,4 +50,13 @@ specta-typescript = { workspace = true }
 # temp_db) into hc-app's integration tests without forcing the feature on for
 # normal consumers (R-TEST-009).
 hc-storage = { path = "../hc-storage", features = ["testing"] }
+# Dev-only: exercise the REAL seed -> JSONL -> import -> search path in the
+# fixture-import integration test. Tools depend on crates, so pulling the tool
+# into hc-app's DEV deps does not invert the production graph (hc-app never
+# depends on hc-seed in a release build).
+hc-seed = { path = "../../tools/seed" }
 tempfile = "3"
+
+# The fixture-import integration test exercises the feature-gated command; a
+# plain `cargo test -p hc-app` does not compile it in. Run it with
+# `cargo test -p hc-app --features e2e-test-keys`.

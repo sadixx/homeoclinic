@@ -12,6 +12,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# DEV/E2E ONLY — never set for a release/public build. Forwards to
+# `hc-app/e2e-test-keys`, which compiles in the test-only licence key and the
+# `patient_import_fixture` seeding command. The documented E2E build enables it
+# explicitly: `tauri build --debug --features e2e-test-keys` (hc-e2e-testing).
+e2e-test-keys = ["hc-app/e2e-test-keys"]
+
 [dependencies]
 hc-app = { path = "../../../crates/hc-app" }
 tauri = { workspace = true }

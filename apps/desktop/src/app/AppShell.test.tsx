@@ -35,6 +35,11 @@ const {
   setupSetPin,
   setupStartTrial,
   setupComplete,
+  patientListQuery,
+  patientSearch,
+  patientRecent,
+  patientGetDashboard,
+  patientTouchRecent,
 } = vi.hoisted(() => ({
   setupGetState: vi.fn(),
   authGetLockState: vi.fn(),
@@ -46,6 +51,12 @@ const {
   setupSetPin: vi.fn(),
   setupStartTrial: vi.fn(),
   setupComplete: vi.fn(),
+  // Patient UI reads the shell now mounts behind /patients + the S04 overlay.
+  patientListQuery: vi.fn(),
+  patientSearch: vi.fn(),
+  patientRecent: vi.fn(),
+  patientGetDashboard: vi.fn(),
+  patientTouchRecent: vi.fn(),
 }));
 
 vi.mock('@/bindings', () => ({
@@ -78,6 +89,12 @@ vi.mock('@/bindings', () => ({
     // guard assertions fail on the assertion (backup-screen present) rather
     // than on an unmocked binding reject.
     listRemovableDrives: vi.fn(async () => ({ drives: [] })),
+    // Patient UI dependencies for the mounted /patients route + S04 overlay.
+    patientListQuery,
+    patientSearch,
+    patientRecent,
+    patientGetDashboard,
+    patientTouchRecent,
   },
 }));
 
@@ -113,6 +130,70 @@ beforeEach(() => {
   setupSetPin.mockResolvedValue({ recoveryCode: 'TEST-RECOVERY-CODE' });
   setupStartTrial.mockResolvedValue(undefined);
   setupComplete.mockResolvedValue(undefined);
+  // Patient UI defaults: one patient in the list / recent, and a dashboard for
+  // it, so the mounted /patients route and the S04 overlay render real content.
+  patientListQuery.mockReset();
+  patientListQuery.mockResolvedValue({
+    rows: [
+      {
+        patientId: 'p-123',
+        code: 'HC-000123',
+        name: 'Ramesh Kumar',
+        ageLabel: '34y',
+        sex: 'M',
+        mobile: '9876543210',
+        city: 'Pune',
+        lastVisitAt: null,
+        duesPaise: 0,
+        matchType: '',
+        photoPath: null,
+      },
+    ],
+    total: 1,
+    nextCursor: null,
+  });
+  patientSearch.mockReset();
+  patientSearch.mockResolvedValue({
+    results: [
+      {
+        patientId: 'p-123',
+        code: 'HC-000123',
+        name: 'Ramesh Kumar',
+        ageLabel: '34y',
+        sex: 'M',
+        mobile: '9876543210',
+        city: 'Pune',
+        lastVisitAt: null,
+        duesPaise: 0,
+        matchType: 'exact_name',
+        photoPath: null,
+      },
+    ],
+    nextCursor: null,
+  });
+  patientRecent.mockReset();
+  patientRecent.mockResolvedValue({ results: [] });
+  patientGetDashboard.mockReset();
+  patientGetDashboard.mockResolvedValue({
+    demographics: {
+      code: 'HC-000123',
+      name: 'Ramesh Kumar',
+      ageLabel: '34y',
+      sex: 'M',
+      mobile: '9876543210',
+      city: 'Pune',
+      referredBy: null,
+      photoPath: null,
+    },
+    allergies: null,
+    alerts: null,
+    duesPaise: 0,
+    visits: [],
+    lastPrescription: null,
+    family: [],
+  });
+  patientTouchRecent.mockReset();
+  patientTouchRecent.mockResolvedValue(null);
 });
 
 describe('AppShell', () => {
@@ -493,6 +574,132 @@ describe('AppShell', () => {
       // Setup was never finished, so no trial/complete writes happened.
       expect(setupStartTrial).not.toHaveBeenCalled();
       expect(setupComplete).not.toHaveBeenCalled();
+    });
+  });
+
+  // Patient UI integration (M2-D blockers 1 & 2): the shell must MOUNT the
+  // /patients route behind the completion guard and the global S04 search
+  // overlay, and the Patients nav must land on the list — no `*`->/today
+  // bounce (R-DEL-002, no dead end). These exercise the real AppShell router;
+  // the patient bindings are the faked dependencies.
+  describe('patient UI mount + global search (M2-D blockers 1 & 2)', () => {
+    /** Drive an in-app navigation the way a nav click / deep link would. */
+    async function navigateViaHash(hash: string): Promise<void> {
+      await act(async () => {
+        window.location.hash = hash;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      });
+    }
+
+    it('mounts /patients and renders the patient list (no bounce to /today)', async () => {
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patients');
+
+      // The list screen must render — the route exists now, so there is no
+      // redirect back to Today.
+      expect(
+        await screen.findByTestId('patient-list-title'),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+    });
+
+    it('the Patients nav item actually navigates to the list (R-DEL-002)', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // Patients is enabled (features.patients) and clicking it lands on the
+      // list, not a dead end.
+      await user.click(screen.getByTestId('nav-patients'));
+      expect(
+        await screen.findByTestId('patient-list-title'),
+      ).toBeInTheDocument();
+    });
+
+    it('deep-links /patients?id=<id> straight to that patient dashboard', async () => {
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patients?id=p-123');
+
+      expect(
+        await screen.findByTestId('patient-dash-demographics'),
+      ).toBeInTheDocument();
+      expect(patientGetDashboard).toHaveBeenCalled();
+    });
+
+    it('blocks /patients before setup completion (completion guard still holds)', async () => {
+      setupGetState.mockResolvedValue({
+        completed: false,
+        currentStep: 1,
+        dataDir: '/tmp/hc',
+      });
+      authGetLockState.mockResolvedValue({
+        locked: false,
+        autolockMinutes: 15,
+      });
+
+      render(<AppShell />);
+      expect(await screen.findByTestId('setup-wizard')).toBeInTheDocument();
+
+      await navigateViaHash('#/patients');
+
+      // Guard holds the fresh install on the wizard; the patient UI must not
+      // render before the licence/trial is activated.
+      await waitFor(() => {
+        expect(screen.getByTestId('setup-wizard')).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByTestId('patient-list-title'),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
+    });
+
+    it('F2 opens the global search overlay over any screen', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // Overlay is not mounted until opened.
+      expect(screen.queryByTestId('search-overlay')).not.toBeInTheDocument();
+
+      await user.keyboard('{F2}');
+
+      expect(await screen.findByTestId('search-overlay')).toBeInTheDocument();
+      expect(screen.getByTestId('search-input')).toBeInTheDocument();
+    });
+
+    it('clicking the top-bar search box opens the overlay', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await user.click(screen.getByTestId('topbar-search'));
+
+      expect(await screen.findByTestId('search-overlay')).toBeInTheDocument();
+    });
+
+    it('Enter on a search result navigates into /patients for that patient', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await user.keyboard('{F2}');
+      await screen.findByTestId('search-overlay');
+
+      // Type a query, pick the first result, and open it with Enter (PSR-006).
+      await user.type(screen.getByTestId('search-input'), 'ramesh');
+      await screen.findByTestId('search-result-row');
+      await user.keyboard('{ArrowDown}{Enter}');
+
+      // The shell navigates into /patients and the S07 dashboard renders.
+      expect(
+        await screen.findByTestId('patient-dash-demographics'),
+      ).toBeInTheDocument();
+      // Opening a patient closes the overlay.
+      expect(screen.queryByTestId('search-overlay')).not.toBeInTheDocument();
     });
   });
 });

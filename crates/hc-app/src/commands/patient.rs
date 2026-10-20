@@ -13,8 +13,10 @@ use crate::error::{map_error, to_user_result, AppError, UserFacingError};
 use crate::patient::{
     CheckDuplicateRequest, CheckDuplicateResponse, CreatePatientRequest, CreatePatientResponse,
     ExportRequest, ExportResponse, GetDashboardRequest, LinkFamilyRequest, LinkFamilyResponse,
-    NextCodeResponse, PatientDashboard, PatientService, PermanentDeleteRequest, RestoreRequest,
-    SoftDeleteRequest, SoftDeleteResponse, UpdatePatientRequest,
+    ListExportCsvRequest, ListQueryRequest, ListQueryResponse, NextCodeResponse, PatientDashboard,
+    PatientService, PermanentDeleteRequest, RecentRequest, RecentResponse, RestoreRequest,
+    SearchRequest, SearchResponse, SoftDeleteRequest, SoftDeleteResponse, TouchRecentRequest,
+    UpdatePatientRequest,
 };
 use crate::state::AppState;
 
@@ -144,4 +146,70 @@ pub fn patient_export_json(
     req: ExportRequest,
 ) -> Result<ExportResponse, UserFacingError> {
     with_pool(&state, |pool| service(&state).export_json(pool, req))
+}
+
+/// Global patient search (HC-MVP1-050, PSR-001..005): ranked, keyset-paginated.
+#[tauri::command]
+#[specta::specta]
+pub fn patient_search(
+    state: State<'_, AppState>,
+    req: SearchRequest,
+) -> Result<SearchResponse, UserFacingError> {
+    with_pool(&state, |pool| service(&state).patient_search(pool, req))
+}
+
+/// Recently-opened patients for the empty search box (HC-MVP1-050, PSR-007).
+#[tauri::command]
+#[specta::specta]
+pub fn patient_recent(
+    state: State<'_, AppState>,
+    req: RecentRequest,
+) -> Result<RecentResponse, UserFacingError> {
+    with_pool(&state, |pool| service(&state).patient_recent(pool, req))
+}
+
+/// Record that a patient was opened (HC-MVP1-050, PSR-007).
+#[tauri::command]
+#[specta::specta]
+pub fn patient_touch_recent(
+    state: State<'_, AppState>,
+    req: TouchRecentRequest,
+) -> Result<(), UserFacingError> {
+    with_pool(&state, |pool| service(&state).touch_recent(pool, req))
+}
+
+/// Filtered, sorted, keyset-paginated patient list (HC-MVP1-052, PSR-008).
+#[tauri::command]
+#[specta::specta]
+pub fn patient_list_query(
+    state: State<'_, AppState>,
+    req: ListQueryRequest,
+) -> Result<ListQueryResponse, UserFacingError> {
+    with_pool(&state, |pool| service(&state).list_query(pool, req))
+}
+
+/// Export the current filtered, sorted list as a CSV (HC-MVP1-052, PSR-011).
+#[tauri::command]
+#[specta::specta]
+pub fn patient_list_export_csv(
+    state: State<'_, AppState>,
+    req: ListExportCsvRequest,
+) -> Result<ExportResponse, UserFacingError> {
+    with_pool(&state, |pool| service(&state).list_export_csv(pool, req))
+}
+
+/// Import a SYNTHETIC JSONL fixture through the real create path (DEV/E2E ONLY,
+/// feature `e2e-test-keys`). Lets the E2E orchestrator seed the provisioned,
+/// boot-gated app with a >=200-patient multi-disease fixture that is then
+/// immediately searchable — without sharing the seed's key with the app
+/// (OPTION A). Not compiled or registered in the release/public build.
+#[cfg(feature = "e2e-test-keys")]
+#[tauri::command]
+#[specta::specta]
+pub fn patient_import_fixture(
+    state: State<'_, AppState>,
+    req: crate::patient::ImportFixtureRequest,
+) -> Result<crate::patient::ImportFixtureResponse, UserFacingError> {
+    let path = std::path::PathBuf::from(&req.path);
+    with_pool(&state, |pool| service(&state).import_fixture(pool, &path))
 }

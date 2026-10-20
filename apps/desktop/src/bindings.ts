@@ -131,6 +131,16 @@ export const commands = {
 	patientExportPdf: (req: ExportRequest) => typedError<ExportResponse, UserFacingError>(__TAURI_INVOKE("patient_export_pdf", { req })),
 	/**  Export the single patient as JSON (PAT-011). */
 	patientExportJson: (req: ExportRequest) => typedError<ExportResponse, UserFacingError>(__TAURI_INVOKE("patient_export_json", { req })),
+	/**  Global patient search (HC-MVP1-050, PSR-001..005): ranked, keyset-paginated. */
+	patientSearch: (req: SearchRequest) => typedError<SearchResponse, UserFacingError>(__TAURI_INVOKE("patient_search", { req })),
+	/**  Recently-opened patients for the empty search box (HC-MVP1-050, PSR-007). */
+	patientRecent: (req: RecentRequest) => typedError<RecentResponse, UserFacingError>(__TAURI_INVOKE("patient_recent", { req })),
+	/**  Record that a patient was opened (HC-MVP1-050, PSR-007). */
+	patientTouchRecent: (req: TouchRecentRequest) => typedError<null, UserFacingError>(__TAURI_INVOKE("patient_touch_recent", { req })),
+	/**  Filtered, sorted, keyset-paginated patient list (HC-MVP1-052, PSR-008). */
+	patientListQuery: (req: ListQueryRequest) => typedError<ListQueryResponse, UserFacingError>(__TAURI_INVOKE("patient_list_query", { req })),
+	/**  Export the current filtered, sorted list as a CSV (HC-MVP1-052, PSR-011). */
+	patientListExportCsv: (req: ListExportCsvRequest) => typedError<ExportResponse, UserFacingError>(__TAURI_INVOKE("patient_list_export_csv", { req })),
 };
 
 /* Types */
@@ -476,6 +486,39 @@ export type LinkFamilyResponse = {
 	familyLinkId: string,
 };
 
+/**
+ *  CSV-export input (`patient_list_export_csv`, PSR-011): the same filter + sort
+ *  as the on-screen list.
+ */
+export type ListExportCsvRequest = {
+	/**  The active filters. */
+	filters: PatientFilter,
+	/**  The sort spec. */
+	sort: PatientSort,
+};
+
+/**  List-query input (`patient_list_query`, PSR-008). */
+export type ListQueryRequest = {
+	/**  The active filters (AND-combined). */
+	filters: PatientFilter,
+	/**  The sort spec. */
+	sort: PatientSort,
+	/**  Opaque keyset cursor from a prior page, or `None` for the first page. */
+	cursor: string | null,
+	/**  Page size. */
+	limit: number,
+};
+
+/**  List-query result: a page of rows plus the next cursor (PSR-008, R-DATA-007). */
+export type ListQueryResponse = {
+	/**  The rows for this page. */
+	rows: SearchRow[],
+	/**  Total matching count, when cheap to compute; `None` at R2 (keyset-only). */
+	total: number | null,
+	/**  Opaque cursor for the next page, or `None` when exhausted. */
+	nextCursor: string | null,
+};
+
 /**  Lock-screen state (`auth_get_lock_state`). */
 export type LockState = {
 	/**  Whether the app is currently locked. */
@@ -516,6 +559,58 @@ export type PatientDashboard = {
 };
 
 /**
+ *  The patient-list filter set (PSR-008). R2-active facets map to real patient
+ *  columns; the remainder (visit/remedy/potency/diagnosis/tags/case-note) are
+ *  carried for the FROZEN UI contract (S05 renders them disabled, R3/R4) but
+ *  are NOT applied to SQL at R2 (R-DEL-002). All optional; AND-combined.
+ */
+export type PatientFilter = {
+	/**  Visit-date range start (R3; no visit data at R2 ⇒ ignored). */
+	visitFrom: string | null,
+	/**  Visit-date range end (R3; ignored at R2). */
+	visitTo: string | null,
+	/**  Last visit older than N days (R2-active; operates on `last_visit_at`). */
+	lastVisitOlderThanDays: number | null,
+	/**
+	 *  Follow-up facet: `none` | `today` | `overdue` | `range` (R2-active on
+	 *  `next_followup_on`).
+	 */
+	followup: string | null,
+	/**  Follow-up range start (when `followup = "range"`). */
+	followupFrom: string | null,
+	/**  Follow-up range end (when `followup = "range"`). */
+	followupTo: string | null,
+	/**  Minimum age in years (R2-active). */
+	ageMin: number | null,
+	/**  Maximum age in years (R2-active). */
+	ageMax: number | null,
+	/**  Exact sex (R2-active). */
+	sex: string | null,
+	/**  City (R2-active, exact). */
+	city: string | null,
+	/**  Tags (PAT-007; rendered once tags ship, not applied at R2). */
+	tags: string[] | null,
+	/**  Diagnosis text (R3/R4; not applied at R2). */
+	diagnosisText: string | null,
+	/**  Remedy id (R4; not applied at R2). */
+	remedyId: string | null,
+	/**  Potency (R4; not applied at R2). */
+	potency: string | null,
+	/**  Dues > 0 (R2-active; always 0 at R2 ⇒ matches nothing, R-DEL-002). */
+	duesPositive: boolean | null,
+	/**  Case-note full-text (PSR-009, P1; not applied at R2). */
+	casenoteText: string | null,
+};
+
+/**  The sort spec (field + direction) for the list (PSR-008). */
+export type PatientSort = {
+	/**  The column to sort by. */
+	field: SortField,
+	/**  The direction. */
+	dir: SortDir,
+};
+
+/**
  *  Permanent-delete input (`patient_permanent_delete`, PAT-008). Requires the
  *  app PIN (re-verified). `pin` is a request-only secret; never logged.
  */
@@ -524,6 +619,18 @@ export type PermanentDeleteRequest = {
 	patientId: string,
 	/**  The app PIN, re-verified before the hard delete (PAT-008, R-DATA-003). */
 	pin: string,
+};
+
+/**  Recent-list input (`patient_recent`, PSR-007). */
+export type RecentRequest = {
+	/**  How many recent patients to return (capped at 20). */
+	limit: number,
+};
+
+/**  Recent-list result: the last-opened patients, most-recent first (PSR-007). */
+export type RecentResponse = {
+	/**  The recently-opened rows, most-recent first. */
+	results: SearchRow[],
 };
 
 /**  Forgot-PIN recovery input (`auth_recover_with_code`, SET-004). */
@@ -669,6 +776,61 @@ export type SaveDoctorProfileResponse = {
 	doctorId: string,
 };
 
+/**
+ *  Global-search input (`patient_search`, PSR-001..004). `query` is the single
+ *  free-text box; `cursor` pages forward (PSR-005).
+ */
+export type SearchRequest = {
+	/**  The single free-text query (name / id / mobile / city). */
+	query: string,
+	/**  Page size (bounded by the engine's page limit). */
+	limit: number,
+	/**  Opaque keyset cursor from a prior page, or `None` for the first page. */
+	cursor: string | null,
+};
+
+/**  Global-search result: a ranked page plus the next-page cursor (PSR-004/005). */
+export type SearchResponse = {
+	/**  The ranked rows (exact → phonetic → other; ties by recency). */
+	results: SearchRow[],
+	/**  Opaque cursor for the next page, or `None` when exhausted. */
+	nextCursor: string | null,
+};
+
+/**
+ *  One row for the S04 search list and S05 patient list (PSR-005/008). Full
+ *  demographics the row renders; `dues_paise` is always 0 at R2 (billing is R5,
+ *  R-DEL-002); `match_type` is the ranking tag ("" for list rows).
+ */
+export type SearchRow = {
+	/**  UUIDv7 id. */
+	patientId: string,
+	/**  Patient code (e.g. `HC-000123`). */
+	code: string,
+	/**  Display name. */
+	name: string,
+	/**  Human age label, e.g. `34y` (from DOB preferred, else age_years). */
+	ageLabel: string,
+	/**  Sex, or `None`. */
+	sex: string | null,
+	/**  Mobile — the FULL number in MVP1 (no masking, PSR-005 open-Q), or `None`. */
+	mobile: string | null,
+	/**  City, or `None`. */
+	city: string | null,
+	/**  RFC3339 most-recent-visit instant, or `None` (NULL at R2). */
+	lastVisitAt: string | null,
+	/**  Outstanding dues, integer paise. ALWAYS 0 for R2 (R-DEL-002, R-DATA-004). */
+	duesPaise: number,
+	/**
+	 *  Match-type tag for the ranking display (PSR-004): one of `exact_id`,
+	 *  `exact_mobile`, `exact_name`, `name_prefix`, `phonetic`, `other`. Empty
+	 *  for plain list rows (S05) that are not ranked search hits.
+	 */
+	matchType: string,
+	/**  Opaque photo attachment ref, or `None`. */
+	photoPath: string | null,
+};
+
 /**  Result of `set_auto_backup`. */
 export type SetAutoBackupResponse = {
 	/**  Whether the toggle was applied. */
@@ -734,12 +896,39 @@ export type SoftDeleteResponse = {
 	recycleUntil: string,
 };
 
+/**  Sort direction. */
+export type SortDir = 
+/**  Ascending. */
+"asc" | 
+/**  Descending. */
+"desc";
+
+/**  Sort field for the list (PSR-008). */
+export type SortField = 
+/**  Sort by display name. */
+"name" | 
+/**  Sort by patient id / code. */
+"id" | 
+/**  Sort by most-recent visit. */
+"lastVisit" | 
+/**  Sort by next follow-up. */
+"nextFollowup";
+
 /**  Result of starting the local trial (LIC-063). */
 export type StartTrialResponse = {
 	/**  RFC3339 UTC expiry. */
 	trialValidUntil: string,
 	/**  Whole days remaining in the trial (30 at start). */
 	trialDaysRemaining: number,
+};
+
+/**
+ *  Record-open input (`patient_touch_recent`, PSR-007): mark a patient as just
+ *  opened so it surfaces in the recent list.
+ */
+export type TouchRecentRequest = {
+	/**  The patient that was just opened. */
+	patientId: string,
 };
 
 /**  Unlock input (`auth_unlock`). `pin` is a request-only secret. */
