@@ -42,6 +42,12 @@ pub fn migrations() -> &'static [Migration] {
             target: 4,
             sql: include_str!("migrations/0004_patient_search.sql"),
         },
+        // HC-MVP1-056: primary `diagnosis` column on patient (synthetic data
+        // generator disease spread; later dashboard/filter use). Forward-only.
+        Migration {
+            target: 5,
+            sql: include_str!("migrations/0005_patient_diagnosis.sql"),
+        },
     ]
 }
 

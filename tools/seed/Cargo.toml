@@ -1,0 +1,37 @@
+[package]
+name = "hc-seed"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+# Synthetic data generator (NFR-007, HC-MVP1-056). Owned by hc-data-dev.
+# Library target carries the (tested) generator; the binary is a thin CLI over
+# it so unit tests drive generation in-process without a subprocess.
+
+[[bin]]
+name = "hc-seed"
+path = "src/main.rs"
+
+[lib]
+name = "hc_seed"
+path = "src/lib.rs"
+
+[dependencies]
+hc-domain = { path = "../../crates/hc-domain" }
+# `testing` feature exposes DevKeyProvider::new_test() + the pool seam; the task
+# allows the dev/test key for seed output (never a production key).
+hc-storage = { path = "../../crates/hc-storage", features = ["testing"] }
+hc-search = { path = "../../crates/hc-search" }
+# Same pin as hc-storage/hc-search; seed binds INSERT params on a Connection and
+# opens the pool. bundled feature compiles in FTS5 + trigram (trigger sync).
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
+# SAME pin already used by hc-storage; seeded StdRng (determinism contract).
+rand = { version = "0.8.5" }
+thiserror = { workspace = true }   # SeedError (R-RUST-001)
+tracing = { workspace = true }     # counts only, opaque ids (R-PRIV-001)
+# Same pin as hc-storage; UUIDv7 patient ids (R-DATA-005).
+uuid = { version = "1.28", features = ["v7"] }
+
+[dev-dependencies]
+# Temp output DB for the integration test (already in the workspace lock).
+tempfile = "3"

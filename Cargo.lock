@@ -1646,6 +1646,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc-seed"
+version = "0.1.0"
+dependencies = [
+ "hc-domain",
+ "hc-search",
+ "hc-storage",
+ "rand",
+ "rusqlite",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "hc-storage"
 version = "0.1.0"
 dependencies = [
