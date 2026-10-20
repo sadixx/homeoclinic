@@ -78,8 +78,15 @@ describe('BackupScreen (S17) — health', () => {
   it('shows the last backup, checked result and the 14/8/12 retention line', async () => {
     render(<BackupScreen />);
 
-    const last = await screen.findByTestId('backup-status-last');
-    expect(last).toHaveTextContent(en['backup.health.checkedOk']);
+    // Wait for the RESOLVED text, not just the element's existence: the
+    // status element renders a placeholder ("Last backup: —") before the
+    // mocked getBackupStatus promise resolves, so asserting on existence alone
+    // races the async re-render.
+    await waitFor(() =>
+      expect(screen.getByTestId('backup-status-last')).toHaveTextContent(
+        en['backup.health.checkedOk'],
+      ),
+    );
     expect(screen.getByTestId('backup-retention')).toHaveTextContent(
       en['backup.health.retention'],
     );
@@ -109,8 +116,16 @@ describe('BackupScreen (S17) — health', () => {
     );
     render(<BackupScreen />);
 
-    const last = await screen.findByTestId('backup-status-last');
-    expect(last).toHaveTextContent(en['backup.health.never']);
+    // Wait for the RESOLVED never-backed-up text, not just the element's
+    // existence: the status element first renders a placeholder before the
+    // mocked getBackupStatus promise resolves. The stale-never banner likewise
+    // only mounts once stale === true after resolution, so gate on the
+    // resolved text first, then assert the banner.
+    await waitFor(() =>
+      expect(screen.getByTestId('backup-status-last')).toHaveTextContent(
+        en['backup.health.never'],
+      ),
+    );
     expect(screen.getByTestId('backup-stale-banner')).toHaveTextContent(
       en['backup.health.staleNever'],
     );
@@ -121,6 +136,11 @@ describe('BackupScreen (S17) — health', () => {
     render(<BackupScreen />);
 
     const toggle = await screen.findByTestId('backup-auto-toggle');
+    // Wait for the resolved status (autoEnabled: true) to drive the checkbox
+    // before clicking: the toggle renders unchecked in its placeholder state
+    // before getBackupStatus resolves, so clicking too early would send the
+    // opposite value. Gate on the checked state, then toggle off.
+    await waitFor(() => expect(toggle).toBeChecked());
     await user.click(toggle);
     expect(setAuto).toHaveBeenCalledWith(false);
   });
@@ -199,7 +219,10 @@ describe('BackupScreen (S17) — back up now', () => {
     await user.click(
       await screen.findByTestId('backup-usb-option-/run/media/doc/USB'),
     );
-    const confirm = screen.getByTestId('backup-password-confirm');
+    // The confirm field only mounts once the resolved status (lastBackupAt:
+    // null => firstTime) has loaded, so wait for it to appear rather than a
+    // synchronous getByTestId that races the async re-render.
+    const confirm = await screen.findByTestId('backup-password-confirm');
     expect(confirm).toBeInTheDocument();
 
     await user.type(screen.getByTestId('backup-password'), 'longenough1');
