@@ -7,3 +7,25 @@ license.workspace = true
 [dependencies]
 hc-domain = { path = "../hc-domain" }
 hc-storage = { path = "../hc-storage" }
+# Same pin as hc-storage; search executes parameterised SQL (FTS5 MATCH, keyset
+# paging) against a rusqlite Connection. The bundled SQLCipher build compiles in
+# FTS5 + the trigram tokeniser used by patient_trgm (R-SEC-008 pinned).
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
+thiserror = { workspace = true }   # SearchError enum (R-RUST-001)
+tracing = { workspace = true }     # structured logs, hashed ids only (R-PRIV-001)
+# UUIDv7 ids for the test/insert fixtures and the insert helper (same pin as hc-storage).
+uuid = { version = "1.28", features = ["v7"] }
+# Test seam only: in-memory/temp DB helpers under the `testing` feature.
+tempfile = { version = "3", optional = true }
+
+[features]
+# Exposes hc_search::testing::* (memory_search_db, insert_patient, TestPatient)
+# to this crate's integration tests and to downstream crates' tests.
+testing = ["dep:tempfile"]
+
+[dev-dependencies]
+# Self-dependency with `testing` enabled so tests/*.rs see hc_search::testing::*
+# under a plain `cargo test` without forcing the feature on library consumers
+# (R-TEST-009).
+hc-search = { path = ".", features = ["testing"] }
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }

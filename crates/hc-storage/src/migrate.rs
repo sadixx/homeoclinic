@@ -36,6 +36,12 @@ pub fn migrations() -> &'static [Migration] {
             target: 3,
             sql: include_str!("migrations/0003_licence_state.sql"),
         },
+        // HC-MVP1-047: patient table + patient_fts (prefix) + patient_trgm
+        // (trigram) + same-transaction sync triggers (PSR-012, R-DATA-006).
+        Migration {
+            target: 4,
+            sql: include_str!("migrations/0004_patient_search.sql"),
+        },
     ]
 }
 
