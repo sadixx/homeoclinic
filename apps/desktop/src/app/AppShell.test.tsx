@@ -435,6 +435,34 @@ describe('AppShell', () => {
     });
   });
 
+  describe('Today empty-state New patient action (user-reported defect)', () => {
+    // Regression: the Today empty-state "New patient" button did nothing
+    // because AppShell rendered <TodayScreen /> without wiring onNewPatient,
+    // so the optional callback was undefined. It must navigate to the S06
+    // register form (/patients?view=new).
+    it('opens the register form when the Today New patient button is clicked', async () => {
+      setupGetState.mockResolvedValue({
+        completed: true,
+        currentStep: 4,
+        dataDir: '/tmp/hc',
+      });
+      authGetLockState.mockResolvedValue({
+        locked: false,
+        autolockMinutes: 15,
+      });
+
+      const user = userEvent.setup();
+      render(<AppShell />);
+
+      // Boots into the shell on Today with the empty-state action.
+      const action = await screen.findByTestId('today-new-patient');
+      await user.click(action);
+
+      // Lands on the patient register form (S06), not a no-op.
+      expect(await screen.findByTestId('patient-form')).toBeInTheDocument();
+    });
+  });
+
   // Regression (user-reported defect, SET-001): on a FRESH install the boot
   // decision resolves completed:false and seeds /setup. Finishing the wizard
   // calls onComplete -> navigate('/today'), but ShellRoute reads the FROZEN
