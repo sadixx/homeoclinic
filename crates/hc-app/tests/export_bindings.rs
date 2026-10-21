@@ -216,6 +216,7 @@ fn export_bindings_contains_m3_case_visit_commands() {
     for wrapper in [
         "caseTemplateGetDefault",
         "caseTemplateList",
+        "caseTemplateSetVisibility",
         "caseVisitOpenOrCreate",
         "caseVisitAutosave",
         "caseSummaryRender",

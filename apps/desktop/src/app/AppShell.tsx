@@ -26,7 +26,7 @@
 // uncertain fails safe to /lock (handoff 46). The resolved autolockMinutes is
 // threaded into ShellFrame's idle timer (replacing the hardcoded fallback when
 // a value is present). UI -> typed commands only.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   HashRouter,
   Navigate,
@@ -34,6 +34,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useParams,
   useSearchParams,
 } from 'react-router-dom';
 
@@ -44,6 +45,7 @@ import { StatusBar } from '@/app/StatusBar';
 import { TopBar } from '@/app/TopBar';
 import { BackupScreen } from '@/backup/BackupScreen';
 import { commands } from '@/bindings';
+import { CaseForm } from '@/case/CaseForm';
 import { TodayScreen } from '@/home/TodayScreen';
 import { PatientsPage } from '@/patients/PatientsPage';
 import { SetupWizard } from '@/setup/SetupWizard';
@@ -207,6 +209,69 @@ function ShellFrame({
     navigate('/patients?view=new');
   }, [navigate]);
 
+  // Navigate to the S08 case form for an already-resolved visit (CASE / S08).
+  // The deep-linkable URL carries both ids so the form is reachable directly
+  // and the completion guard still wraps it (it is a shell route).
+  const openCaseVisit = useCallback(
+    (patientId: string, visitId: string): void => {
+      navigate(
+        `/patient/${encodeURIComponent(patientId)}/case/${encodeURIComponent(
+          visitId,
+        )}`,
+      );
+    },
+    [navigate],
+  );
+
+  // Start (open-or-create) a First visit for a patient and route into the
+  // case form (S08 entry points: dashboard "New visit / Take case" and F5).
+  // Only the generated binding is called; the resolved `visit_id` becomes the
+  // route param so the URL is deep-linkable and CaseForm restores the same
+  // open visit (VIS-001, CASE-005).
+  const startCaseForPatient = useCallback(
+    async (patientId: string): Promise<void> => {
+      try {
+        const open = await run(
+          commands.caseVisitOpenOrCreate({ patientId, visitType: 'first' }),
+        );
+        openCaseVisit(patientId, open.visitId);
+      } catch {
+        /* a failed open leaves the user where they are; no dead end, no crash */
+      }
+    },
+    [openCaseVisit],
+  );
+
+  // The patient currently in focus (if any), parsed from the active route so
+  // F5 "new visit for the open patient" (S08 keyboard) knows whom to open. It
+  // is set by the /patients?id=<id> dashboard deep-link and by the case route.
+  const openPatientId = useMemo((): string | null => {
+    const caseMatch = /^\/patient\/([^/]+)\/case\//.exec(location.pathname);
+    if (caseMatch && caseMatch[1] !== undefined) {
+      return decodeURIComponent(caseMatch[1]);
+    }
+    if (location.pathname === '/patients') {
+      const params = new URLSearchParams(location.search);
+      const id = params.get('id');
+      if (id !== null && id !== '') return id;
+    }
+    return null;
+  }, [location.pathname, location.search]);
+
+  // F5: new visit for the open patient (S08 keyboard). Feature-gated with the
+  // case flag (R-DEL-002); never fires during IME composition (00-conventions).
+  useEffect(() => {
+    if (!features.case) return undefined;
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'F5' || e.isComposing) return;
+      if (openPatientId === null) return;
+      e.preventDefault();
+      void startCaseForPatient(openPatientId);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [openPatientId, startCaseForPatient]);
+
   // Idle auto-lock (SET-004): after the configured idle timeout with no user
   // activity, lock the app. Any clinical edit is already autosaved (CASE-005),
   // so locking never loses data. Ctrl+L (TopBar) is the explicit path. The
@@ -272,7 +337,16 @@ function ShellFrame({
               element={<TodayScreen onNewPatient={openNewPatient} />}
             />
             {features.patients ? (
-              <Route path="/patients" element={<PatientsRoute />} />
+              <Route
+                path="/patients"
+                element={<PatientsRoute onTakeCase={startCaseForPatient} />}
+              />
+            ) : null}
+            {features.case ? (
+              <Route
+                path="/patient/:patientId/case/:visitId"
+                element={<CaseRoute />}
+              />
             ) : null}
             {features.backup ? (
               <Route path="/backup" element={<BackupScreen />} />
@@ -305,7 +379,11 @@ function ShellFrame({
  * forces a fresh PatientsPage when the deep-linked id changes (a new search
  * Enter must re-open the dashboard even from within /patients).
  */
-function PatientsRoute(): JSX.Element {
+function PatientsRoute({
+  onTakeCase,
+}: {
+  readonly onTakeCase: (patientId: string) => void;
+}): JSX.Element {
   const [params] = useSearchParams();
   const id = params.get('id') ?? undefined;
   const view = params.get('view') === 'new' ? 'new' : 'list';
@@ -314,10 +392,80 @@ function PatientsRoute(): JSX.Element {
   // PatientsPage when the deep-linked id changes (a new search Enter re-opens
   // the dashboard even from within /patients).
   return id !== undefined ? (
-    <PatientsPage key={id} initialPatientId={id} />
+    <PatientsPage key={id} initialPatientId={id} onTakeCase={onTakeCase} />
   ) : (
-    <PatientsPage key={view} initialView={view} />
+    <PatientsPage key={view} initialView={view} onTakeCase={onTakeCase} />
   );
+}
+
+/**
+ * `/patient/:patientId/case/:visitId` route (S08). Loads the patient once to
+ * derive the two props the schema-driven case form needs beyond its ids — the
+ * patient's sex (drives the menstrual/obstetric conditional section) and whole-
+ * year age (drives the child-development section) (CASE-001). Both come from
+ * the typed `patient_get_dashboard` payload; the UI never reads SQL. The case
+ * form itself opens-or-restores the visit's answers/vitals (CASE-005).
+ */
+function CaseRoute(): JSX.Element {
+  const params = useParams<{ patientId: string; visitId: string }>();
+  const patientId = params.patientId ?? '';
+  const visitId = params.visitId ?? '';
+  const [sex, setSex] = useState<'male' | 'female'>('male');
+  const [ageYears, setAgeYears] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async (): Promise<void> => {
+      try {
+        const dash = await run(commands.patientGetDashboard({ patientId }));
+        if (cancelled) return;
+        setSex(sexOf(dash.demographics.sex));
+        setAgeYears(ageYearsOf(dash.demographics.ageLabel));
+      } catch {
+        /* fall back to the safe defaults; the form still renders (no dead end) */
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId]);
+
+  if (!loaded) {
+    return (
+      <section
+        data-testid="case-route-loading"
+        aria-busy="true"
+        className="p-6 text-sm text-slate-500"
+      >
+        <div className="h-24 w-full animate-pulse rounded bg-slate-100" />
+      </section>
+    );
+  }
+
+  return (
+    <CaseForm
+      patientId={patientId}
+      visitId={visitId}
+      sex={sex}
+      ageYears={ageYears}
+    />
+  );
+}
+
+/** Map the free-form demographics sex to the case form's binary conditional. */
+function sexOf(sex: string | null): 'male' | 'female' {
+  if (sex === null) return 'male';
+  const s = sex.trim().toLowerCase();
+  return s.startsWith('f') ? 'female' : 'male';
+}
+
+/** Parse whole years from an age label like `34y` / `34 y` / `6m` (-> 0). */
+function ageYearsOf(ageLabel: string): number {
+  const match = /^\s*(\d+)\s*y/i.exec(ageLabel);
+  return match && match[1] !== undefined ? Number(match[1]) : 0;
 }
 
 /** `/lock` route: unlock returns to Today (or the previous screen). */

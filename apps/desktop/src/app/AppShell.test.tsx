@@ -40,6 +40,12 @@ const {
   patientRecent,
   patientGetDashboard,
   patientTouchRecent,
+  caseVisitOpenOrCreate,
+  caseTemplateGetDefault,
+  caseTemplateList,
+  caseVisitAutosave,
+  caseSummaryRender,
+  caseTemplateSetVisibility,
 } = vi.hoisted(() => ({
   setupGetState: vi.fn(),
   authGetLockState: vi.fn(),
@@ -57,6 +63,14 @@ const {
   patientRecent: vi.fn(),
   patientGetDashboard: vi.fn(),
   patientTouchRecent: vi.fn(),
+  // S08 case form + its entry wiring (route + Take-case + F5). CaseForm reads
+  // these on mount; open-or-create also backs the Take-case / F5 navigation.
+  caseVisitOpenOrCreate: vi.fn(),
+  caseTemplateGetDefault: vi.fn(),
+  caseTemplateList: vi.fn(),
+  caseVisitAutosave: vi.fn(),
+  caseSummaryRender: vi.fn(),
+  caseTemplateSetVisibility: vi.fn(),
 }));
 
 vi.mock('@/bindings', () => ({
@@ -95,6 +109,13 @@ vi.mock('@/bindings', () => ({
     patientRecent,
     patientGetDashboard,
     patientTouchRecent,
+    // S08 case form + entry wiring dependencies.
+    caseVisitOpenOrCreate,
+    caseTemplateGetDefault,
+    caseTemplateList,
+    caseVisitAutosave,
+    caseSummaryRender,
+    caseTemplateSetVisibility,
   },
 }));
 
@@ -194,6 +215,38 @@ beforeEach(() => {
   });
   patientTouchRecent.mockReset();
   patientTouchRecent.mockResolvedValue(null);
+  // S08 case-form defaults: open-or-create resolves a fresh First visit, the
+  // default template is a minimal chronic schema, and the picker list is empty.
+  // These let the /patient/:id/case/:vid route render the real CaseForm and
+  // back the Take-case / F5 open-or-create navigation.
+  caseVisitOpenOrCreate.mockReset();
+  caseVisitOpenOrCreate.mockResolvedValue({
+    visitId: 'v-1',
+    templateId: 'chronic_detailed',
+    dataJson: '{}',
+    vitalsJson: '{}',
+    visitAt: '2026-10-21T10:42:00Z',
+  });
+  caseTemplateGetDefault.mockReset();
+  caseTemplateGetDefault.mockResolvedValue({
+    templateId: 'chronic_detailed',
+    name: 'Chronic (detailed)',
+    schemaJson: JSON.stringify({
+      version: 1,
+      sections: [
+        {
+          key: 'chief_complaints',
+          title: 'Chief complaints',
+          collapsible: true,
+          hideable: true,
+          repeatable: true,
+          fields: [{ key: 'location', label: 'Location', type: 'text' }],
+        },
+      ],
+    }),
+  });
+  caseTemplateList.mockReset();
+  caseTemplateList.mockResolvedValue({ templates: [] });
 });
 
 describe('AppShell', () => {
@@ -728,6 +781,99 @@ describe('AppShell', () => {
       ).toBeInTheDocument();
       // Opening a patient closes the overlay.
       expect(screen.queryByTestId('search-overlay')).not.toBeInTheDocument();
+    });
+  });
+
+  // S08 case-form wiring (M3 Slice B, R3): the shell must MOUNT the case route
+  // behind the completion guard so the form is reachable (no dead end,
+  // ADR-0002), the S07 dashboard "Take case" entry must open-or-create a visit
+  // and navigate into it, and F5 must start a new visit for the open patient.
+  // The case bindings are the faked dependencies; the real AppShell router runs.
+  describe('S08 case form route + Take-case + F5 (M3 Slice B)', () => {
+    /** Drive an in-app navigation the way a nav click / deep link would. */
+    async function navigateViaHash(hash: string): Promise<void> {
+      await act(async () => {
+        window.location.hash = hash;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      });
+    }
+
+    it('mounts /patient/:id/case/:vid and renders the case form', async () => {
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patient/p-123/case/v-1');
+
+      // The route exists -> the real CaseForm renders (no bounce to /today).
+      expect(await screen.findByTestId('case-form')).toBeInTheDocument();
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+    });
+
+    it('the dashboard Take-case entry opens-or-creates a visit and routes into the case form', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // Open the patient dashboard (S07) via the deep link.
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+
+      // The R3 Take-case action is present and enabled; clicking it opens-or-
+      // creates the visit and navigates into the case form.
+      await user.click(await screen.findByTestId('patient-dash-take-case'));
+
+      await waitFor(() =>
+        expect(caseVisitOpenOrCreate).toHaveBeenCalledWith({
+          patientId: 'p-123',
+          visitType: 'first',
+        }),
+      );
+      expect(await screen.findByTestId('case-form')).toBeInTheDocument();
+    });
+
+    it('F5 starts a new visit for the open patient', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // Open a patient so F5 knows whom to take the case for.
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+
+      await user.keyboard('{F5}');
+
+      await waitFor(() =>
+        expect(caseVisitOpenOrCreate).toHaveBeenCalledWith({
+          patientId: 'p-123',
+          visitType: 'first',
+        }),
+      );
+      expect(await screen.findByTestId('case-form')).toBeInTheDocument();
+    });
+
+    it('blocks the case route before setup completion (completion guard holds)', async () => {
+      setupGetState.mockResolvedValue({
+        completed: false,
+        currentStep: 1,
+        dataDir: '/tmp/hc',
+      });
+      authGetLockState.mockResolvedValue({
+        locked: false,
+        autolockMinutes: 15,
+      });
+
+      render(<AppShell />);
+      expect(await screen.findByTestId('setup-wizard')).toBeInTheDocument();
+
+      await navigateViaHash('#/patient/p-123/case/v-1');
+
+      // The guard must hold the fresh install on the wizard; the clinical form
+      // must not render before the licence/trial is activated.
+      await waitFor(() => {
+        expect(screen.getByTestId('setup-wizard')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('case-form')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
     });
   });
 });

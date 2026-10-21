@@ -62,6 +62,17 @@ pub struct TemplateListResponse {
     pub templates: Vec<TemplateSummary>,
 }
 
+/// `case_template_set_visibility` request (CASE-002) — hide/show one section
+/// for the doctor (persists as their template).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SetVisibilityRequest {
+    /// The template section key to toggle (e.g. `"mental_generals"`).
+    pub section_key: String,
+    /// `true` hides the section for this doctor; `false` shows it again.
+    pub hidden: bool,
+}
+
 // ---------------------------------------------------------------------------
 // Case-visit (first/detailed) commands (VIS-001, CASE-005/009).
 // ---------------------------------------------------------------------------
@@ -344,6 +355,24 @@ impl<'a> VisitService<'a> {
             })
         })
         .map_err(AppError::from)
+    }
+
+    /// Hide or show a template section for the doctor; the choice persists as
+    /// their template (CASE-002). One txn, one audit row (R-DATA-001). No
+    /// patient data is read or written.
+    pub fn template_set_visibility(
+        &self,
+        pool: &Pool,
+        req: SetVisibilityRequest,
+    ) -> Result<OkResponse, AppError> {
+        let now = self.clock.now_rfc3339();
+        pool.with_writer(|c| {
+            let tx = c.transaction()?;
+            tpl_repo::set_section_visibility(&tx, &req.section_key, req.hidden, &now)?;
+            tx.commit()?;
+            Ok(())
+        })?;
+        Ok(OkResponse { ok: true })
     }
 
     /// Open the patient's current same-day detailed visit, or create a new one

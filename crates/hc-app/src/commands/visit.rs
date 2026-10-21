@@ -16,8 +16,8 @@ use crate::visit::{
     AutosaveResponse, CaseAutosaveRequest, CreateFollowupRequest, CreateFollowupResponse,
     DefaultTemplateResponse, FollowupAutosaveRequest, OkResponse, OpenOrCreateRequest,
     OpenOrCreateResponse, RubricSearchPrefillRequest, RubricSearchPrefillResponse,
-    SetNextFollowupRequest, SummaryRenderRequest, SummaryRenderResponse, TemplateListResponse,
-    TodayOverviewRequest, TodayOverviewResponse, VisitService,
+    SetNextFollowupRequest, SetVisibilityRequest, SummaryRenderRequest, SummaryRenderResponse,
+    TemplateListResponse, TodayOverviewRequest, TodayOverviewResponse, VisitService,
 };
 
 /// Build a [`VisitService`] over the managed state's injected clock.
@@ -53,6 +53,19 @@ pub fn case_template_list(
     state: State<'_, AppState>,
 ) -> Result<TemplateListResponse, UserFacingError> {
     with_pool(&state, |pool| service(&state).template_list(pool))
+}
+
+/// Hide or show a case-template section for the doctor (CASE-002). The choice
+/// persists as their template; one txn + one audit row.
+#[tauri::command]
+#[specta::specta]
+pub fn case_template_set_visibility(
+    state: State<'_, AppState>,
+    req: SetVisibilityRequest,
+) -> Result<OkResponse, UserFacingError> {
+    with_pool(&state, |pool| {
+        service(&state).template_set_visibility(pool, req)
+    })
 }
 
 /// Open or create the detailed case visit for a patient (VIS-001/CASE-001).

@@ -125,6 +125,26 @@ export class PatientsPage {
     return byTestId('patient-dash-restore');
   }
 
+  // S08 consultation entry (R3, features.case): "New visit" / "Take case".
+  get dashTakeCaseBtn(): ChainablePromiseElement {
+    return byTestId('patient-dash-take-case');
+  }
+
+  get dashNewVisitBtn(): ChainablePromiseElement {
+    return byTestId('patient-dash-new-visit');
+  }
+
+  /**
+   * Click "Take case" on the S07 dashboard to open-or-create a First visit and
+   * route into the S08 case form (CASE / VIS-001). Both this and "New visit"
+   * call onTakeCase -> case_visit_open_or_create -> navigate
+   * /patient/:id/case/:visitId; the caller waits for the case form.
+   */
+  async dashTakeCase(timeout = 15000): Promise<void> {
+    await this.dashTakeCaseBtn.waitForClickable({ timeout });
+    await this.dashTakeCaseBtn.click();
+  }
+
   // ---- navigation --------------------------------------------------------
 
   /** Open the S06 register form via the deep-link the search overlay uses. */

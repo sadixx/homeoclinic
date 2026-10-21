@@ -4,10 +4,12 @@
 // The ONLY fake is the dependency: the typed Tauri bindings
 // (`vi.mock('@/bindings')`, R-TEST-002). Visible strings from en.json
 // (R-UI-007); controls by their spec data-testid (R-UI-003). R2 slice: visits
-// timeline is HONEST-EMPTY (0), dues badge is Rs 0, and the four consultation
-// quick buttons (New visit / Repertorise / Prescribe / Bill) are HIDDEN (no
-// dead end, ADR-0002); demographics / alerts / family / recycle / export are
-// real.
+// timeline is HONEST-EMPTY (0), dues badge is Rs 0; demographics / alerts /
+// family / recycle / export are real. R3 flip (M3 Slice B): the case form
+// ships, so the dashboard now surfaces an ENABLED "New visit / Take case"
+// consultation entry (previously the four quick buttons were hidden at R2 to
+// avoid a dead end, ADR-0002); Repertorise / Prescribe / Bill stay hidden
+// until their screens ship (R5+).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -102,15 +104,28 @@ describe('PatientDashboard (S07) — load + demographics', () => {
     );
   });
 
-  it('HIDES the four consultation quick buttons at R2 (ADR-0002)', async () => {
-    render(<PatientDashboard patientId="p-123" />);
+  it('shows the enabled New visit / Take case consultation entry at R3 (CASE/VIS-001)', async () => {
+    // R3 flip (CASE ships at M3 Slice B): the case form now has a route, so the
+    // dashboard surfaces a REAL "New visit / Take case" entry instead of the R2
+    // dead-end-avoiding hidden buttons. Clicking it starts the case for this
+    // patient via the onTakeCase callback the /patients route wires to
+    // open-or-create + navigate. Repertorise / Prescribe / Bill stay hidden
+    // until their screens ship (R5+), so no new dead end is introduced.
+    const onTakeCase = vi.fn();
+    const user = userEvent.setup();
+    render(<PatientDashboard patientId="p-123" onTakeCase={onTakeCase} />);
     await screen.findByTestId('patient-dash-demographics');
-    expect(
-      screen.queryByTestId('patient-dash-new-visit'),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('patient-dash-prescribe'),
-    ).not.toBeInTheDocument();
+
+    const newVisit = screen.getByTestId('patient-dash-new-visit');
+    const takeCase = screen.getByTestId('patient-dash-take-case');
+    expect(newVisit).toBeInTheDocument();
+    expect(takeCase).toBeInTheDocument();
+
+    await user.click(takeCase);
+    expect(onTakeCase).toHaveBeenCalledWith('p-123');
+
+    // The screens not yet shipped stay hidden — still no dead end (ADR-0002).
+    expect(screen.queryByTestId('patient-dash-prescribe')).not.toBeInTheDocument();
     expect(screen.queryByTestId('patient-dash-bill')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('patient-dash-repertorise'),

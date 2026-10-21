@@ -89,6 +89,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 // 061/062/063/064/068..072, S08/S09/S03).
                 commands::visit::case_template_get_default,
                 commands::visit::case_template_list,
+                // Per-doctor hide-sections persistence (CASE-002, S08).
+                commands::visit::case_template_set_visibility,
                 commands::visit::case_visit_open_or_create,
                 commands::visit::case_visit_autosave,
                 commands::visit::case_summary_render,
@@ -145,6 +147,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 // Case-template + visit + Today use-case commands (M3-A).
                 commands::visit::case_template_get_default,
                 commands::visit::case_template_list,
+                // Per-doctor hide-sections persistence (CASE-002, S08).
+                commands::visit::case_template_set_visibility,
                 commands::visit::case_visit_open_or_create,
                 commands::visit::case_visit_autosave,
                 commands::visit::case_summary_render,

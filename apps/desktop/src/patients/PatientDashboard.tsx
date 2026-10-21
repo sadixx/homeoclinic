@@ -20,6 +20,7 @@ import {
 } from '@/bindings';
 import { run } from '@/shared/command';
 import { formatDate } from '@/shared/datetime';
+import { features } from '@/shared/features';
 import { formatMobile } from '@/shared/mobile';
 import { formatPaise } from '@/shared/money';
 import { t } from '@/shared/strings';
@@ -33,6 +34,12 @@ export interface PatientDashboardProps {
   readonly onEdit?: (patientId: string) => void;
   /** Go back to the list (S05). */
   readonly onBack?: () => void;
+  /**
+   * Start a new First visit / take the case for this patient (S08 entry
+   * point). Shipped at R3 (CASE / VIS-001): replaces the R2 hidden-buttons
+   * dead end with a real, enabled action.
+   */
+  readonly onTakeCase?: (patientId: string) => void;
   /** Render already in the recycle bin (deep-link into a soft-deleted row). */
   readonly initiallyDeleted?: boolean;
 }
@@ -43,6 +50,7 @@ export function PatientDashboard({
   onOpenPatient,
   onEdit,
   onBack,
+  onTakeCase,
   initiallyDeleted = false,
 }: PatientDashboardProps): JSX.Element {
   const [data, setData] = useState<PatientDashboardData | null>(null);
@@ -285,9 +293,36 @@ export function PatientDashboard({
         </div>
       </header>
 
-      {/* NOTE: the four consultation quick buttons (New visit / Repertorise /
-          Prescribe / Bill) are intentionally NOT rendered at R2 — their screens
-          do not exist yet, so showing them would be a dead end (ADR-0002). */}
+      {/* Consultation entry (S08). At R3 the case form ships, so the "New
+          visit / Take case" action is REAL and enabled — flipping the R2
+          dead-end (buttons hidden, ADR-0002) into a working entry point. It is
+          compile-time gated on features.case so a pre-R3 build still hides it,
+          and suppressed while the record is in the recycle bin. Repertorise /
+          Prescribe / Bill stay hidden until their screens ship (R5+). */}
+      {features.case && !deleted ? (
+        <div
+          data-testid="patient-dash-consult"
+          className="flex flex-wrap items-center gap-2"
+        >
+          <h2 className="sr-only">{t('patient.dash.consult.title')}</h2>
+          <button
+            type="button"
+            data-testid="patient-dash-new-visit"
+            onClick={() => onTakeCase?.(patientId)}
+            className="rounded bg-blue-600 px-3 py-1.5 font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700"
+          >
+            {t('patient.dash.newVisit')}
+          </button>
+          <button
+            type="button"
+            data-testid="patient-dash-take-case"
+            onClick={() => onTakeCase?.(patientId)}
+            className="rounded border border-slate-300 px-3 py-1.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            {t('patient.dash.takeCase')}
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
         {/* Visit timeline — HONEST-EMPTY at R2 */}

@@ -11,7 +11,8 @@
 use hc_app::clock::Clock;
 use hc_app::visit::{
     CaseAutosaveRequest, CreateFollowupRequest, OpenOrCreateRequest, RubricSearchPrefillRequest,
-    SetNextFollowupRequest, SummaryRenderRequest, TodayOverviewRequest, VisitService,
+    SetNextFollowupRequest, SetVisibilityRequest, SummaryRenderRequest, TodayOverviewRequest,
+    VisitService,
 };
 
 use hc_storage::testing::{insert_visit_for, seed_patient, temp_db};
@@ -397,5 +398,79 @@ fn rubric_search_prefill_is_flagged_unavailable() {
     assert!(
         !resp.available,
         "repertory prefill is not available until R7"
+    );
+}
+
+/// `case_template_set_visibility` persists a hidden section for the doctor and
+/// a visibility read reflects it; hiding then showing clears it (CASE-002).
+/// Also asserts exactly one audit row per toggle (R-DATA-001). Asserts the
+/// resulting stored state, not merely `is_ok()` (R-TEST-003).
+#[test]
+fn case_template_set_visibility_persists_hidden_section() {
+    let (_dir, pool) = temp_db();
+    let clock = FakeClock {
+        now: "2026-10-21T09:00:00Z".to_string(),
+    };
+    let svc = VisitService::new(&clock);
+
+    // Nothing hidden to start with: the read map is empty.
+    let before = pool
+        .with_reader(hc_storage::case_template::get_hidden_sections)
+        .expect("read hidden sections");
+    assert!(
+        before.is_empty(),
+        "no section is hidden before any toggle (CASE-002 default)"
+    );
+
+    // Hide the mental_generals section.
+    let resp = svc
+        .template_set_visibility(
+            &pool,
+            SetVisibilityRequest {
+                section_key: "mental_generals".to_string(),
+                hidden: true,
+            },
+        )
+        .expect("set visibility (hide)");
+    assert!(resp.ok, "set_visibility returns ok");
+
+    // A visibility read reflects it.
+    let after_hide = pool
+        .with_reader(hc_storage::case_template::get_hidden_sections)
+        .expect("read hidden sections after hide");
+    assert_eq!(
+        after_hide.get("mental_generals"),
+        Some(&true),
+        "mental_generals is persisted as hidden for the doctor (CASE-002)"
+    );
+
+    // Exactly one audit row was written for the setting toggle (R-DATA-001).
+    let audit_count: i64 = pool
+        .with_reader(|c| {
+            Ok(c.query_row(
+                "SELECT COUNT(*) FROM audit_log WHERE entity = 'app_setting' \
+                 AND entity_id = ?1",
+                [hc_storage::case_template::HIDDEN_SECTIONS_SETTING_KEY],
+                |r| r.get(0),
+            )?)
+        })
+        .expect("count audit rows");
+    assert_eq!(audit_count, 1, "exactly one audit row per toggle");
+
+    // Showing it again clears the key (default-visible, minimal stored map).
+    svc.template_set_visibility(
+        &pool,
+        SetVisibilityRequest {
+            section_key: "mental_generals".to_string(),
+            hidden: false,
+        },
+    )
+    .expect("set visibility (show)");
+    let after_show = pool
+        .with_reader(hc_storage::case_template::get_hidden_sections)
+        .expect("read hidden sections after show");
+    assert!(
+        !after_show.contains_key("mental_generals"),
+        "showing a section removes it from the hidden map (CASE-002)"
     );
 }

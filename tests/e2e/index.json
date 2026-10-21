@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-21T01:29:29.272Z",
+  "generatedAt": "2026-10-21T18:04:06.873Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -47,6 +47,22 @@
       ],
       "tier": "regression",
       "area": "backup",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/case/case-form.e2e.ts",
+      "reqs": [
+        "CASE-001",
+        "CASE-003",
+        "CASE-005",
+        "CASE-006",
+        "CASE-009",
+        "VIS-001"
+      ],
+      "tier": "stable",
+      "area": "case",
       "targets": [
         "linux"
       ]

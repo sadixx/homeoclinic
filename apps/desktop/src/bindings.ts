@@ -145,6 +145,11 @@ export const commands = {
 	caseTemplateGetDefault: () => typedError<DefaultTemplateResponse, UserFacingError>(__TAURI_INVOKE("case_template_get_default")),
 	/**  List all case templates (CASE-004). */
 	caseTemplateList: () => typedError<TemplateListResponse, UserFacingError>(__TAURI_INVOKE("case_template_list")),
+	/**
+	 *  Hide or show a case-template section for the doctor (CASE-002). The choice
+	 *  persists as their template; one txn + one audit row.
+	 */
+	caseTemplateSetVisibility: (req: SetVisibilityRequest) => typedError<OkResponse, UserFacingError>(__TAURI_INVOKE("case_template_set_visibility", { req })),
 	/**  Open or create the detailed case visit for a patient (VIS-001/CASE-001). */
 	caseVisitOpenOrCreate: (req: OpenOrCreateRequest) => typedError<OpenOrCreateResponse, UserFacingError>(__TAURI_INVOKE("case_visit_open_or_create", { req })),
 	/**  Autosave the case form + vitals, recomputing BMI (CASE-005). */
@@ -1018,6 +1023,17 @@ export type SetPinRequest = {
 export type SetPinResponse = {
 	/**  Grouped recovery code to show once and print; never shown again. */
 	recoveryCode: string,
+};
+
+/**
+ *  `case_template_set_visibility` request (CASE-002) — hide/show one section
+ *  for the doctor (persists as their template).
+ */
+export type SetVisibilityRequest = {
+	/**  The template section key to toggle (e.g. `"mental_generals"`). */
+	sectionKey: string,
+	/**  `true` hides the section for this doctor; `false` shows it again. */
+	hidden: boolean,
 };
 
 /**  Wizard progress snapshot (`setup_get_state`). */

@@ -18,6 +18,7 @@ const FEATURES = {
   backupMoveToNewComputer: false, // BAK-005 move-to-new-computer: DEFERRED (OQ-S17-4)
   setupP1Controls: false, // SET-005 font + SET-006 data-folder: DEFERRED (R-DEL-002/006)
   licenceImport: false, // "I already have a licence" import path: hidden until R8
+  case: true, // S08 first case form ships at M3 Slice B (R3); CASE-001..006/009, VIS-001
 };
 
 export default defineConfig({
