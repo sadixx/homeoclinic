@@ -1762,6 +1762,9 @@ dependencies = [
  "hc-app",
  "tauri",
  "tauri-build",
+ "tracing",
+ "webkit2gtk",
+ "webview2-com",
 ]
 
 [[package]]

@@ -87,3 +87,98 @@ export function captureSimulatedFrame(): string {
 export function webcamRef(): string {
   return `webcam-capture-${Date.now()}.png`;
 }
+
+/** Outcome of a webcam capture attempt. */
+export interface WebcamCaptureResult {
+  /** `true` when a frame was captured; `false` when no camera / denied. */
+  readonly ok: boolean;
+  /** Data-URL preview of the captured frame (present when `ok`). */
+  readonly previewUrl?: string;
+}
+
+/**
+ * Capture a photo from the DEFAULT camera using the real WebRTC API
+ * (`navigator.mediaDevices.getUserMedia`), draw one frame to a canvas and
+ * return it as a PNG data URL. This is the production path for patient photo
+ * capture (HC-MVP1-038); on a laptop it uses the built-in webcam.
+ *
+ * Camera *switching* (choosing among multiple devices) is deferred to the
+ * Settings milestone (MS / SET-007); here we always use the browser's default
+ * video input.
+ *
+ * Determinism / headless fallback: when `window.__HC_E2E_CAMERA__` is set, or
+ * when `navigator.mediaDevices.getUserMedia` is unavailable (headless/CI, no
+ * camera), fall back to the simulated grant decision + a generated frame so
+ * E2E stays reproducible and the app never throws. No patient data, path or
+ * stack leaves this helper (R-PRIV-001).
+ */
+export async function captureWebcamPhoto(): Promise<WebcamCaptureResult> {
+  const override =
+    typeof window !== 'undefined' ? window.__HC_E2E_CAMERA__ : undefined;
+  const mediaDevices =
+    typeof navigator !== 'undefined' ? navigator.mediaDevices : undefined;
+
+  // E2E override or no real camera API -> deterministic simulated path.
+  if (override !== undefined || mediaDevices?.getUserMedia === undefined) {
+    return simulateCameraAccess()
+      ? { ok: true, previewUrl: captureSimulatedFrame() }
+      : { ok: false };
+  }
+
+  // Real capture, hard-bounded: getUserMedia + play + first frame are raced
+  // against an overall timeout. On WebKitGTK a wedged media pipeline can make
+  // getUserMedia resolve but play()/frame delivery never complete, which would
+  // otherwise hang the UI. On timeout (or any error) we stop the stream and
+  // return {ok:false} so the form shows "couldn't capture, try again or choose
+  // a file" instead of freezing.
+  const CAPTURE_TIMEOUT_MS = 8000;
+  let stream: MediaStream | undefined;
+
+  const capture = async (): Promise<WebcamCaptureResult> => {
+    stream = await mediaDevices.getUserMedia({ video: true, audio: false });
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    // Start playback but do NOT await it (play() can hang on WebKitGTK); wait
+    // for the first decoded frame instead.
+    void video.play().catch(() => undefined);
+    if (video.readyState < 2 /* HAVE_CURRENT_DATA */ || video.videoWidth === 0) {
+      await new Promise<void>((resolve) => {
+        let settled = false;
+        const done = (): void => {
+          if (!settled) {
+            settled = true;
+            resolve();
+          }
+        };
+        video.onloadeddata = done;
+        video.onloadedmetadata = done;
+      });
+    }
+    const width = video.videoWidth || 640;
+    const height = video.videoHeight || 480;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (ctx === null) {
+      return { ok: false };
+    }
+    ctx.drawImage(video, 0, 0, width, height);
+    return { ok: true, previewUrl: canvas.toDataURL('image/png') };
+  };
+
+  const timeout = new Promise<WebcamCaptureResult>((resolve) => {
+    setTimeout(() => resolve({ ok: false }), CAPTURE_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([capture(), timeout]);
+  } catch {
+    // Permission denied, no device, or capture error -> treated as "no camera".
+    return { ok: false };
+  } finally {
+    stream?.getTracks().forEach((track) => track.stop());
+  }
+}

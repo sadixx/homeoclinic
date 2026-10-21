@@ -20,12 +20,7 @@ import { Camera, Upload, Trash2, RefreshCw } from 'lucide-react';
 import { commands } from '@/bindings';
 import { run } from '@/shared/command';
 import { t } from '@/shared/strings';
-import {
-  type AttachedPhoto,
-  captureSimulatedFrame,
-  simulateCameraAccess,
-  webcamRef,
-} from './photo';
+import { type AttachedPhoto, captureWebcamPhoto, webcamRef } from './photo';
 
 /** How the form is opened. */
 export type PatientFormMode = 'new' | 'edit';
@@ -246,19 +241,22 @@ export function PatientForm({
     [],
   );
 
-  const onUseWebcam = useCallback((): void => {
-    // Randomly granted/denied, standing in for a real camera (sandbox).
-    if (!simulateCameraAccess()) {
+  const onUseWebcam = useCallback(async (): Promise<void> => {
+    // Capture from the default camera (real getUserMedia; simulated fallback
+    // in headless/E2E). Camera switching arrives with Settings (SET-007).
+    const result = await captureWebcamPhoto();
+    if (!result.ok || result.previewUrl === undefined) {
       setCameraDenied(true);
       return;
     }
     setCameraDenied(false);
+    const previewUrl = result.previewUrl;
     setPhoto((prev) => {
       if (prev && prev.previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(prev.previewUrl);
       }
       return {
-        previewUrl: captureSimulatedFrame(),
+        previewUrl,
         ref: webcamRef(),
         source: 'webcam',
       };
@@ -433,7 +431,7 @@ export function PatientForm({
             <button
               type="button"
               data-testid="patient-form-photo-webcam"
-              onClick={onUseWebcam}
+              onClick={() => void onUseWebcam()}
               className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
             >
               <Camera className="h-3.5 w-3.5" aria-hidden="true" />
@@ -456,7 +454,9 @@ export function PatientForm({
                   type="button"
                   data-testid="patient-form-photo-retake"
                   onClick={
-                    photo.source === 'webcam' ? onUseWebcam : onChooseFile
+                    photo.source === 'webcam'
+                      ? () => void onUseWebcam()
+                      : onChooseFile
                   }
                   className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
                 >
