@@ -1,0 +1,64 @@
+{
+  "patients": 50000,
+  "seed": 7,
+  "db_bytes": 37101568,
+  "ops": [
+    {
+      "id": "patient_search",
+      "label": "Patient search (per-keystroke ranked query)",
+      "budget_p95_ms": 100.0,
+      "pct": {
+        "p50_ms": 0.153024,
+        "p95_ms": 3.719712,
+        "p99_ms": 4.100987,
+        "max_ms": 4.338324,
+        "iters": 300
+      },
+      "result_rows": 20,
+      "pass": true
+    },
+    {
+      "id": "patient_get_dashboard",
+      "label": "Open dashboard (full visit timeline)",
+      "budget_p95_ms": 300.0,
+      "pct": {
+        "p50_ms": 0.094114,
+        "p95_ms": 0.11145999999999999,
+        "p99_ms": 0.133088,
+        "max_ms": 0.136305,
+        "iters": 300
+      },
+      "result_rows": 1,
+      "pass": true
+    },
+    {
+      "id": "patient_list_query",
+      "label": "Advanced filter query",
+      "budget_p95_ms": 500.0,
+      "pct": {
+        "p50_ms": 0.790344,
+        "p95_ms": 1.070411,
+        "p99_ms": 1.164412,
+        "max_ms": 1.2230260000000002,
+        "iters": 300
+      },
+      "result_rows": 20,
+      "pass": true
+    },
+    {
+      "id": "today_followup_list",
+      "label": "Today follow-up list (VIS-005 equivalent query)",
+      "budget_p95_ms": 200.0,
+      "pct": {
+        "p50_ms": 0.008791,
+        "p95_ms": 0.009262999999999999,
+        "p99_ms": 0.009713,
+        "max_ms": 0.010961,
+        "iters": 300
+      },
+      "result_rows": 0,
+      "pass": true
+    }
+  ],
+  "all_pass": true
+}

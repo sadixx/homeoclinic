@@ -1,0 +1,43 @@
+[package]
+name = "hc-perf"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+# NFR-002 performance CI gate (HC-MVP1-057). Owned by hc-perf-tester.
+#
+# A standalone release-profile binary that seeds N synthetic patients through
+# the real hc-seed generator (NFR-007) into an encrypted clinic.db keyed with
+# the SAME deterministic dev/test key the seed/E2E path uses, then measures the
+# four NFR-002 patient paths (search / dashboard / advanced filter / Today
+# follow-up list) at scale and EXITS NON-ZERO when any p95 budget is missed.
+#
+# The heavy run is a BINARY, not a `cargo test`, so `cargo test --workspace`
+# stays fast; CI runs this binary explicitly in a dedicated perf job. See
+# .github/workflows/ci.yml.
+
+[[bin]]
+name = "hc-perf"
+path = "src/main.rs"
+
+[lib]
+name = "hc_perf"
+path = "src/lib.rs"
+
+[dependencies]
+# The synthetic data generator (NFR-007). Pulls hc-storage `testing` transitively
+# so the DevKeyProvider test key opens the seeded DB.
+hc-seed = { path = "../../tools/seed" }
+# The ranked search query (patient_search core).
+hc-search = { path = "../../crates/hc-search" }
+# The use-case services actually wired to the Tauri commands: patient_search,
+# patient_get_dashboard, patient_list_query. Measuring these is the honest path.
+hc-app = { path = "../../crates/hc-app" }
+# The pool + the dev/test key provider + the FileKeystore (unused by the
+# measured read paths but required to construct PatientService). `testing`
+# exposes DevKeyProvider; the seed opens the DB with the same key.
+hc-storage = { path = "../../crates/hc-storage", features = ["testing"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# Fixed-instant clock for the Today-window bound (no wall clock; reproducible).
+tempfile = "3"

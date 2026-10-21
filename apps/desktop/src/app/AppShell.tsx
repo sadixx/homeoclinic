@@ -2,12 +2,16 @@
 // bar, wired to a router. It owns its own HashRouter so it is self-contained
 // (the unit test renders <AppShell /> with no external provider).
 //
-// R-DEL-002: only shipped features get a route. At M0 the Patients and Settings
-// modules are gated OFF by the compile-time feature flags (src/shared/features.ts),
-// so there is NO /patients or /settings route and NO "coming soon" screen. Their
-// nav items still render (disabled, see SideNav) but navigate nowhere.
-//   /today  -> S03 Today (empty state at R0), the default route
-//   /lock   -> S02 lock stub (full-window overlay, no nav)
+// R-DEL-002: only shipped features get a route. Patients ships at M2 Slice D
+// (R2), so when the compile-time flag features.patients is on (vite.config.ts)
+// the shell mounts a real /patients route AND the global S04 search overlay —
+// there is no dead-end nav. Settings is still gated OFF at M0/M1: its nav item
+// renders (disabled, see SideNav) but has no route and no "coming soon" screen.
+//   /today    -> S03 Today (empty state at R0), the default route
+//   /patients -> S05/S06/S07 patient UI (list / register+edit / dashboard),
+//                deep-linked via ?id=<patientId> or ?view=new (search overlay)
+//   /backup   -> S17 backup/restore (BAK-001..004)
+//   /lock     -> S02 lock stub (full-window overlay, no nav)
 // Unknown routes redirect to /today.
 //
 // Launch boot-gate (SET-001, SET-004; handoff 34): before the router mounts,
@@ -30,15 +34,18 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from 'react-router-dom';
 
 import { LockScreen } from '@/app/LockScreen';
+import { SearchOverlay } from '@/app/SearchOverlay';
 import { SideNav, type NavRoute } from '@/app/SideNav';
 import { StatusBar } from '@/app/StatusBar';
 import { TopBar } from '@/app/TopBar';
 import { BackupScreen } from '@/backup/BackupScreen';
 import { commands } from '@/bindings';
 import { TodayScreen } from '@/home/TodayScreen';
+import { PatientsPage } from '@/patients/PatientsPage';
 import { SetupWizard } from '@/setup/SetupWizard';
 import { run } from '@/shared/command';
 import { features } from '@/shared/features';
@@ -171,6 +178,13 @@ function ShellFrame({
 }): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
+  // Global search overlay (S04): the shell owns its open state so it floats
+  // over every screen. Opened from the top-bar box or F2 / Ctrl+K (TopBar
+  // reports the intent via onOpenSearch); Esc / backdrop / opening a patient
+  // closes it.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
 
   const goToLock = useCallback(() => navigate('/lock'), [navigate]);
   const onNavigate = useCallback(
@@ -178,6 +192,20 @@ function ShellFrame({
     [navigate],
   );
   const goToBackup = useCallback(() => navigate('/backup'), [navigate]);
+
+  // Enter on a search result opens that patient's dashboard: navigate into the
+  // /patients route carrying the id in the hash query so PatientsPage deep-
+  // links straight to the S07 dashboard (consistent with its initialPatientId).
+  const openPatient = useCallback(
+    (patientId: string): void => {
+      navigate(`/patients?id=${encodeURIComponent(patientId)}`);
+    },
+    [navigate],
+  );
+  // The no-results "New patient" action opens the register form (S06).
+  const openNewPatient = useCallback((): void => {
+    navigate('/patients?view=new');
+  }, [navigate]);
 
   // Idle auto-lock (SET-004): after the configured idle timeout with no user
   // activity, lock the app. Any clinical edit is already autosaved (CASE-005),
@@ -219,16 +247,18 @@ function ShellFrame({
   const activeRoute: NavRoute | undefined =
     location.pathname === '/today' || location.pathname === '/'
       ? '/today'
-      : location.pathname === '/backup'
-        ? '/backup'
-        : undefined;
+      : location.pathname === '/patients'
+        ? '/patients'
+        : location.pathname === '/backup'
+          ? '/backup'
+          : undefined;
 
   return (
     <div
       data-testid="app-shell"
       className="flex h-screen flex-col bg-white text-[14px]"
     >
-      <TopBar onLock={goToLock} />
+      <TopBar onLock={goToLock} onOpenSearch={openSearch} />
       <div className="flex min-h-0 flex-1">
         <SideNav activeRoute={activeRoute} onNavigate={onNavigate} />
         <main
@@ -238,6 +268,9 @@ function ShellFrame({
           <Routes>
             <Route path="/" element={<Navigate to="/today" replace />} />
             <Route path="/today" element={<TodayScreen />} />
+            {features.patients ? (
+              <Route path="/patients" element={<PatientsRoute />} />
+            ) : null}
             {features.backup ? (
               <Route path="/backup" element={<BackupScreen />} />
             ) : null}
@@ -246,7 +279,41 @@ function ShellFrame({
         </main>
       </div>
       <StatusBar onOpenBackup={goToBackup} />
+      {/* S04 global search overlay, floating over the whole shell. */}
+      {features.patients ? (
+        <SearchOverlay
+          open={searchOpen}
+          onClose={closeSearch}
+          onOpenPatient={openPatient}
+          onNewPatient={openNewPatient}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * `/patients` route wrapper (S05/S06/S07). Reads an optional deep-link from the
+ * hash query — `?id=<patientId>` opens straight to that patient's dashboard
+ * (S07, used by the search overlay's Enter), `?view=new` opens the register
+ * form (S06, used by the no-results "New patient" action) — and otherwise
+ * lands on the patient list (S05). The query is the single source of the
+ * initial view, so the same URL is shareable/deep-linkable and the `key`
+ * forces a fresh PatientsPage when the deep-linked id changes (a new search
+ * Enter must re-open the dashboard even from within /patients).
+ */
+function PatientsRoute(): JSX.Element {
+  const [params] = useSearchParams();
+  const id = params.get('id') ?? undefined;
+  const view = params.get('view') === 'new' ? 'new' : 'list';
+  // `exactOptionalPropertyTypes` is on: pass initialPatientId only when it is a
+  // real id, never an explicit `undefined`. The `key` forces a fresh
+  // PatientsPage when the deep-linked id changes (a new search Enter re-opens
+  // the dashboard even from within /patients).
+  return id !== undefined ? (
+    <PatientsPage key={id} initialPatientId={id} />
+  ) : (
+    <PatientsPage key={view} initialView={view} />
   );
 }
 

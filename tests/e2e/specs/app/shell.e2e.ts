@@ -26,6 +26,7 @@
 import { expect } from '@wdio/globals';
 
 import { bootPage } from '../../pages/boot.page.js';
+import { searchPage } from '../../pages/search.page.js';
 import { setupPage } from '../../pages/setup.page.js';
 import { shellPage } from '../../pages/shell.page.js';
 import { completeFirstRunWizard } from '../../helpers/setup-flow.js';
@@ -70,9 +71,15 @@ describe('R0 walking skeleton: app shell renders', () => {
     await expect(shellPage.todayScreen).toBeDisplayed();
     await expect(shellPage.todayEmpty).toBeDisplayed();
 
-    // Step 3: F2 focuses the global search box.
+    // Step 3: F2 is the global-search affordance. Since M2 Slice D the shell
+    // mounts a global SearchOverlay (S04) and F2 / Ctrl+K OPEN it (TopBar
+    // onOpenSearch), rather than merely focusing the inline top-bar box as at
+    // R0/R1. The top-bar box is now a launcher (readOnly) whose focus opens the
+    // overlay; asserting the overlay opens on F2 and its input takes focus is
+    // the honest R0 gate against the current, reviewer-clean wiring.
     await expect(shellPage.search).toBeDisplayed();
-    await shellPage.focusSearchWithF2();
-    await expect(await shellPage.searchIsFocused()).toBe(true);
+    await searchPage.openWithF2();
+    await expect(searchPage.overlay).toBeDisplayed();
+    await expect(searchPage.input).toBeFocused();
   });
 });

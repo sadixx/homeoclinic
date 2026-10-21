@@ -13,7 +13,7 @@
 // restart the driver chain at the chosen dir and `reloadSession()` so the Tauri
 // app is relaunched there — the exact "separate launch, specific data dir"
 // behaviour the orchestrator got from separate processes.
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -125,6 +125,47 @@ export async function relaunchInto(name: string): Promise<void> {
 export async function relaunchFresh(name: string): Promise<void> {
   // Allocate (or reuse by name) — callers pass a NEW name for a clean install.
   await relaunchInto(name);
+}
+
+/**
+ * Relaunch the app against the NAMED data dir using a SPECIFIC application
+ * binary, restarting the driver chain and reloading the session with the
+ * chosen `tauri:options.application`. This is the lever the upgrade-path
+ * harness needs: it must launch the PREVIOUS-release build (e.g. the R1 app)
+ * to provision/age a data dir, then launch the CURRENT-release build (the R2
+ * app under test) over the SAME dir — a genuine "install N over N-1".
+ *
+ * tauri-driver takes the app binary from the `tauri:options.application`
+ * capability at session-init, so passing it to `reloadSession` switches which
+ * binary the next launch runs. The XDG_DATA_HOME is still set on the driver
+ * chain (startDriver) so the launched app — whichever build — resolves the
+ * SAME on-disk data dir. `binaryPath` must be an existing, absolute path.
+ */
+export async function relaunchIntoWithBinary(
+  name: string,
+  binaryPath: string,
+): Promise<void> {
+  if (!existsSync(binaryPath)) {
+    throw new Error(
+      `infra_incomplete: application binary not found at ${binaryPath} ` +
+        `(upgrade-path harness needs both the previous- and current-release ` +
+        `builds; set HC_R1_APP_BINARY to the R1 build and leave the default ` +
+        `target/debug/homeoclinic-desktop as the R2 build).`,
+    );
+  }
+  const s = requireState();
+  const dir = dataDir(name);
+  s.current = dir;
+  // The app is launched by WebKitWebDriver, which inherits XDG_DATA_HOME from
+  // the driver chain; reap+respawn it pointed at `dir` first.
+  await startDriver(dataDirEnv(dir));
+  // Reload with the overridden application capability so THIS launch runs the
+  // chosen binary. tauri-driver reads `tauri:options.application` per session.
+  await browser.reloadSession({
+    'tauri:options': { application: binaryPath },
+    browserName: 'wry',
+    'wdio:enforceWebDriverClassic': true,
+  } as WebdriverIO.Capabilities);
 }
 
 /**

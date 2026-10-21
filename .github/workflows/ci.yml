@@ -278,3 +278,60 @@ jobs:
           retention-days: 14
           path: |
             .e2e-out/**
+
+  perf-gate:
+    name: NFR-002 performance gate (50k + 100k)
+    needs: lint-and-test
+    # HC-MVP1-057 / NFR-002 / NFR-007 (R-PERF-004): seed the synthetic dataset
+    # at BOTH 50k and 100k with the real hc-seed generator and run the perf
+    # harness (tests/perf) against each. The harness exits non-zero when any
+    # NFR-002 p95 budget is missed, which fails this job and the build. The
+    # heavy run is a release BINARY, not `cargo test`, so the lint-and-test
+    # `cargo test --workspace` gate stays fast; this job runs it explicitly.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Ubuntu system dependencies
+        # SQLCipher (bundled-sqlcipher-vendored-openssl) builds from source;
+        # build-essential + libssl-dev cover the native toolchain it needs.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev
+
+      - name: Build perf harness (release profile, R-PERF-004)
+        run: cargo build --release -p hc-perf
+
+      # Deterministic seed so a run is reproducible; 300 iterations/op (>= the
+      # 200-iteration procedure minimum) after discarded warm-ups. A missed
+      # budget exits non-zero and FAILS the build (NFR-007 done-when).
+      - name: Perf gate at 50k patients (NFR-002 + DB-size NFR-007)
+        run: |
+          ./target/release/hc-perf \
+            --patients 50000 --seed 7 --iters 300 \
+            --baseline-out "$RUNNER_TEMP/perf-50k.json"
+
+      - name: Perf gate at 100k patients (NFR-002, must also pass)
+        run: |
+          ./target/release/hc-perf \
+            --patients 100000 --seed 7 --iters 300 \
+            --baseline-out "$RUNNER_TEMP/perf-100k.json"
+
+      - name: Upload perf baselines
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: homeoclinic-perf-baselines
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/perf-50k.json
+            ${{ runner.temp }}/perf-100k.json
+            tests/perf/baseline.json

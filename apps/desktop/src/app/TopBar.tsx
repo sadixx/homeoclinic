@@ -16,18 +16,33 @@ export interface TopBarProps {
   onHelp?: () => void;
   /** Invoked when the Lock button or Ctrl+L is pressed. */
   onLock?: () => void;
+  /**
+   * Invoked to open the global search overlay (S04): F2 / Ctrl+K from
+   * anywhere, or focusing / clicking the top-bar search box. The shell owns
+   * the overlay; the top bar only reports the intent so TopBar stays
+   * router-free and unit-testable on its own.
+   */
+  onOpenSearch?: () => void;
 }
 
 /** Fixed-height top bar with global search and Help/Lock actions. */
-export function TopBar({ onHelp, onLock }: TopBarProps): JSX.Element {
+export function TopBar({
+  onHelp,
+  onLock,
+  onOpenSearch,
+}: TopBarProps): JSX.Element {
   const info = useAppInfo();
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const focusSearch = useCallback(() => {
+  const openSearch = useCallback(() => {
+    // Keep focusing the inline box (its own focus ring is the F2 affordance
+    // when no overlay is wired, e.g. the standalone TopBar unit test), then
+    // ask the shell to open the overlay over the current screen (S04).
     searchRef.current?.focus();
-  }, []);
+    onOpenSearch?.();
+  }, [onOpenSearch]);
 
-  // Global shortcuts: F2 / Ctrl+K focus search; F1 help; Ctrl+L lock
+  // Global shortcuts: F2 / Ctrl+K open search; F1 help; Ctrl+L lock
   // (00-conventions §3). Ignored while an IME composition is active.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -38,7 +53,7 @@ export function TopBar({ onHelp, onLock }: TopBarProps): JSX.Element {
         (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
       if (event.key === 'F2' || ctrlK) {
         event.preventDefault();
-        focusSearch();
+        openSearch();
         return;
       }
       if (event.key === 'F1') {
@@ -53,7 +68,7 @@ export function TopBar({ onHelp, onLock }: TopBarProps): JSX.Element {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [focusSearch, onHelp, onLock]);
+  }, [openSearch, onHelp, onLock]);
 
   const version = info ? info.version : '…';
 
@@ -76,6 +91,18 @@ export function TopBar({ onHelp, onLock }: TopBarProps): JSX.Element {
         type="search"
         placeholder={`${t('search.placeholder')} (F2)`}
         aria-keyshortcuts="F2 Control+K"
+        readOnly={onOpenSearch !== undefined}
+        onFocus={onOpenSearch}
+        onMouseDown={
+          onOpenSearch
+            ? (e) => {
+                // The real box is a launcher for the overlay (S04): clicking it
+                // opens the overlay whose own input takes the keystrokes.
+                e.preventDefault();
+                onOpenSearch();
+              }
+            : undefined
+        }
         className="h-8 flex-1 rounded border border-slate-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
       />
 

@@ -53,10 +53,28 @@ webview-observable end state (app opens, migrated schema serves, R1 backups
 open). This mirrors how `restore-clean-install.e2e.ts` defers exact
 profile-value equality to a Rust integration test.
 
-## Future releases (R2 onward)
+## R2 onward (IMPLEMENTED: the R1 -> R2 hop)
 
-From R2 the previous release *does* write real data. This same harness slot
-(`tests/e2e/specs/release/upgrade-path.e2e.ts`) should then seed the actual
-previous-release data dir (patients, cases, backups) and assert the new build
-migrates it forward and opens it — the NFR-011 contract is unchanged; only the
-seeded `user_version` and row counts grow.
+From R2 the previous release *does* write real data, so the harness no longer
+relies on an empty baseline for that hop. The same harness slot
+(`tests/e2e/specs/release/upgrade-path.e2e.ts`, PHASE C/D) now installs the
+**R2 build over a GENUINE R1 install**:
+
+- PHASE C launches the **R1 build** (`HC_R1_APP_BINARY` — the R1 source tree,
+  i.e. `staging-main`, built as a debug app; migrations 0001..0003) and runs the
+  real first-run wizard, leaving a real `clinic.db` at `user_version` **3** plus
+  a PIN-derived key hierarchy, the doctor/clinic profile rows, and a real
+  R1-made `.hcbak`.
+- PHASE D launches the **R2 build under test** over that SAME dir and asserts the
+  upgrade: migrations advance forward **3 → 7** (0004_patient_search,
+  0005_patient_diagnosis, 0006_patient_registration, 0007_patient_recent), the
+  R1 PIN unlocks the DB, the R1 profile/setup persists, and the R1-made `.hcbak`
+  still opens under R2.
+
+The NFR-011 / R-DEL-004 contract is unchanged; only the seeded `user_version`
+and the real previous-release data grow with each hop. If `HC_R1_APP_BINARY` is
+absent the R1 -> R2 phases SKIP (infra) rather than silently pass — the executor
+must supply the R1 build. The exact `user_version` advance and profile-value
+equality remain asserted at the Rust layer
+(`crates/hc-storage/tests/migrate_test.rs`); the E2E hop asserts the equivalent
+webview-observable end state.

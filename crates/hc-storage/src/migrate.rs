@@ -36,6 +36,32 @@ pub fn migrations() -> &'static [Migration] {
             target: 3,
             sql: include_str!("migrations/0003_licence_state.sql"),
         },
+        // HC-MVP1-047: patient table + patient_fts (prefix) + patient_trgm
+        // (trigram) + same-transaction sync triggers (PSR-012, R-DATA-006).
+        Migration {
+            target: 4,
+            sql: include_str!("migrations/0004_patient_search.sql"),
+        },
+        // HC-MVP1-056: primary `diagnosis` column on patient (synthetic data
+        // generator disease spread; later dashboard/filter use). Forward-only.
+        Migration {
+            target: 5,
+            sql: include_str!("migrations/0005_patient_diagnosis.sql"),
+        },
+        // HC-MVP1-036..043: patient registration demographic columns, the
+        // family_link table (PAT-006) and the never-reused patient_sequence
+        // counter (PAT-002). Additive; does not touch the 0004 FTS triggers.
+        Migration {
+            target: 6,
+            sql: include_str!("migrations/0006_patient_registration.sql"),
+        },
+        // HC-MVP1-050: the non-clinical "recently opened" patient list (PSR-007)
+        // shown when the S04 search box is empty. Additive; no FTS trigger
+        // impact. R-DATA-005 exemption (UI convenience list, like `setting`).
+        Migration {
+            target: 7,
+            sql: include_str!("migrations/0007_patient_recent.sql"),
+        },
     ]
 }
 

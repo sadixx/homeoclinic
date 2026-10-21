@@ -1583,6 +1583,7 @@ dependencies = [
  "hc-licence",
  "hc-repertory",
  "hc-search",
+ "hc-seed",
  "hc-storage",
  "serde",
  "serde_json",
@@ -1625,6 +1626,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc-perf"
+version = "0.1.0"
+dependencies = [
+ "hc-app",
+ "hc-search",
+ "hc-seed",
+ "hc-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "hc-repertory"
 version = "0.1.0"
 dependencies = [
@@ -1636,7 +1650,30 @@ name = "hc-search"
 version = "0.1.0"
 dependencies = [
  "hc-domain",
+ "hc-search",
  "hc-storage",
+ "rusqlite",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "hc-seed"
+version = "0.1.0"
+dependencies = [
+ "hc-domain",
+ "hc-search",
+ "hc-storage",
+ "rand",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

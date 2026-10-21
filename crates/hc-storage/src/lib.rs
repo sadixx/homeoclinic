@@ -20,6 +20,7 @@ pub mod key;
 pub mod keystore;
 pub mod licence;
 pub mod migrate;
+pub mod patient;
 pub mod pool;
 pub mod profile;
 pub(crate) mod wrap;
