@@ -145,6 +145,17 @@ export class PatientsPage {
     await this.dashTakeCaseBtn.click();
   }
 
+  /**
+   * Click "New visit" on the S07 dashboard. When the patient has a prior visit
+   * the dashboard resolves this to onNewFollowup (S09 follow-up); with no prior
+   * visit it falls back to onTakeCase (S08). The caller waits for the resulting
+   * screen (followupPage.waitForScreen / casePage.waitForForm).
+   */
+  async dashNewVisit(timeout = 15000): Promise<void> {
+    await this.dashNewVisitBtn.waitForClickable({ timeout });
+    await this.dashNewVisitBtn.click();
+  }
+
   // ---- navigation --------------------------------------------------------
 
   /** Open the S06 register form via the deep-link the search overlay uses. */

@@ -51,6 +51,7 @@ import { PatientsPage } from '@/patients/PatientsPage';
 import { SetupWizard } from '@/setup/SetupWizard';
 import { run } from '@/shared/command';
 import { features } from '@/shared/features';
+import { FollowupVisit } from '@/visit/FollowupVisit';
 
 /**
  * Default idle auto-lock timeout in minutes (SET-004). The shell runs the idle
@@ -242,6 +243,38 @@ function ShellFrame({
     [openCaseVisit],
   );
 
+  // Navigate to the S09 follow-up visit for a patient with a prior visit. The
+  // previous visit (whose complaints pre-load, VIS-002) is carried in the hash
+  // query so the deep-linkable URL holds everything FollowupVisit needs.
+  const openFollowupVisit = useCallback(
+    (patientId: string, visitId: string, prevVisitId: string): void => {
+      navigate(
+        `/patient/${encodeURIComponent(patientId)}/visit/${encodeURIComponent(
+          visitId,
+        )}/followup?prev=${encodeURIComponent(prevVisitId)}`,
+      );
+    },
+    [navigate],
+  );
+
+  // Start (create) a Follow-up visit and route into S09 (dashboard "New visit"
+  // when a prior visit exists; F5 when the resolved type is Follow-up). Only
+  // the generated binding is called; the resolved `visit_id` becomes the route
+  // param so the URL is deep-linkable (S09 entry points, VIS-001/002).
+  const startFollowupForPatient = useCallback(
+    async (patientId: string, prevVisitId: string): Promise<void> => {
+      try {
+        const created = await run(
+          commands.visitCreateFollowup({ patientId, prevVisitId }),
+        );
+        openFollowupVisit(patientId, created.visitId, prevVisitId);
+      } catch {
+        /* a failed create leaves the user where they are; no dead end */
+      }
+    },
+    [openFollowupVisit],
+  );
+
   // The patient currently in focus (if any), parsed from the active route so
   // F5 "new visit for the open patient" (S08 keyboard) knows whom to open. It
   // is set by the /patients?id=<id> dashboard deep-link and by the case route.
@@ -249,6 +282,12 @@ function ShellFrame({
     const caseMatch = /^\/patient\/([^/]+)\/case\//.exec(location.pathname);
     if (caseMatch && caseMatch[1] !== undefined) {
       return decodeURIComponent(caseMatch[1]);
+    }
+    const followupMatch = /^\/patient\/([^/]+)\/visit\//.exec(
+      location.pathname,
+    );
+    if (followupMatch && followupMatch[1] !== undefined) {
+      return decodeURIComponent(followupMatch[1]);
     }
     if (location.pathname === '/patients') {
       const params = new URLSearchParams(location.search);
@@ -334,18 +373,35 @@ function ShellFrame({
             <Route path="/" element={<Navigate to="/today" replace />} />
             <Route
               path="/today"
-              element={<TodayScreen onNewPatient={openNewPatient} />}
+              element={
+                <TodayScreen
+                  onNewPatient={openNewPatient}
+                  onOpenPatient={openPatient}
+                  onOpenBackup={goToBackup}
+                />
+              }
             />
             {features.patients ? (
               <Route
                 path="/patients"
-                element={<PatientsRoute onTakeCase={startCaseForPatient} />}
+                element={
+                  <PatientsRoute
+                    onTakeCase={startCaseForPatient}
+                    onNewFollowup={startFollowupForPatient}
+                  />
+                }
               />
             ) : null}
             {features.case ? (
               <Route
                 path="/patient/:patientId/case/:visitId"
                 element={<CaseRoute />}
+              />
+            ) : null}
+            {features.case ? (
+              <Route
+                path="/patient/:patientId/visit/:visitId/followup"
+                element={<FollowupRoute />}
               />
             ) : null}
             {features.backup ? (
@@ -381,8 +437,10 @@ function ShellFrame({
  */
 function PatientsRoute({
   onTakeCase,
+  onNewFollowup,
 }: {
   readonly onTakeCase: (patientId: string) => void;
+  readonly onNewFollowup: (patientId: string, prevVisitId: string) => void;
 }): JSX.Element {
   const [params] = useSearchParams();
   const id = params.get('id') ?? undefined;
@@ -392,9 +450,19 @@ function PatientsRoute({
   // PatientsPage when the deep-linked id changes (a new search Enter re-opens
   // the dashboard even from within /patients).
   return id !== undefined ? (
-    <PatientsPage key={id} initialPatientId={id} onTakeCase={onTakeCase} />
+    <PatientsPage
+      key={id}
+      initialPatientId={id}
+      onTakeCase={onTakeCase}
+      onNewFollowup={onNewFollowup}
+    />
   ) : (
-    <PatientsPage key={view} initialView={view} onTakeCase={onTakeCase} />
+    <PatientsPage
+      key={view}
+      initialView={view}
+      onTakeCase={onTakeCase}
+      onNewFollowup={onNewFollowup}
+    />
   );
 }
 
@@ -451,6 +519,29 @@ function CaseRoute(): JSX.Element {
       visitId={visitId}
       sex={sex}
       ageYears={ageYears}
+    />
+  );
+}
+
+/**
+ * `/patient/:patientId/visit/:visitId/followup` route (S09). The follow-up
+ * visit id comes from the path; the previous visit whose complaints pre-load
+ * (VIS-002) is carried in the `?prev=` hash query so the URL is deep-linkable
+ * and the completion guard still wraps it (it is a shell route). The component
+ * itself fetches the pre-loaded complaints and autosaves (VIS-002/003). UI ->
+ * typed commands only.
+ */
+function FollowupRoute(): JSX.Element {
+  const params = useParams<{ patientId: string; visitId: string }>();
+  const [query] = useSearchParams();
+  const patientId = params.patientId ?? '';
+  const visitId = params.visitId ?? '';
+  const prevVisitId = query.get('prev') ?? '';
+  return (
+    <FollowupVisit
+      patientId={patientId}
+      visitId={visitId}
+      prevVisitId={prevVisitId}
     />
   );
 }

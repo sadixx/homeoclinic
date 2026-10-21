@@ -46,6 +46,7 @@ const {
   caseVisitAutosave,
   caseSummaryRender,
   caseTemplateSetVisibility,
+  todayGetOverview,
 } = vi.hoisted(() => ({
   setupGetState: vi.fn(),
   authGetLockState: vi.fn(),
@@ -71,6 +72,16 @@ const {
   caseVisitAutosave: vi.fn(),
   caseSummaryRender: vi.fn(),
   caseTemplateSetVisibility: vi.fn(),
+  // S03 Today upgrade (R3): the TodayScreen now calls today_get_overview on
+  // mount, so every Today-routed AppShell render depends on it. Default to an
+  // all-empty overview so the shell renders Today's empty state.
+  todayGetOverview: vi.fn(async () => ({
+    dueToday: [],
+    overdue: [],
+    registeredToday: [],
+    backupWarning: null,
+    licenceReminder: null,
+  })),
 }));
 
 vi.mock('@/bindings', () => ({
@@ -116,6 +127,8 @@ vi.mock('@/bindings', () => ({
     caseVisitAutosave,
     caseSummaryRender,
     caseTemplateSetVisibility,
+    // S03 Today overview read (R3) the TodayScreen fires on mount.
+    todayGetOverview,
   },
 }));
 

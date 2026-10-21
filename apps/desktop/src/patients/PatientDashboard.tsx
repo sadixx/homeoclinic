@@ -40,6 +40,13 @@ export interface PatientDashboardProps {
    * dead end with a real, enabled action.
    */
   readonly onTakeCase?: (patientId: string) => void;
+  /**
+   * Start a Follow-up visit (S09) for this patient, carrying the previous
+   * visit whose complaints pre-load (VIS-002). When a prior visit exists the
+   * "New visit" action resolves to a follow-up rather than a fresh First case
+   * (S09 entry points; F5 resolution). Shipped at R3.
+   */
+  readonly onNewFollowup?: (patientId: string, prevVisitId: string) => void;
   /** Render already in the recycle bin (deep-link into a soft-deleted row). */
   readonly initiallyDeleted?: boolean;
 }
@@ -51,6 +58,7 @@ export function PatientDashboard({
   onEdit,
   onBack,
   onTakeCase,
+  onNewFollowup,
   initiallyDeleted = false,
 }: PatientDashboardProps): JSX.Element {
   const [data, setData] = useState<PatientDashboardData | null>(null);
@@ -308,7 +316,17 @@ export function PatientDashboard({
           <button
             type="button"
             data-testid="patient-dash-new-visit"
-            onClick={() => onTakeCase?.(patientId)}
+            onClick={() => {
+              // A patient with a prior visit routes to a Follow-up (S09),
+              // carrying the newest visit as the one whose complaints pre-load
+              // (VIS-002). With no prior visit, start a First case (S08).
+              const prev = data.visits[0];
+              if (prev !== undefined && onNewFollowup !== undefined) {
+                onNewFollowup(patientId, prev.visitId);
+              } else {
+                onTakeCase?.(patientId);
+              }
+            }}
             className="rounded bg-blue-600 px-3 py-1.5 font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700"
           >
             {t('patient.dash.newVisit')}

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-21T18:04:06.873Z",
+  "generatedAt": "2026-10-21T19:21:06.784Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -63,6 +63,18 @@
       ],
       "tier": "stable",
       "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/home/today-overview.e2e.ts",
+      "reqs": [
+        "VIS-004",
+        "VIS-005"
+      ],
+      "tier": "stable",
+      "area": "home",
       "targets": [
         "linux"
       ]
@@ -154,6 +166,20 @@
       "targets": [
         "linux",
         "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/visit/followup-visit.e2e.ts",
+      "reqs": [
+        "VIS-001",
+        "VIS-002",
+        "VIS-003",
+        "CASE-005"
+      ],
+      "tier": "stable",
+      "area": "visit",
+      "targets": [
+        "linux"
       ]
     }
   ]
