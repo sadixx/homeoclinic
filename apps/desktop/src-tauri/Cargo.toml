@@ -22,3 +22,23 @@ e2e-test-keys = ["hc-app/e2e-test-keys"]
 [dependencies]
 hc-app = { path = "../../../crates/hc-app" }
 tauri = { workspace = true }
+# Non-blocking startup log line when the webview camera permission cannot be
+# wired (HC-MVP1-038). Already the workspace logging stack; adds no new sink.
+tracing = { workspace = true }
+
+# Linux: grant the WebKitGTK webview's getUserMedia (camera) permission request
+# for patient photo capture (HC-MVP1-038). Pinned to the exact version already
+# resolved in Cargo.lock (= the version wry 0.57 pins); `v2_8` gives
+# `UserMediaPermissionRequest::is_for_video_device`, and is unified up to the
+# `v2_40` that wry already enables, so the resolved feature set is unchanged.
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = { version = "=2.0.2", features = ["v2_8"] }
+
+# Windows: grant the WebView2 Camera permission request (HC-MVP1-038). Pinned to
+# the version already resolved in Cargo.lock (transitive via tauri/wry). COM
+# interop requires a narrowly-scoped `unsafe` block — see ADR 0015. Never built
+# on Linux/macOS. The WebView2 COM types (permission kind/state, args, event
+# handler) are re-exported by `webview2-com`, so no direct `windows` dep is
+# needed.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "=0.39.1"
