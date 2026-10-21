@@ -11,3 +11,4 @@ pub mod health;
 pub mod licence;
 pub mod patient;
 pub mod setup;
+pub mod visit;

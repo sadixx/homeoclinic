@@ -18,6 +18,7 @@ pub mod logging;
 pub mod patient;
 pub mod setup;
 pub mod state;
+pub mod visit;
 
 use tauri_specta::{collect_commands, Builder};
 
@@ -83,7 +84,21 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::patient::patient_recent,
                 commands::patient::patient_touch_recent,
                 commands::patient::patient_list_query,
-                commands::patient::patient_list_export_csv
+                commands::patient::patient_list_export_csv,
+                // Case-template + visit + Today use-case commands (HC-MVP1-058/
+                // 061/062/063/064/068..072, S08/S09/S03).
+                commands::visit::case_template_get_default,
+                commands::visit::case_template_list,
+                commands::visit::case_visit_open_or_create,
+                commands::visit::case_visit_autosave,
+                commands::visit::case_summary_render,
+                commands::visit::visit_create_followup,
+                commands::visit::visit_autosave,
+                commands::visit::visit_set_next_followup,
+                commands::visit::today_get_overview,
+                // Send-to-repertory STUB (CASE-006, R7) — flagged unavailable,
+                // registered for a stable binding (no dead end, R-DEL-002).
+                commands::visit::rubric_search_prefill
             ]
         };
         (with_e2e) => {
@@ -127,6 +142,17 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::patient::patient_touch_recent,
                 commands::patient::patient_list_query,
                 commands::patient::patient_list_export_csv,
+                // Case-template + visit + Today use-case commands (M3-A).
+                commands::visit::case_template_get_default,
+                commands::visit::case_template_list,
+                commands::visit::case_visit_open_or_create,
+                commands::visit::case_visit_autosave,
+                commands::visit::case_summary_render,
+                commands::visit::visit_create_followup,
+                commands::visit::visit_autosave,
+                commands::visit::visit_set_next_followup,
+                commands::visit::today_get_overview,
+                commands::visit::rubric_search_prefill,
                 // DEV/E2E ONLY (feature e2e-test-keys): synthetic fixture
                 // import through the real create path (OPTION A seeding).
                 commands::patient::patient_import_fixture

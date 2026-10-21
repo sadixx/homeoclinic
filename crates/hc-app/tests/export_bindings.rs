@@ -202,3 +202,46 @@ fn m2d_export_bindings_contains_search_and_list_commands() {
         "patientListExportCsv returns a filePath (PSR-011)"
     );
 }
+
+/// HC-MVP1-058/061/062/063/064/068..072 (R-TEST-008, R-ARCH-004): exporting the
+/// collection declares the ten M3-A case/visit/Today command wrappers and the
+/// camelCase field names the S08/S09/S03 UI depends on, so a command dropped
+/// from `specta_builder()` or a renamed type fails HERE (an assertion) rather
+/// than later as a UI TS2307/TS2339. Asserts on generated CONTENT (R-TEST-003).
+#[test]
+fn export_bindings_contains_m3_case_visit_commands() {
+    // `_dir` keeps the temp dir alive for the body; dropping it cleans up.
+    let (generated, _dir) = export_bindings_content();
+
+    for wrapper in [
+        "caseTemplateGetDefault",
+        "caseTemplateList",
+        "caseVisitOpenOrCreate",
+        "caseVisitAutosave",
+        "caseSummaryRender",
+        "visitCreateFollowup",
+        "visitAutosave",
+        "visitSetNextFollowup",
+        "todayGetOverview",
+        "rubricSearchPrefill",
+    ] {
+        assert!(
+            generated.contains(wrapper),
+            "bindings.ts must expose the {wrapper} command wrapper (M3-A contract)"
+        );
+    }
+
+    // camelCase response field names the M3 UI depends on must survive to TS.
+    for field in [
+        "savedAt",
+        "prevComplaints",
+        "dueToday",
+        "overdue",
+        "registeredToday",
+    ] {
+        assert!(
+            generated.contains(field),
+            "bindings.ts must expose the {field} field (M3-A contract)"
+        );
+    }
+}

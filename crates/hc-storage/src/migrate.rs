@@ -62,6 +62,21 @@ pub fn migrations() -> &'static [Migration] {
             target: 7,
             sql: include_str!("migrations/0007_patient_recent.sql"),
         },
+        // HC-MVP1-058: case_template table + the 3 default case templates
+        // (Chronic detailed/Acute quick/Child) whose schema_json encodes the
+        // CASE-001 sections/fields (CASE-001..004). Additive; no existing FTS
+        // trigger impact.
+        Migration {
+            target: 8,
+            sql: include_str!("migrations/0008_case_template.sql"),
+        },
+        // HC-MVP1-068..072: visit table + visit_fts (external-content FTS5) +
+        // same-transaction sync triggers (VIS-001..005, R-DATA-006). B-tree
+        // indexes for the per-patient timeline + the Today follow-up scan.
+        Migration {
+            target: 9,
+            sql: include_str!("migrations/0009_visit.sql"),
+        },
     ]
 }
 

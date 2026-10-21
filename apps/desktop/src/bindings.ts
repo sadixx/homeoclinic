@@ -141,6 +141,26 @@ export const commands = {
 	patientListQuery: (req: ListQueryRequest) => typedError<ListQueryResponse, UserFacingError>(__TAURI_INVOKE("patient_list_query", { req })),
 	/**  Export the current filtered, sorted list as a CSV (HC-MVP1-052, PSR-011). */
 	patientListExportCsv: (req: ListExportCsvRequest) => typedError<ExportResponse, UserFacingError>(__TAURI_INVOKE("patient_list_export_csv", { req })),
+	/**  Get the default case template (CASE-004/001). */
+	caseTemplateGetDefault: () => typedError<DefaultTemplateResponse, UserFacingError>(__TAURI_INVOKE("case_template_get_default")),
+	/**  List all case templates (CASE-004). */
+	caseTemplateList: () => typedError<TemplateListResponse, UserFacingError>(__TAURI_INVOKE("case_template_list")),
+	/**  Open or create the detailed case visit for a patient (VIS-001/CASE-001). */
+	caseVisitOpenOrCreate: (req: OpenOrCreateRequest) => typedError<OpenOrCreateResponse, UserFacingError>(__TAURI_INVOKE("case_visit_open_or_create", { req })),
+	/**  Autosave the case form + vitals, recomputing BMI (CASE-005). */
+	caseVisitAutosave: (req: CaseAutosaveRequest) => typedError<AutosaveResponse, UserFacingError>(__TAURI_INVOKE("case_visit_autosave", { req })),
+	/**  Render the read-only case summary HTML (CASE-009). */
+	caseSummaryRender: (req: SummaryRenderRequest) => typedError<SummaryRenderResponse, UserFacingError>(__TAURI_INVOKE("case_summary_render", { req })),
+	/**  Create a follow-up visit, pre-loading previous complaints (VIS-002). */
+	visitCreateFollowup: (req: CreateFollowupRequest) => typedError<CreateFollowupResponse, UserFacingError>(__TAURI_INVOKE("visit_create_followup", { req })),
+	/**  Autosave the follow-up fields (VIS-002/003). */
+	visitAutosave: (req: FollowupAutosaveRequest) => typedError<AutosaveResponse, UserFacingError>(__TAURI_INVOKE("visit_autosave", { req })),
+	/**  Set the next follow-up date on the visit + patient (VIS-004). */
+	visitSetNextFollowup: (req: SetNextFollowupRequest) => typedError<OkResponse, UserFacingError>(__TAURI_INVOKE("visit_set_next_followup", { req })),
+	/**  The Today overview: due / overdue / registered-today (VIS-005). */
+	todayGetOverview: (req: TodayOverviewRequest) => typedError<TodayOverviewResponse, UserFacingError>(__TAURI_INVOKE("today_get_overview", { req })),
+	/**  Send-to-repertory STUB (CASE-006, R7) — flagged unavailable, no dead end. */
+	rubricSearchPrefill: (req: RubricSearchPrefillRequest) => typedError<RubricSearchPrefillResponse, UserFacingError>(__TAURI_INVOKE("rubric_search_prefill", { req })),
 };
 
 /* Types */
@@ -158,6 +178,12 @@ export type AppInfo = {
 	version: string,
 	/**  Build profile the binary was compiled in. */
 	build_profile: BuildProfile,
+};
+
+/**  Autosave acknowledgement (CASE-005 / VIS-002) — the "Saved" timestamp. */
+export type AutosaveResponse = {
+	/**  RFC3339 instant the save committed at. */
+	savedAt: string,
 };
 
 /**
@@ -214,6 +240,16 @@ export type BuildProfile =
 /**  Compiled in release mode (an optimised, shipped build). */
 "release";
 
+/**  `case_visit_autosave` request (CASE-005). */
+export type CaseAutosaveRequest = {
+	/**  Visit to update. */
+	visitId: string,
+	/**  Case-form answers JSON. */
+	dataJson: string,
+	/**  Vitals JSON (weight/height drive the recomputed BMI). */
+	vitalsJson: string,
+};
+
 /**
  *  Duplicate-check input (`patient_check_duplicate`, PAT-004). At least a name;
  *  mobile and/or dob narrow the match. Never blocks.
@@ -237,6 +273,24 @@ export type CheckDuplicateResponse = {
 export type CompleteSetupResponse = {
 	/**  Route to open after setup (`"/today"`). */
 	homeRoute: string,
+};
+
+/**  `visit_create_followup` request (VIS-002). */
+export type CreateFollowupRequest = {
+	/**  Patient the follow-up belongs to. */
+	patientId: string,
+	/**  The previous visit whose complaints pre-load. */
+	prevVisitId: string,
+};
+
+/**  `visit_create_followup` response (VIS-002). */
+export type CreateFollowupResponse = {
+	/**  The new follow-up visit id. */
+	visitId: string,
+	/**  RFC3339 visit instant. */
+	visitAt: string,
+	/**  The previous visit's complaints, pre-loaded with status to be set. */
+	prevComplaints: PrevComplaint[],
 };
 
 /**
@@ -288,6 +342,16 @@ export type CreatePatientResponse = {
 	patientId: string,
 	/**  The assigned code (PAT-002), e.g. `HC-000123`. */
 	code: string,
+};
+
+/**  `case_template_get_default` response — the default template (CASE-004). */
+export type DefaultTemplateResponse = {
+	/**  Template id (the fixed default id). */
+	templateId: string,
+	/**  Display name. */
+	name: string,
+	/**  The JSON schema (sections[] -> fields[]). */
+	schemaJson: string,
 };
 
 /**  Demographics block (PAT-005). */
@@ -410,6 +474,24 @@ export type FamilyMember = {
 	name: string,
 	/**  Relation (e.g. `Wife`). */
 	relation: string,
+};
+
+/**  `visit_autosave` request (VIS-002/003) — the follow-up fields. */
+export type FollowupAutosaveRequest = {
+	/**  Visit to update. */
+	visitId: string,
+	/**  Visit type. */
+	type: string,
+	/**  Per-complaint status JSON (Better/Same/Worse/New/Resolved). */
+	complaintStatusJson: string,
+	/**  Per-complaint improvement % JSON (D1). */
+	improvementPctJson: string,
+	/**  Remedy-response quick-pick value (VIS-003), or `None`. */
+	remedyResponse: string | null,
+	/**  Vitals JSON. */
+	vitalsJson: string,
+	/**  Free-text observations. */
+	observations: string,
 };
 
 /**  Global font size (SET-005, DEFERRED/P1 — minimal persist only). */
@@ -536,6 +618,34 @@ export type NextCodeResponse = {
 	code: string,
 };
 
+/**  `visit_set_next_followup` response (VIS-004). */
+export type OkResponse = {
+	/**  Whether the update succeeded. */
+	ok: boolean,
+};
+
+/**  `case_visit_open_or_create` request (VIS-001). */
+export type OpenOrCreateRequest = {
+	/**  Patient the visit belongs to. */
+	patientId: string,
+	/**  Visit type: `first | follow_up | acute | tele`. */
+	visitType: string,
+};
+
+/**  `case_visit_open_or_create` response (VIS-001). */
+export type OpenOrCreateResponse = {
+	/**  The open or newly created visit id. */
+	visitId: string,
+	/**  The default template id the case form renders. */
+	templateId: string,
+	/**  Current case-form answers JSON (empty object on a fresh visit). */
+	dataJson: string,
+	/**  Current vitals JSON (empty object on a fresh visit). */
+	vitalsJson: string,
+	/**  RFC3339 visit instant. */
+	visitAt: string,
+};
+
 /**
  *  The single patient dashboard payload (PAT-005). For R2 the visits list is
  *  empty, `last_prescription` is `None` and `dues_paise` is 0 (visits/Rx/billing
@@ -619,6 +729,16 @@ export type PermanentDeleteRequest = {
 	patientId: string,
 	/**  The app PIN, re-verified before the hard delete (PAT-008, R-DATA-003). */
 	pin: string,
+};
+
+/**  One pre-loaded previous complaint (VIS-002). */
+export type PrevComplaint = {
+	/**  Complaint key (section/complaint identifier). */
+	key: string,
+	/**  Complaint text (sensation / summary). */
+	text: string,
+	/**  Complaint location, or empty if none. */
+	location: string,
 };
 
 /**  Recent-list input (`patient_recent`, PSR-007). */
@@ -708,6 +828,24 @@ export type Retention = {
 	weekly: number,
 	/**  Monthly copies kept (12). */
 	monthly: number,
+};
+
+/**  `rubric_search_prefill` request (CASE-006). Carried for a stable binding. */
+export type RubricSearchPrefillRequest = {
+	/**  The visit the symptom text came from. */
+	visitId: string,
+	/**  The selected symptom text to pre-fill the rubric search with. */
+	sourceText: string,
+};
+
+/**
+ *  `rubric_search_prefill` response (CASE-006, R7 stub). `available = false`
+ *  until the repertory engine lands (R7); registered now so the UI binds a
+ *  stable command and sees no dead end (R-DEL-002).
+ */
+export type RubricSearchPrefillResponse = {
+	/**  Always `false` this slice — the feature is not built yet (R7). */
+	available: boolean,
 };
 
 /**  Last-prescription card (PAT-005). R4+; `None` for R2. */
@@ -855,6 +993,14 @@ export type SetFontSizeRequest = {
 	size: FontSize,
 };
 
+/**  `visit_set_next_followup` request (VIS-004). */
+export type SetNextFollowupRequest = {
+	/**  Visit whose next follow-up is set. */
+	visitId: string,
+	/**  Next follow-up date (RFC3339 date), or `None` to clear. */
+	nextFollowupOn: string | null,
+};
+
 /**
  *  PIN set input (SET-004). `pin` must be 4–6 numeric digits and equal
  *  `confirm_pin`.
@@ -920,6 +1066,90 @@ export type StartTrialResponse = {
 	trialValidUntil: string,
 	/**  Whole days remaining in the trial (30 at start). */
 	trialDaysRemaining: number,
+};
+
+/**  `case_summary_render` request (CASE-009). */
+export type SummaryRenderRequest = {
+	/**  Visit to render. */
+	visitId: string,
+};
+
+/**  `case_summary_render` response (CASE-009) — read-only printable HTML. */
+export type SummaryRenderResponse = {
+	/**  The rendered, non-empty case-summary HTML. */
+	html: string,
+};
+
+/**  `case_template_list` response (CASE-004). */
+export type TemplateListResponse = {
+	/**  All templates in presentation order. */
+	templates: TemplateSummary[],
+};
+
+/**  One template summary row (`case_template_list`). */
+export type TemplateSummary = {
+	/**  Template id. */
+	id: string,
+	/**  Display name. */
+	name: string,
+	/**  Whether this is the default template. */
+	isDefault: boolean,
+};
+
+/**  `today_get_overview` request (VIS-005). */
+export type TodayOverviewRequest = {
+	/**  The "today" date (RFC3339 date or instant) the UI anchors on. */
+	today: string,
+};
+
+/**  `today_get_overview` response (VIS-005) — the default home screen. */
+export type TodayOverviewResponse = {
+	/**  Patients due for follow-up today. */
+	dueToday: TodayPatientRow[],
+	/**  Patients whose follow-up is overdue. */
+	overdue: TodayPatientRow[],
+	/**  Visits registered today. */
+	registeredToday: TodayVisitRow[],
+	/**  Backup-stale warning banner text, or `None` (no patient data). */
+	backupWarning: string | null,
+	/**  Licence-reminder banner text, or `None`. */
+	licenceReminder: string | null,
+};
+
+/**  A Today-list patient row (due-today / overdue). */
+export type TodayPatientRow = {
+	/**  Patient id. */
+	patientId: string,
+	/**  Patient code. */
+	code: string,
+	/**  Display name. */
+	name: string,
+	/**  Age label (e.g. `"34 y"`), derived from dob/age_years. */
+	ageLabel: string,
+	/**  Sex, or `None`. */
+	sex: string | null,
+	/**  Opaque photo attachment ref, or `None`. */
+	photoPath: string | null,
+	/**  Next-follow-up date (RFC3339 date), or `None`. */
+	nextFollowupOn: string | null,
+	/**  Outstanding dues in paise (0 at R3 — billing not built, R-DEL-002). */
+	duesPaise: number,
+};
+
+/**  A Today-list registered-visit row (today's registered visits). */
+export type TodayVisitRow = {
+	/**  Patient id. */
+	patientId: string,
+	/**  Patient code. */
+	code: string,
+	/**  Patient display name. */
+	name: string,
+	/**  Opaque photo attachment ref, or `None`. */
+	photoPath: string | null,
+	/**  RFC3339 visit instant. */
+	visitAt: string,
+	/**  Visit type. */
+	type: string,
 };
 
 /**

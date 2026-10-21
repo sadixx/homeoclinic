@@ -51,6 +51,9 @@ family_link(id, patient_id, related_patient_id, relation)
 case_template(id, name, schema_json, is_default)
 visit(id, patient_id, visit_at, type, template_id, data_json, vitals_json, complaint_status_json,
       improvement_pct, remedy_response, next_followup_on, notes)
+      -- Note (ADR 0016, M3-A): `improvement_pct` is realised as
+      -- `improvement_pct_json` (a per-complaint JSON map) to satisfy VIS-002's
+      -- per-complaint improvement %; a forward-only superset of this line.
 attachment(id, patient_id, visit_id NULL, file_path, mime, sha256, caption)
 analysis(id, visit_id, method, settings_json, result_snapshot_json)
 analysis_rubric(id, analysis_id, clipboard_no, pack_id, rubric_id, weight, is_eliminative,
