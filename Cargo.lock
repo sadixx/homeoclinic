@@ -1626,6 +1626,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc-perf"
+version = "0.1.0"
+dependencies = [
+ "hc-app",
+ "hc-search",
+ "hc-seed",
+ "hc-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "hc-repertory"
 version = "0.1.0"
 dependencies = [

@@ -10,6 +10,7 @@ members = [
   "crates/hc-app",
   "apps/desktop/src-tauri",
   "tools/seed",
+  "tests/perf",
 ]
 
 [workspace.package]
