@@ -247,7 +247,11 @@ jobs:
         working-directory: apps/desktop
 
       - name: Build debug Tauri bundle
-        run: npm run tauri build -- --debug
+        # E2E-only: enable e2e-test-keys so the dev/test patient_import_fixture
+        # command is compiled in (the R2 global-search spec seeds the fixture
+        # through it). This throwaway E2E bundle is NOT a published artifact;
+        # the release/installer build jobs never enable this feature.
+        run: npm run tauri build -- --debug --features e2e-test-keys
         working-directory: apps/desktop
 
       - name: Build hc-seed binary (E2E fixture seeding)
