@@ -83,30 +83,27 @@ mod linux {
             settings.set_enable_media_stream(true);
             // enable-webrtc exists only on newer WebKitGTK; set it via the
             // glib property so older bindings/runtimes don't break the build.
-            settings.set_property_from_value(
-                "enable-webrtc",
-                &true.to_value(),
-            );
+            settings.set_property_from_value("enable-webrtc", &true.to_value());
         }
 
         wv.connect_permission_request(|_webview, request| {
-                // Only user-media (getUserMedia) requests are in scope. Anything
-                // else (geolocation, notifications, pointer lock, …) is left to
-                // the webview default — we do not handle it.
-                let Some(user_media) = request.downcast_ref::<UserMediaPermissionRequest>() else {
-                    return false;
-                };
-                // MVP1 captures a still photo: allow a video-device request and
-                // deny an audio-only one. getUserMedia({video:true}) yields a
-                // video request, so the real capture path is granted.
-                if user_media.is_for_video_device() {
-                    tracing::info!("granting webview camera (user-media) permission");
-                    user_media.allow();
-                } else {
-                    user_media.deny();
-                }
-                true
-            });
+            // Only user-media (getUserMedia) requests are in scope. Anything
+            // else (geolocation, notifications, pointer lock, …) is left to
+            // the webview default — we do not handle it.
+            let Some(user_media) = request.downcast_ref::<UserMediaPermissionRequest>() else {
+                return false;
+            };
+            // MVP1 captures a still photo: allow a video-device request and
+            // deny an audio-only one. getUserMedia({video:true}) yields a
+            // video request, so the real capture path is granted.
+            if user_media.is_for_video_device() {
+                tracing::info!("granting webview camera (user-media) permission");
+                user_media.allow();
+            } else {
+                user_media.deny();
+            }
+            true
+        });
     }
 }
 
