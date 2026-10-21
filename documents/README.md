@@ -14,7 +14,7 @@ previous releases plus the new features of that release.
 | Guide | Covers |
 |---|---|
 | `HomeoClinic-User-Guide-R1.md` / `.pdf` | R0 + R1 (M0 + M1) |
-| `HomeoClinic-User-Guide-R2.*` (future) | R0 + R1 + R2 |
+| `HomeoClinic-User-Guide-R2.md` / `.pdf` | R0 + R1 + R2 (M0 + M1 + M2) |
 | `HomeoClinic-User-Guide-R3.*` (future) | R0 + R1 + R2 + R3 |
 | ... | ... |
 
