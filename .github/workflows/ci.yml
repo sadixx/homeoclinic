@@ -250,6 +250,12 @@ jobs:
         run: npm run tauri build -- --debug
         working-directory: apps/desktop
 
+      - name: Build hc-seed binary (E2E fixture seeding)
+        # The R2 global-search spec seeds the >=200 patient fixture by
+        # invoking the hc-seed binary; build it so the spec is not
+        # infra_incomplete. HC_SEED_BIN points the harness at it.
+        run: cargo build -p hc-seed --bin hc-seed
+
       - name: Install E2E dependencies
         run: npm ci
         working-directory: tests/e2e
@@ -265,6 +271,7 @@ jobs:
           mkdir -p "$HC_E2E_OUTDIR"
           HC_NATIVE_DRIVER="$(command -v WebKitWebDriver)" \
           HC_APP_BINARY="$GITHUB_WORKSPACE/target/debug/homeoclinic-desktop" \
+          HC_SEED_BIN="$GITHUB_WORKSPACE/target/debug/hc-seed" \
           HC_DATA_DIR="$(mktemp -d)" \
           xvfb-run -a npx wdio run wdio.conf.ts
         working-directory: tests/e2e
@@ -300,11 +307,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install Ubuntu system dependencies
-        # SQLCipher (bundled-sqlcipher-vendored-openssl) builds from source;
-        # build-essential + libssl-dev cover the native toolchain it needs.
+        # hc-perf depends on hc-app, which transitively pulls Tauri's
+        # gtk/gdk/glib/gio -sys crates, so the full Tauri system deps are
+        # required even for this non-bundling release build. (SQLCipher
+        # bundled-sqlcipher-vendored-openssl also needs build-essential +
+        # libssl-dev, which LINUX_TAURI_DEPS includes.)
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libssl-dev
+          sudo apt-get install -y ${{ env.LINUX_TAURI_DEPS }}
 
       - name: Build perf harness (release profile, R-PERF-004)
         run: cargo build --release -p hc-perf
