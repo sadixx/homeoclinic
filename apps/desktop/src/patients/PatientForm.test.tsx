@@ -14,7 +14,7 @@
 // asserted here.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const { nextCode, checkDuplicate, createPatient, updatePatient, getDashboard } =
@@ -84,7 +84,7 @@ describe('PatientForm (S06) — new patient', () => {
     expect(save).toBeEnabled();
   });
 
-  it('shows an inline error when neither DOB nor age is given (PAT-001)', async () => {
+  it('requires age when no DOB is given (PAT-001)', async () => {
     const user = userEvent.setup();
     render(<PatientForm mode="new" />);
     await screen.findByTestId('patient-form-code');
@@ -93,9 +93,33 @@ describe('PatientForm (S06) — new patient', () => {
     await user.click(screen.getByTestId('patient-form-save'));
 
     expect(screen.getByTestId('patient-form-age-error')).toHaveTextContent(
-      en['patient.form.error.ageOrDob'],
+      en['patient.form.error.ageRequired'],
     );
     expect(createPatient).not.toHaveBeenCalled();
+  });
+
+  it('auto-fills age from a directly entered DOB (PAT-001)', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    render(<PatientForm mode="new" onSaved={onSaved} />);
+    await screen.findByTestId('patient-form-code');
+
+    await user.type(screen.getByTestId('patient-form-name'), 'Sita Devi');
+    // Enter DOB directly; the age field fills from it (DOB not mandatory,
+    // age is the required value).
+    const dob = screen.getByTestId('patient-form-dob') as HTMLInputElement;
+    const year = new Date().getFullYear() - 40;
+    // A birthday already passed this year => exactly 40.
+    fireEvent.change(dob, { target: { value: `${year}-01-01` } });
+
+    const age = screen.getByTestId('patient-form-age') as HTMLInputElement;
+    expect(age.value).toBe('40');
+
+    await user.click(screen.getByTestId('patient-form-save'));
+    await waitFor(() => expect(createPatient).toHaveBeenCalledTimes(1));
+    const arg = createPatient.mock.calls[0]![0];
+    expect(arg.ageYears).toBe(40);
+    expect(arg.dob).toBe(`${year}-01-01`);
   });
 
   it('creates a patient with the typed command and reports the new id', async () => {

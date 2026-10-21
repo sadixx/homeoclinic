@@ -137,6 +137,16 @@ FEAT Scale testing | NFR-002, NFR-007
 TASK dev | P0 | 2 | Synthetic data generator tools/seed for 50k and 100k realistic Indian patients, visits, Rx, bills | NFR-007 | Both datasets generated in CI
 TASK test | P0 | 1 | Performance CI gate for search, dashboard, filter, Today list at 50k and 100k | NFR-002 | CI fails when a budget is missed
 
+EPIC MS | Settings and preferences (editable S18; added 2026-10-21, SCOPED not scheduled) | M2
+FEAT Editable settings | ADM-001, SET-002, SET-003, SET-004, SET-005, SET-006, SET-007, PAT-002, LIC-006
+TASK dev | P0 | 1.5 | S18 Settings screen at /settings under the completion guard; get_settings read command | ADM-001, SET-002, SET-003 | Settings opens; current values shown
+TASK dev | P0 | 1 | Edit doctor + clinic profile incl. consultation/follow-up fees and patient-ID prefix | SET-002, SET-003, PAT-002, LIC-006 | Edits persist; new codes use new prefix; existing codes unchanged; name/reg-no locked only after real licence
+TASK dev | P0 | 0.5 | Font size (Normal/Large/Extra large) applied app-wide | SET-005 | Setting changes font app-wide and persists
+TASK dev | P0 | 0.5 | Idle auto-lock minutes editable | SET-004 | New timeout takes effect
+TASK dev | P0 | 1 | Data folder chooser with safe atomic move | SET-006 | Data moves to chosen folder safely
+TASK dev | P0 | 1 | Camera/webcam device selection: list real cameras, pick default, S06 honours it, file fallback | SET-007 | Laptop webcam listed and selectable; headless falls back to sim
+> Brief: docs/milestones/MS-settings-brief.md. Executes after R2 at team convenience; independent of R3..R9. Full S18 (audit log, recycle-bin manager, templates, advice, print layout) remains at R9/M10.
+
 EPIC M3 | Case taking, visits and Today screen | M2, HANDOFF
 FEAT Template-driven case form | CASE-001, CASE-002, CASE-003, CASE-004, CASE-005, CASE-009
 TASK dev | P0 | 3 | Form engine rendering case templates from JSON schema (text, long text, choice, number, date, scale) | CASE-001, CASE-004 | 3 default templates render and validate

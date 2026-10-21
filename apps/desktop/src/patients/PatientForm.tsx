@@ -98,6 +98,27 @@ function ageYearsFromLabel(ageLabel: string): string {
   return match ? match[1]! : '';
 }
 
+/**
+ * Whole-year age computed from a `YYYY-MM-DD` date of birth relative to today,
+ * as a string for the age field; `''` when the DOB is empty or unparseable or
+ * in the future. DOB is optional; when the doctor enters it the age field is
+ * derived from it (age itself is the required value).
+ */
+function ageFromDob(dob: string): string {
+  const d = dob.trim();
+  if (d === '') return '';
+  const born = new Date(`${d}T00:00:00`);
+  if (Number.isNaN(born.getTime())) return '';
+  const now = new Date();
+  if (born.getTime() > now.getTime()) return '';
+  let years = now.getFullYear() - born.getFullYear();
+  const beforeBirthday =
+    now.getMonth() < born.getMonth() ||
+    (now.getMonth() === born.getMonth() && now.getDate() < born.getDate());
+  if (beforeBirthday) years -= 1;
+  return years >= 0 && years <= 120 ? String(years) : '';
+}
+
 /** Register or edit a patient. */
 export function PatientForm({
   mode,
@@ -260,11 +281,10 @@ export function PatientForm({
     if (form.name.trim() === '') {
       next.name = t('patient.form.error.nameRequired');
     }
-    const hasDob = form.dob.trim() !== '';
     const hasAge = form.age.trim() !== '';
-    if (!hasDob && !hasAge) {
-      next.age = t('patient.form.error.ageOrDob');
-    } else if (hasAge) {
+    if (!hasAge) {
+      next.age = t('patient.form.error.ageRequired');
+    } else {
       const n = Number(form.age);
       if (!Number.isInteger(n) || n < 0 || n > 120) {
         next.age = t('patient.form.error.ageRange');
@@ -528,7 +548,16 @@ export function PatientForm({
               data-testid="patient-form-dob"
               type="date"
               value={form.dob}
-              onChange={(e) => set('dob', e.target.value)}
+              onChange={(e) => {
+                const dob = e.target.value;
+                // DOB is optional; entering it derives the (required) age.
+                const derived = ageFromDob(dob);
+                setForm((f) => ({
+                  ...f,
+                  dob,
+                  age: derived !== '' ? derived : f.age,
+                }));
+              }}
               onBlur={() => void runDuplicateCheck()}
               className="input"
             />
