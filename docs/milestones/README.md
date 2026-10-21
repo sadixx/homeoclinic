@@ -33,6 +33,13 @@ R0    R1    R2    R3    R4    R5                    (R6 at M5)   R7    R8    R9
 
 Upgrade-path harness: HC-MVP1-226.
 
+> **MS — Settings and preferences** (added 2026-10-21, scoped not scheduled):
+> a standalone milestone for the *editable* half of S18 — change profile,
+> **fees**, ID prefix, font size, auto-lock, data folder, and **camera
+> selection** after setup. Runs any time after R2; independent of R3..R9. The
+> *full* S18 (audit log, recycle-bin manager, templates, advice, print layout)
+> stays at R9/M10. Brief: `docs/milestones/MS-settings-brief.md`.
+
 ## Demo scripts (run as E2E, network disabled)
 
 R0
