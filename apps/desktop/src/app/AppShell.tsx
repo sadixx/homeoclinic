@@ -267,7 +267,10 @@ function ShellFrame({
         >
           <Routes>
             <Route path="/" element={<Navigate to="/today" replace />} />
-            <Route path="/today" element={<TodayScreen />} />
+            <Route
+              path="/today"
+              element={<TodayScreen onNewPatient={openNewPatient} />}
+            />
             {features.patients ? (
               <Route path="/patients" element={<PatientsRoute />} />
             ) : null}
