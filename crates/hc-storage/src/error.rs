@@ -55,6 +55,10 @@ pub enum StorageError {
     /// An attachment blob was not found on disk.
     #[error("attachment not found")]
     AttachmentMissing,
+    /// The chosen file is not a supported report type (PDF or a common image).
+    /// PAT-009. Generic by design — carries no file name or path (R-PRIV-001).
+    #[error("file type is not a supported report (PDF or image)")]
+    UnsupportedAttachmentType,
     /// A `.hcbak` archive is not valid or is damaged: bad magic, a failed
     /// header CRC, a failed body checksum, or a truncated chunk. HC-MVP1-030.
     /// Generic by design — no path, SQL or key material (R-PRIV-001).

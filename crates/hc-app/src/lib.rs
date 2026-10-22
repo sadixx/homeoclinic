@@ -8,6 +8,7 @@
 //! [`tauri_specta::Builder`] so the Tauri shell and the bindings-export test
 //! share one source of truth for the command list.
 
+pub mod attachment;
 pub mod auth;
 pub mod backup;
 pub mod clock;
@@ -100,7 +101,15 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::visit::today_get_overview,
                 // Send-to-repertory STUB (CASE-006, R7) — flagged unavailable,
                 // registered for a stable binding (no dead end, R-DEL-002).
-                commands::visit::rubric_search_prefill
+                commands::visit::rubric_search_prefill,
+                // Visit lab-report attachments (PAT-009, HC-MVP1-M3ux3, S08
+                // Investigations). Reuse the M1-024 encrypted AttachmentStore;
+                // typed file-open + encrypted store + one txn/one audit row.
+                commands::attachment::visit_attach_report,
+                commands::attachment::visit_list_attachments,
+                commands::attachment::visit_open_attachment,
+                commands::attachment::visit_delete_attachment,
+                commands::attachment::visit_pick_report_file
             ]
         };
         (with_e2e) => {
@@ -157,6 +166,12 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::visit::visit_set_next_followup,
                 commands::visit::today_get_overview,
                 commands::visit::rubric_search_prefill,
+                // Visit lab-report attachments (PAT-009, M3ux3).
+                commands::attachment::visit_attach_report,
+                commands::attachment::visit_list_attachments,
+                commands::attachment::visit_open_attachment,
+                commands::attachment::visit_delete_attachment,
+                commands::attachment::visit_pick_report_file,
                 // DEV/E2E ONLY (feature e2e-test-keys): synthetic fixture
                 // import through the real create path (OPTION A seeding).
                 commands::patient::patient_import_fixture

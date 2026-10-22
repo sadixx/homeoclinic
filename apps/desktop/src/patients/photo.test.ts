@@ -75,7 +75,9 @@ describe('captureWebcamPhoto — real default-camera capture (HC-MVP1-038)', () 
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
     // Report a decoded frame (readyState HAVE_CURRENT_DATA) with known
     // dimensions so capture takes the fast path (no wait for loadeddata).
-    vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(2);
+    vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(
+      2,
+    );
     vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(
       640,
     );
@@ -105,7 +107,9 @@ describe('captureWebcamPhoto — real default-camera capture (HC-MVP1-038)', () 
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(
       () => new Promise<void>(() => undefined),
     );
-    vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(0);
+    vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(
+      0,
+    );
 
     const p = captureWebcamPhoto();
     await vi.advanceTimersByTimeAsync(8000);

@@ -27,7 +27,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Minus } from 'lucide-react';
 
 import { commands } from '@/bindings';
-import { run } from '@/shared/command';
+import type { AttachmentSummary } from '@/bindings';
+import { isUserFacingError, run } from '@/shared/command';
 import { formatDateTime } from '@/shared/datetime';
 import { t, type StringKey } from '@/shared/strings';
 
@@ -593,6 +594,7 @@ export function CaseForm({
               <SectionPanel
                 key={section.key}
                 section={section}
+                visitId={visitId}
                 data={data}
                 vitals={vitals}
                 complaintErrors={complaintErrors}
@@ -783,6 +785,7 @@ function SaveIndicator({
 /** One expanded section's fields in the centre pane. */
 function SectionPanel({
   section,
+  visitId,
   data,
   vitals,
   complaintErrors,
@@ -796,6 +799,7 @@ function SectionPanel({
   onRemoveComplaint,
 }: {
   readonly section: SchemaSection;
+  readonly visitId: string;
   readonly data: CaseData;
   readonly vitals: Vitals;
   readonly complaintErrors: Record<number, boolean>;
@@ -854,6 +858,16 @@ function SectionPanel({
           />
         ) : section.key === 'examination' ? (
           <VitalsFields section={section} vitals={vitals} onVital={onVital} />
+        ) : section.key === 'investigations' ? (
+          <>
+            <GenericFields
+              section={section}
+              answers={sectionAnswers(data, section.key)}
+              onField={onSectionField}
+              onBlur={onSectionBlur}
+            />
+            <InvestigationsPanel visitId={visitId} />
+          </>
         ) : (
           <GenericFields
             section={section}
@@ -1179,6 +1193,340 @@ function renderField(
     );
   }
   return <input {...common} onChange={(e) => onChange(e.target.value)} />;
+}
+
+/**
+ * Whether a mime is an image (drives the type badge + thumbnail preview).
+ * Everything else the backend accepts is a PDF.
+ */
+function isImageMime(mime: string): boolean {
+  return mime.startsWith('image/');
+}
+
+/** Resolve a user-facing message for a thrown attachment error (R-UI-008). */
+function attachmentErrorMessage(err: unknown): string {
+  if (isUserFacingError(err)) return err.message;
+  return t('case.form.investigations.error.generic');
+}
+
+/**
+ * Investigations lab-report attachments (PAT-009). Lets the doctor attach the
+ * PDFs / ultrasound / CT / lab images a patient brings, list them with a type
+ * badge + caption, open one for in-app preview and remove one behind a
+ * confirm.
+ *
+ * Calls ONLY the generated typed bindings (UI → typed commands only): the OS
+ * file picker returns a path via `visit_pick_report_file` which is handed to
+ * `visit_attach_report` — the UI never constructs a filesystem path
+ * (architecture rule). The encrypted store + validation live in the backend;
+ * this component owns only presentation and the typed calls. No patient data,
+ * path or stack trace is surfaced (R-PRIV-001, R-UI-008).
+ */
+function InvestigationsPanel({
+  visitId,
+}: {
+  readonly visitId: string;
+}): JSX.Element {
+  const [attachments, setAttachments] = useState<AttachmentSummary[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [caption, setCaption] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    url: string;
+    name: string;
+    isImage: boolean;
+  } | null>(null);
+
+  const reload = useCallback(async (): Promise<void> => {
+    const res = await run(commands.visitListAttachments({ visitId }));
+    setAttachments(res.attachments);
+    setLoaded(true);
+  }, [visitId]);
+
+  // Load this visit's attachments on mount (and when the visit changes).
+  useEffect(() => {
+    let cancelled = false;
+    void (async (): Promise<void> => {
+      try {
+        const res = await run(commands.visitListAttachments({ visitId }));
+        if (!cancelled) {
+          setAttachments(res.attachments);
+          setLoaded(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setLoaded(true);
+          setError(t('case.form.investigations.error.generic'));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [visitId]);
+
+  const onUpload = useCallback(async (): Promise<void> => {
+    setError(null);
+    setBusy(true);
+    try {
+      // Ask the OS picker for a path — the UI never builds one itself.
+      const picked = await run(commands.visitPickReportFile());
+      if (picked.sourcePath === null) return; // cancelled
+      await run(
+        commands.visitAttachReport({
+          visitId,
+          sourcePath: picked.sourcePath,
+          caption: caption.trim() === '' ? null : caption.trim(),
+        }),
+      );
+      setCaption('');
+      await reload();
+    } catch (e) {
+      setError(attachmentErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [visitId, caption, reload]);
+
+  const onOpen = useCallback(async (attachmentId: string): Promise<void> => {
+    setError(null);
+    try {
+      const res = await run(commands.visitOpenAttachment({ attachmentId }));
+      // In-app preview from a data: URL (CSP allows img-src data:). No
+      // plaintext temp file is written to disk (ADR-0017).
+      const url = `data:${res.mime};base64,${res.dataBase64}`;
+      setPreview({
+        url,
+        name: res.originalName ?? '',
+        isImage: isImageMime(res.mime),
+      });
+    } catch (e) {
+      setError(attachmentErrorMessage(e));
+    }
+  }, []);
+
+  const onConfirmRemove = useCallback(async (): Promise<void> => {
+    if (confirmId === null) return;
+    const id = confirmId;
+    setConfirmId(null);
+    setError(null);
+    try {
+      await run(commands.visitDeleteAttachment({ attachmentId: id }));
+      await reload();
+    } catch (e) {
+      setError(attachmentErrorMessage(e));
+    }
+  }, [confirmId, reload]);
+
+  return (
+    <div className="mt-3 flex flex-col gap-3">
+      <div>
+        <h3 className="text-xs font-semibold uppercase text-slate-500">
+          {t('case.form.investigations.title')}
+        </h3>
+        <p className="text-xs text-slate-500">
+          {t('case.form.investigations.hint')}
+        </p>
+      </div>
+
+      {/* Upload control: optional caption + the upload action. */}
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-600">
+            {t('case.form.investigations.caption')}
+          </span>
+          <input
+            data-testid="case-form-investigations-caption"
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            className="input"
+            aria-label={t('case.form.investigations.caption')}
+          />
+        </label>
+        <button
+          type="button"
+          data-testid="case-form-investigations-upload"
+          onClick={() => void onUpload()}
+          disabled={busy}
+          className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-60"
+        >
+          {busy
+            ? t('case.form.investigations.uploading')
+            : t('case.form.investigations.upload')}
+        </button>
+      </div>
+
+      {error !== null ? (
+        <p
+          role="alert"
+          data-testid="case-form-investigations-error"
+          className="text-xs text-red-700"
+        >
+          {error}
+        </p>
+      ) : null}
+
+      {loaded && attachments.length === 0 ? (
+        <p
+          data-testid="case-form-investigations-empty"
+          className="text-sm text-slate-500"
+        >
+          {t('case.form.investigations.empty')}
+        </p>
+      ) : null}
+
+      {attachments.length > 0 ? (
+        <ul
+          data-testid="case-form-investigations-list"
+          className="flex flex-col gap-2"
+        >
+          {attachments.map((a, index) => {
+            const n = index + 1;
+            const image = isImageMime(a.mime);
+            return (
+              <li
+                key={a.attachmentId}
+                data-testid={`case-form-investigations-item-${n}`}
+                className="flex items-center justify-between gap-3 rounded border border-slate-200 px-3 py-2"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    data-testid={`case-form-investigations-badge-${n}`}
+                    className={[
+                      'flex-none rounded px-1.5 py-0.5 text-[0.7rem] font-semibold uppercase',
+                      image
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-rose-100 text-rose-800',
+                    ].join(' ')}
+                  >
+                    {image
+                      ? t('case.form.investigations.badge.image')
+                      : t('case.form.investigations.badge.pdf')}
+                  </span>
+                  <span className="min-w-0 truncate">
+                    <span className="font-medium">{a.originalName ?? ''}</span>
+                    {a.caption !== null && a.caption !== '' ? (
+                      <span className="text-slate-500"> — {a.caption}</span>
+                    ) : null}
+                  </span>
+                </div>
+                <div className="flex flex-none items-center gap-2">
+                  <button
+                    type="button"
+                    data-testid={`case-form-investigations-open-${n}`}
+                    onClick={() => void onOpen(a.attachmentId)}
+                    className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    {t('case.form.investigations.open')}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`case-form-investigations-remove-${n}`}
+                    onClick={() => setConfirmId(a.attachmentId)}
+                    className="rounded border border-slate-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    {t('case.form.investigations.remove')}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      {confirmId !== null ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('case.form.investigations.remove.title')}
+          data-testid="case-form-investigations-remove-dialog"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setConfirmId(null);
+          }}
+        >
+          <div className="w-[26rem] rounded border border-slate-300 bg-white p-4 shadow-lg">
+            <h2 className="mb-1 text-sm font-semibold">
+              {t('case.form.investigations.remove.title')}
+            </h2>
+            <p className="mb-3 text-xs text-slate-600">
+              {t('case.form.investigations.remove.body')}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                data-testid="case-form-investigations-remove-cancel"
+                onClick={() => setConfirmId(null)}
+                className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {t('case.form.investigations.remove.cancel')}
+              </button>
+              <button
+                type="button"
+                data-testid="case-form-investigations-remove-confirm"
+                onClick={() => void onConfirmRemove()}
+                className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-red-700"
+              >
+                {t('case.form.investigations.remove.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {preview !== null ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={preview.name}
+          data-testid="case-form-investigations-preview"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setPreview(null);
+          }}
+        >
+          <div className="flex max-h-[85vh] w-[48rem] flex-col rounded border border-slate-300 bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
+              <h2 className="truncate text-sm font-semibold">{preview.name}</h2>
+              <button
+                type="button"
+                data-testid="case-form-investigations-preview-close"
+                onClick={() => setPreview(null)}
+                className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {t('case.form.investigations.remove.cancel')}
+              </button>
+            </div>
+            <div className="overflow-auto p-4">
+              {preview.isImage ? (
+                <img
+                  data-testid="case-form-investigations-preview-image"
+                  src={preview.url}
+                  alt={preview.name}
+                  className="mx-auto max-h-[70vh] max-w-full"
+                />
+              ) : (
+                // CSP sets object-src 'none', so a PDF cannot be embedded; the
+                // doctor saves/opens it through the OS via a download anchor of
+                // the decrypted data URL (no plaintext temp file is written by
+                // the app, ADR-0017).
+                <a
+                  data-testid="case-form-investigations-preview-download"
+                  href={preview.url}
+                  download={preview.name}
+                  className="inline-block rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-700"
+                >
+                  {t('case.form.investigations.download')}
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 /** The per-doctor hide/show sections dialog (CASE-002). */

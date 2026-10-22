@@ -32,12 +32,21 @@ specta = { workspace = true }
 # so `number` is lossless for this domain (R-DATA-004 kept as i64 in Rust).
 specta-typescript = { workspace = true }
 tauri = { workspace = true }
+# Typed OS file-open dialog for visit_pick_report_file (PAT-009): a first-party
+# Tauri plugin so the UI never constructs a filesystem path (architecture rule).
+# Only `dialog:allow-open` is granted in the capability — no fs/shell/opener.
+# Pinned to the exact version resolved in Cargo.lock for tauri 2.9.
+tauri-plugin-dialog = "=2.4.1"
 tauri-specta = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
 sha2 = { workspace = true }
+# Base64-encode the decrypted attachment bytes for in-app preview
+# (visit_open_attachment, PAT-009 / ADR 0017). Pinned to the version already
+# resolved in Cargo.lock (also used as a dev-dep to DECODE in the test).
+base64 = "=0.22.1"
 # UUIDv7 ids for profile/trial rows (R-DATA-005); same pin as hc-storage.
 uuid = { version = "1.28", features = ["v7"] }
 # RFC3339 parse/format + 30-day trial math through the injected clock (LIC-063).
@@ -56,6 +65,11 @@ hc-storage = { path = "../hc-storage", features = ["testing"] }
 # depends on hc-seed in a release build).
 hc-seed = { path = "../../tools/seed" }
 tempfile = "3"
+# Test-only: decode the base64 data_base64 from visit_open_attachment to assert
+# the decrypted bytes round-trip (PAT-009, ADR 0017). Pinned to the version
+# already resolved in Cargo.lock. The GREEN service adds base64 as a normal dep
+# to ENCODE; this dev-dep only DECODES in the test.
+base64 = "=0.22.1"
 
 # The fixture-import integration test exercises the feature-gated command; a
 # plain `cargo test -p hc-app` does not compile it in. Run it with

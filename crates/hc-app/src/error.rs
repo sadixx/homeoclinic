@@ -218,6 +218,13 @@ impl From<hc_storage::StorageError> for AppError {
             hc_storage::StorageError::WrongPin => AppError::WrongPin,
             hc_storage::StorageError::WrongRecoveryCode => AppError::WrongRecoveryCode,
             hc_storage::StorageError::WrongBackupPassword => AppError::WrongBackupPassword,
+            // An unsupported attachment type is a user input problem, not an
+            // infrastructure failure: surface it as Validation (PAT-009) so the
+            // UI shows "unsupported file" with the Validation code, not a
+            // generic "something went wrong" (R-PRIV-001 keeps it generic).
+            hc_storage::StorageError::UnsupportedAttachmentType => {
+                AppError::Validation(hc_domain::error::DomainError::Invalid)
+            }
             // A damaged archive and a post-write verify failure are both "this
             // archive is not usable" to the doctor (plain message + Details
             // code, NFR-033); they share the BadBackup code.

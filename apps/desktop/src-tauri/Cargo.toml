@@ -22,6 +22,10 @@ e2e-test-keys = ["hc-app/e2e-test-keys"]
 [dependencies]
 hc-app = { path = "../../../crates/hc-app" }
 tauri = { workspace = true }
+# PAT-009: register the native file-open dialog plugin (visit_pick_report_file).
+# First-party Tauri plugin; capability grants only `dialog:allow-open`. Pinned
+# to the exact version resolved in Cargo.lock for tauri 2.9. No fs/shell/opener.
+tauri-plugin-dialog = "=2.4.1"
 # Non-blocking startup log line when the webview camera permission cannot be
 # wired (HC-MVP1-038). Already the workspace logging stack; adds no new sink.
 tracing = { workspace = true }

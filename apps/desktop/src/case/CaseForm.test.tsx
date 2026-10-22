@@ -37,6 +37,17 @@ const {
   summaryRender,
   templateSetVisibility,
   rubricSearchPrefill,
+  // PAT-009 Investigations lab-report attachments (HC-MVP1-M3ux3). The five
+  // typed bindings the Investigations upload UI calls; faked so the upload →
+  // list → open → remove lifecycle is observable at unit level (dependencies,
+  // not the CUT). The UI never constructs a filesystem path — it asks
+  // `visit_pick_report_file` for the chosen path and hands it to
+  // `visit_attach_report` (architecture rule).
+  pickReportFile,
+  attachReport,
+  listAttachments,
+  openAttachment,
+  deleteAttachment,
 } = vi.hoisted(() => ({
   openOrCreate: vi.fn(),
   templateGetDefault: vi.fn(),
@@ -48,6 +59,11 @@ const {
   // state persists" is observable at unit level (a dependency, not the CUT).
   templateSetVisibility: vi.fn(),
   rubricSearchPrefill: vi.fn(),
+  pickReportFile: vi.fn(),
+  attachReport: vi.fn(),
+  listAttachments: vi.fn(),
+  openAttachment: vi.fn(),
+  deleteAttachment: vi.fn(),
 }));
 
 vi.mock('@/bindings', () => ({
@@ -59,6 +75,11 @@ vi.mock('@/bindings', () => ({
     caseSummaryRender: summaryRender,
     caseTemplateSetVisibility: templateSetVisibility,
     rubricSearchPrefill,
+    visitPickReportFile: pickReportFile,
+    visitAttachReport: attachReport,
+    visitListAttachments: listAttachments,
+    visitOpenAttachment: openAttachment,
+    visitDeleteAttachment: deleteAttachment,
   },
 }));
 
@@ -299,6 +320,29 @@ beforeEach(() => {
   templateSetVisibility.mockResolvedValue({ ok: true });
   rubricSearchPrefill.mockReset();
   rubricSearchPrefill.mockResolvedValue({ available: false });
+  // PAT-009 attachment command defaults: an empty Investigations list, a
+  // picker that returns a PDF path, and a successful attach that the list
+  // reload then surfaces. Individual tests override these as needed.
+  pickReportFile.mockReset();
+  pickReportFile.mockResolvedValue({ sourcePath: '/tmp/lab-report.pdf' });
+  attachReport.mockReset();
+  attachReport.mockResolvedValue({
+    attachmentId: 'att-1',
+    mime: 'application/pdf',
+    sha256: 'a'.repeat(64),
+    originalName: 'lab-report.pdf',
+    byteSize: 12_345,
+  });
+  listAttachments.mockReset();
+  listAttachments.mockResolvedValue({ attachments: [] });
+  openAttachment.mockReset();
+  openAttachment.mockResolvedValue({
+    mime: 'application/pdf',
+    originalName: 'lab-report.pdf',
+    dataBase64: 'JVBERi0=',
+  });
+  deleteAttachment.mockReset();
+  deleteAttachment.mockResolvedValue({ ok: true });
 });
 
 afterEach(() => {
@@ -749,5 +793,280 @@ describe('CaseForm (S08) — UX2 side-rail section toggle (HC-MVP1-M3ux)', () =>
         screen.queryByTestId('case-form-section-investigations'),
       ).not.toBeInTheDocument(),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HC-MVP1-M3ux3 — Investigations lab-report attachments (PAT-009) (RED).
+//
+// The Investigations section of the case form gains a lab-report upload UI so
+// a doctor can attach the PDFs / ultrasound / CT / lab images a patient brings.
+// It consumes ONLY the generated typed bindings (UI → typed commands only; the
+// UI never constructs a filesystem path — it asks `visit_pick_report_file` for
+// the chosen path and hands it to `visit_attach_report`, architecture rule):
+//   - Upload: `visit_pick_report_file` → `visit_attach_report` → reload list.
+//   - List:   `visit_list_attachments`, newest/oldest order from the backend.
+//   - Open:   `visit_open_attachment` (decrypted base64 for in-app preview).
+//   - Remove: `visit_delete_attachment`, behind a confirm (NFR-035).
+// Empty state shows "No reports attached" + the upload action; errors
+// (unsupported type / too large) show inline, no stack traces (NFR-033).
+//
+// The backend validates PDF/image by extension+magic and reuses the encrypted
+// AttachmentStore (opaque <uuid>.bin, R-PRIV-007); the UI asserts only its own
+// behaviour against the faked bindings.
+// ---------------------------------------------------------------------------
+
+/** Open the Investigations section panel (collapsed by default). */
+async function openInvestigations(
+  user: ReturnType<typeof userEvent.setup>,
+): Promise<void> {
+  await screen.findByTestId('case-form-section-investigations');
+  await user.click(screen.getByTestId('case-form-section-investigations'));
+}
+
+/** One attachment summary row as the backend returns it. */
+function att(overrides: Record<string, unknown> = {}) {
+  return {
+    attachmentId: 'att-1',
+    mime: 'application/pdf',
+    caption: null,
+    originalName: 'lab-report.pdf',
+    byteSize: 12_345,
+    createdAt: '2026-10-16T10:42:00Z',
+    ...overrides,
+  };
+}
+
+describe('CaseForm (S08) — Investigations lab-report upload (PAT-009, HC-MVP1-M3ux3)', () => {
+  it('shows an empty state with "No reports attached" and the upload action', async () => {
+    const user = userEvent.setup();
+    listAttachments.mockResolvedValue({ attachments: [] });
+    renderForm();
+    await openInvestigations(user);
+
+    expect(
+      await screen.findByTestId('case-form-investigations-empty'),
+    ).toHaveTextContent(/no reports attached/i);
+    expect(
+      screen.getByTestId('case-form-investigations-upload'),
+    ).toBeInTheDocument();
+  });
+
+  it('lists the visit attachments with original name, a type badge and the caption', async () => {
+    const user = userEvent.setup();
+    listAttachments.mockResolvedValue({
+      attachments: [
+        att({
+          attachmentId: 'att-pdf',
+          mime: 'application/pdf',
+          originalName: 'cbc-report.pdf',
+          caption: 'CBC 16 Oct',
+        }),
+        att({
+          attachmentId: 'att-img',
+          mime: 'image/png',
+          originalName: 'ultrasound.png',
+          caption: 'USG abdomen',
+        }),
+      ],
+    });
+    renderForm();
+    await openInvestigations(user);
+
+    const list = await screen.findByTestId('case-form-investigations-list');
+    expect(list).toBeInTheDocument();
+
+    const item1 = screen.getByTestId('case-form-investigations-item-1');
+    expect(item1).toHaveTextContent('cbc-report.pdf');
+    expect(item1).toHaveTextContent('CBC 16 Oct');
+    expect(
+      within(item1).getByTestId('case-form-investigations-badge-1'),
+    ).toHaveTextContent(/pdf/i);
+
+    const item2 = screen.getByTestId('case-form-investigations-item-2');
+    expect(item2).toHaveTextContent('ultrasound.png');
+    expect(item2).toHaveTextContent('USG abdomen');
+    expect(
+      within(item2).getByTestId('case-form-investigations-badge-2'),
+    ).toHaveTextContent(/image/i);
+
+    // The empty state is gone once there are attachments.
+    expect(
+      screen.queryByTestId('case-form-investigations-empty'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('uploads a report: picks a file, attaches it, then reloads the list', async () => {
+    const user = userEvent.setup();
+    pickReportFile.mockResolvedValue({ sourcePath: '/tmp/cbc-report.pdf' });
+    attachReport.mockResolvedValue({
+      attachmentId: 'att-pdf',
+      mime: 'application/pdf',
+      sha256: 'b'.repeat(64),
+      originalName: 'cbc-report.pdf',
+      byteSize: 2_048,
+    });
+    // First load empty; after the attach the reload returns the new row.
+    listAttachments
+      .mockResolvedValueOnce({ attachments: [] })
+      .mockResolvedValue({
+        attachments: [
+          att({ attachmentId: 'att-pdf', originalName: 'cbc-report.pdf' }),
+        ],
+      });
+    renderForm();
+    await openInvestigations(user);
+    await screen.findByTestId('case-form-investigations-empty');
+
+    await user.click(screen.getByTestId('case-form-investigations-upload'));
+
+    // The picker is asked for the path; the UI never builds one itself.
+    await waitFor(() => expect(pickReportFile).toHaveBeenCalled());
+    // The chosen path is handed to the typed attach command for this visit.
+    await waitFor(() => expect(attachReport).toHaveBeenCalled());
+    const arg = attachReport.mock.calls[0]![0];
+    expect(arg.visitId).toBe('v-1');
+    expect(arg.sourcePath).toBe('/tmp/cbc-report.pdf');
+
+    // After the attach the list reloads and the new report appears.
+    const item = await screen.findByTestId('case-form-investigations-item-1');
+    expect(item).toHaveTextContent('cbc-report.pdf');
+  });
+
+  it('does not attach when the file picker is cancelled', async () => {
+    const user = userEvent.setup();
+    pickReportFile.mockResolvedValue({ sourcePath: null });
+    renderForm();
+    await openInvestigations(user);
+    await screen.findByTestId('case-form-investigations-empty');
+
+    await user.click(screen.getByTestId('case-form-investigations-upload'));
+
+    await waitFor(() => expect(pickReportFile).toHaveBeenCalled());
+    expect(attachReport).not.toHaveBeenCalled();
+    // Still the empty state, no error.
+    expect(
+      screen.getByTestId('case-form-investigations-empty'),
+    ).toBeInTheDocument();
+  });
+
+  it('opens an attachment through visit_open_attachment', async () => {
+    const user = userEvent.setup();
+    listAttachments.mockResolvedValue({
+      attachments: [att({ attachmentId: 'att-img', mime: 'image/png' })],
+    });
+    openAttachment.mockResolvedValue({
+      mime: 'image/png',
+      originalName: 'ultrasound.png',
+      dataBase64: 'iVBORw0KGgo=',
+    });
+    renderForm();
+    await openInvestigations(user);
+    await screen.findByTestId('case-form-investigations-item-1');
+
+    await user.click(screen.getByTestId('case-form-investigations-open-1'));
+
+    await waitFor(() =>
+      expect(openAttachment).toHaveBeenCalledWith({ attachmentId: 'att-img' }),
+    );
+  });
+
+  it('removes an attachment after a confirm, then reloads the list', async () => {
+    const user = userEvent.setup();
+    listAttachments
+      .mockResolvedValueOnce({
+        attachments: [att({ attachmentId: 'att-pdf' })],
+      })
+      .mockResolvedValue({ attachments: [] });
+    renderForm();
+    await openInvestigations(user);
+    await screen.findByTestId('case-form-investigations-item-1');
+
+    // Remove asks for confirmation first (NFR-035).
+    await user.click(screen.getByTestId('case-form-investigations-remove-1'));
+    const confirm = await screen.findByTestId(
+      'case-form-investigations-remove-confirm',
+    );
+    await user.click(confirm);
+
+    await waitFor(() =>
+      expect(deleteAttachment).toHaveBeenCalledWith({
+        attachmentId: 'att-pdf',
+      }),
+    );
+    // The list reloads to the now-empty state.
+    await screen.findByTestId('case-form-investigations-empty');
+  });
+
+  it('does not delete when the remove confirm is cancelled', async () => {
+    const user = userEvent.setup();
+    listAttachments.mockResolvedValue({
+      attachments: [att({ attachmentId: 'att-pdf' })],
+    });
+    renderForm();
+    await openInvestigations(user);
+    await screen.findByTestId('case-form-investigations-item-1');
+
+    await user.click(screen.getByTestId('case-form-investigations-remove-1'));
+    await screen.findByTestId('case-form-investigations-remove-confirm');
+    await user.click(
+      screen.getByTestId('case-form-investigations-remove-cancel'),
+    );
+
+    expect(deleteAttachment).not.toHaveBeenCalled();
+    // The attachment is still listed.
+    expect(
+      screen.getByTestId('case-form-investigations-item-1'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows an inline error (no stack trace) when attach fails with a typed error', async () => {
+    const user = userEvent.setup();
+    pickReportFile.mockResolvedValue({ sourcePath: '/tmp/notes.txt' });
+    // The backend rejects an unsupported type with a UserFacingError.
+    attachReport.mockRejectedValue({
+      code: 'validation',
+      message: 'That file type is not supported.',
+      suggestedAction: 'Attach a PDF or image (PNG/JPEG/WebP).',
+    });
+    renderForm();
+    await openInvestigations(user);
+    await screen.findByTestId('case-form-investigations-empty');
+
+    await user.click(screen.getByTestId('case-form-investigations-upload'));
+
+    const err = await screen.findByTestId('case-form-investigations-error');
+    expect(err).toHaveTextContent(/not supported/i);
+    // The message is the typed, safe message — never a raw stack trace / path.
+    expect(err).not.toHaveTextContent('/tmp/notes.txt');
+  });
+
+  it('supports multiple reports (ultrasound, CT, lab PDF) in the list', async () => {
+    const user = userEvent.setup();
+    listAttachments.mockResolvedValue({
+      attachments: [
+        att({
+          attachmentId: 'a1',
+          mime: 'image/jpeg',
+          originalName: 'usg.jpg',
+        }),
+        att({ attachmentId: 'a2', mime: 'image/png', originalName: 'ct.png' }),
+        att({
+          attachmentId: 'a3',
+          mime: 'application/pdf',
+          originalName: 'lab.pdf',
+        }),
+      ],
+    });
+    renderForm();
+    await openInvestigations(user);
+
+    await screen.findByTestId('case-form-investigations-item-1');
+    expect(
+      screen.getByTestId('case-form-investigations-item-2'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('case-form-investigations-item-3'),
+    ).toHaveTextContent('lab.pdf');
   });
 });

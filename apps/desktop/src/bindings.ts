@@ -166,6 +166,27 @@ export const commands = {
 	todayGetOverview: (req: TodayOverviewRequest) => typedError<TodayOverviewResponse, UserFacingError>(__TAURI_INVOKE("today_get_overview", { req })),
 	/**  Send-to-repertory STUB (CASE-006, R7) — flagged unavailable, no dead end. */
 	rubricSearchPrefill: (req: RubricSearchPrefillRequest) => typedError<RubricSearchPrefillResponse, UserFacingError>(__TAURI_INVOKE("rubric_search_prefill", { req })),
+	/**  Attach a PDF/image report to a visit (PAT-009). */
+	visitAttachReport: (req: AttachReportRequest) => typedError<AttachReportResponse, UserFacingError>(__TAURI_INVOKE("visit_attach_report", { req })),
+	/**  List a visit's attachments (PAT-009). */
+	visitListAttachments: (req: ListAttachmentsRequest) => typedError<ListAttachmentsResponse, UserFacingError>(__TAURI_INVOKE("visit_list_attachments", { req })),
+	/**  Open (decrypt) an attachment for in-app preview (PAT-009, ADR 0017). */
+	visitOpenAttachment: (req: OpenAttachmentRequest) => typedError<OpenAttachmentResponse, UserFacingError>(__TAURI_INVOKE("visit_open_attachment", { req })),
+	/**  Delete an attachment row + its encrypted blob (PAT-009). */
+	visitDeleteAttachment: (req: DeleteAttachmentRequest) => typedError<DeleteAttachmentResponse, UserFacingError>(__TAURI_INVOKE("visit_delete_attachment", { req })),
+	/**
+	 *  Open the OS file-open dialog filtered to PDF/image and return the chosen
+	 *  path (PAT-009). Lets the UI obtain a `source_path` without constructing a
+	 *  filesystem path (architecture rule).
+	 * 
+	 *  Uses `tauri-plugin-dialog`'s native picker, filtered to the supported report
+	 *  extensions, gated by the `dialog:allow-open` capability only (no fs/shell/
+	 *  opener scope). The dialog ONLY returns a chosen path; it grants no
+	 *  filesystem read — `visit_attach_report` reads the bytes itself. Interactive,
+	 *  so E2E/UI-tested, not cargo-tested. The chosen path is never logged
+	 *  (R-PRIV-001).
+	 */
+	visitPickReportFile: () => typedError<PickReportFileResponse, UserFacingError>(__TAURI_INVOKE("visit_pick_report_file")),
 };
 
 /* Types */
@@ -183,6 +204,50 @@ export type AppInfo = {
 	version: string,
 	/**  Build profile the binary was compiled in. */
 	build_profile: BuildProfile,
+};
+
+/**
+ *  `visit_attach_report` request. `source_path` is the absolute path the OS
+ *  file-open dialog returned (via `visit_pick_report_file`); the UI never
+ *  constructs it (architecture rule).
+ */
+export type AttachReportRequest = {
+	/**  The visit the report is attached to. */
+	visitId: string,
+	/**  Absolute path of the chosen file (from the typed file-open command). */
+	sourcePath: string,
+	/**  Optional doctor caption. */
+	caption: string | null,
+};
+
+/**  `visit_attach_report` response. */
+export type AttachReportResponse = {
+	/**  The new attachment-row id (UUIDv7). */
+	attachmentId: string,
+	/**  Canonical mime of the stored report. */
+	mime: string,
+	/**  SHA-256 of the plaintext, lowercase hex. */
+	sha256: string,
+	/**  The chosen file's base name (display). */
+	originalName: string,
+	/**  Plaintext byte length. */
+	byteSize: number,
+};
+
+/**  One attachment summary row for the Investigations list. */
+export type AttachmentSummary = {
+	/**  Attachment-row id. */
+	attachmentId: string,
+	/**  Canonical mime (drives the type badge). */
+	mime: string,
+	/**  Optional doctor caption. */
+	caption: string | null,
+	/**  The chosen file's base name (display). */
+	originalName: string | null,
+	/**  Plaintext byte length. */
+	byteSize: number,
+	/**  RFC3339 creation instant. */
+	createdAt: string,
 };
 
 /**  Autosave acknowledgement (CASE-005 / VIS-002) — the "Saved" timestamp. */
@@ -357,6 +422,18 @@ export type DefaultTemplateResponse = {
 	name: string,
 	/**  The JSON schema (sections[] -> fields[]). */
 	schemaJson: string,
+};
+
+/**  `visit_delete_attachment` request. */
+export type DeleteAttachmentRequest = {
+	/**  The attachment to delete (row + encrypted blob). */
+	attachmentId: string,
+};
+
+/**  `visit_delete_attachment` response. */
+export type DeleteAttachmentResponse = {
+	/**  Whether the delete succeeded. */
+	ok: boolean,
 };
 
 /**  Demographics block (PAT-005). */
@@ -573,6 +650,18 @@ export type LinkFamilyResponse = {
 	familyLinkId: string,
 };
 
+/**  `visit_list_attachments` request. */
+export type ListAttachmentsRequest = {
+	/**  The visit whose attachments are listed. */
+	visitId: string,
+};
+
+/**  `visit_list_attachments` response. */
+export type ListAttachmentsResponse = {
+	/**  The visit's attachments, oldest first. */
+	attachments: AttachmentSummary[],
+};
+
 /**
  *  CSV-export input (`patient_list_export_csv`, PSR-011): the same filter + sort
  *  as the on-screen list.
@@ -627,6 +716,27 @@ export type NextCodeResponse = {
 export type OkResponse = {
 	/**  Whether the update succeeded. */
 	ok: boolean,
+};
+
+/**  `visit_open_attachment` request. */
+export type OpenAttachmentRequest = {
+	/**  The attachment to open. */
+	attachmentId: string,
+};
+
+/**
+ *  `visit_open_attachment` response — decrypted bytes for in-app preview. The
+ *  UI renders an image via a `data:<mime>;base64,...` URL (CSP allows
+ *  `img-src data:`) and offers a save/open affordance for PDFs. No plaintext
+ *  temp file is written to disk (ADR 0017).
+ */
+export type OpenAttachmentResponse = {
+	/**  Canonical mime of the decrypted report. */
+	mime: string,
+	/**  The chosen file's base name (display). */
+	originalName: string | null,
+	/**  Base64-encoded decrypted bytes for in-app preview. */
+	dataBase64: string,
 };
 
 /**  `case_visit_open_or_create` request (VIS-001). */
@@ -734,6 +844,17 @@ export type PermanentDeleteRequest = {
 	patientId: string,
 	/**  The app PIN, re-verified before the hard delete (PAT-008, R-DATA-003). */
 	pin: string,
+};
+
+/**
+ *  `visit_pick_report_file` response — the chosen absolute path, or `None` if
+ *  the user cancelled. Lets the UI obtain a `source_path` without ever
+ *  constructing a filesystem path (architecture rule). The dialog only returns
+ *  a path; it grants no filesystem read (the backend reads the bytes).
+ */
+export type PickReportFileResponse = {
+	/**  The chosen absolute path, or `None` on cancel. */
+	sourcePath: string | null,
 };
 
 /**  One pre-loaded previous complaint (VIS-002). */

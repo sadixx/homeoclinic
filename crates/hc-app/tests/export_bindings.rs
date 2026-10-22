@@ -246,3 +246,36 @@ fn export_bindings_contains_m3_case_visit_commands() {
         );
     }
 }
+
+/// PAT-009 (HC-MVP1-M3ux3, R-TEST-008, R-ARCH-004): exporting the collection
+/// declares the five visit lab-report attachment command wrappers and the
+/// camelCase field names the S08 Investigations UI depends on, so a command
+/// dropped from `specta_builder()` or a renamed type fails HERE (an assertion)
+/// rather than later as a UI TS2307/TS2339. Asserts on generated CONTENT
+/// (R-TEST-003).
+#[test]
+fn export_bindings_contains_pat009_attachment_commands() {
+    // `_dir` keeps the temp dir alive for the body; dropping it cleans up.
+    let (generated, _dir) = export_bindings_content();
+
+    for wrapper in [
+        "visitAttachReport",
+        "visitListAttachments",
+        "visitOpenAttachment",
+        "visitDeleteAttachment",
+        "visitPickReportFile",
+    ] {
+        assert!(
+            generated.contains(wrapper),
+            "bindings.ts must expose the {wrapper} command wrapper (PAT-009 contract)"
+        );
+    }
+
+    // Key camelCase field names the Investigations UI depends on.
+    for field in ["attachmentId", "dataBase64", "sourcePath", "originalName"] {
+        assert!(
+            generated.contains(field),
+            "bindings.ts must expose the {field} field (PAT-009 contract)"
+        );
+    }
+}

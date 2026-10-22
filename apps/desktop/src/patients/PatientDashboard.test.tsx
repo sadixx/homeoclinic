@@ -125,7 +125,9 @@ describe('PatientDashboard (S07) — load + demographics', () => {
     expect(onTakeCase).toHaveBeenCalledWith('p-123');
 
     // The screens not yet shipped stay hidden — still no dead end (ADR-0002).
-    expect(screen.queryByTestId('patient-dash-prescribe')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('patient-dash-prescribe'),
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('patient-dash-bill')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('patient-dash-repertorise'),

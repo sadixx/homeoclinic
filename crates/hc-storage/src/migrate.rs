@@ -77,6 +77,13 @@ pub fn migrations() -> &'static [Migration] {
             target: 9,
             sql: include_str!("migrations/0009_visit.sql"),
         },
+        // HC-MVP1-M3ux3 / PAT-009: attachment table for visit lab/ultrasound/CT
+        // report uploads (metadata only; blobs stay encrypted in the M1-024
+        // AttachmentStore). Additive; forward-only superset of §3 (ADR 0017).
+        Migration {
+            target: 10,
+            sql: include_str!("migrations/0010_attachment.sql"),
+        },
     ]
 }
 

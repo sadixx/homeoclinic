@@ -70,6 +70,11 @@ pub fn run() {
     let builder = hc_app::specta_builder();
 
     tauri::Builder::default()
+        // PAT-009: the native file-open dialog for visit_pick_report_file. Only
+        // `dialog:allow-open` is granted in capabilities/main.json (no save/
+        // message/ask, no fs/shell/opener). The picker returns a chosen path;
+        // the backend reads the bytes itself (no fs read is granted).
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             // Resolve the per-user app data dir and initialise logging before
