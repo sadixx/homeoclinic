@@ -20,7 +20,13 @@
 // S08 wireframe "BMI {22.9}". The form shows BMI live, client-side.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within, waitFor, fireEvent } from '@testing-library/react';
+import {
+  render,
+  screen,
+  within,
+  waitFor,
+  fireEvent,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const {
@@ -85,7 +91,13 @@ const CHRONIC_DETAILED_SCHEMA = {
       title: 'History of present illness',
       collapsible: true,
       hideable: true,
-      fields: [{ key: 'narrative', label: 'History of present illness', type: 'long-text' }],
+      fields: [
+        {
+          key: 'narrative',
+          label: 'History of present illness',
+          type: 'long-text',
+        },
+      ],
     },
     {
       key: 'past_history',
@@ -99,14 +111,18 @@ const CHRONIC_DETAILED_SCHEMA = {
       title: 'Family history',
       collapsible: true,
       hideable: true,
-      fields: [{ key: 'narrative', label: 'Family history', type: 'long-text' }],
+      fields: [
+        { key: 'narrative', label: 'Family history', type: 'long-text' },
+      ],
     },
     {
       key: 'personal_history',
       title: 'Personal history',
       collapsible: true,
       hideable: true,
-      fields: [{ key: 'narrative', label: 'Personal history', type: 'long-text' }],
+      fields: [
+        { key: 'narrative', label: 'Personal history', type: 'long-text' },
+      ],
     },
     {
       key: 'physical_generals',
@@ -143,7 +159,9 @@ const CHRONIC_DETAILED_SCHEMA = {
       title: 'Mental generals',
       collapsible: true,
       hideable: true,
-      fields: [{ key: 'narrative', label: 'Mental generals', type: 'long-text' }],
+      fields: [
+        { key: 'narrative', label: 'Mental generals', type: 'long-text' },
+      ],
     },
     {
       key: 'menstrual_obstetric',
@@ -164,7 +182,11 @@ const CHRONIC_DETAILED_SCHEMA = {
       hideable: true,
       showIf: { ageYearsLt: 14 },
       fields: [
-        { key: 'milestones', label: 'Developmental milestones', type: 'long-text' },
+        {
+          key: 'milestones',
+          label: 'Developmental milestones',
+          type: 'long-text',
+        },
         { key: 'birth_history', label: 'Birth history', type: 'long-text' },
         { key: 'vaccination', label: 'Vaccination', type: 'text' },
         { key: 'schooling', label: 'Schooling / behaviour', type: 'long-text' },
@@ -180,7 +202,12 @@ const CHRONIC_DETAILED_SCHEMA = {
         { key: 'pulse', label: 'Pulse', type: 'number' },
         { key: 'weight_kg', label: 'Weight (kg)', type: 'number' },
         { key: 'height_cm', label: 'Height (cm)', type: 'number' },
-        { key: 'bmi', label: 'BMI', type: 'number', computed: 'bmi(weight_kg,height_cm)' },
+        {
+          key: 'bmi',
+          label: 'BMI',
+          type: 'number',
+          computed: 'bmi(weight_kg,height_cm)',
+        },
         { key: 'temp', label: 'Temperature', type: 'number' },
         { key: 'spo2', label: 'SpO2', type: 'number' },
         { key: 'pain_scale', label: 'Pain scale', type: 'scale0-10' },
@@ -191,14 +218,18 @@ const CHRONIC_DETAILED_SCHEMA = {
       title: 'Investigations',
       collapsible: true,
       hideable: true,
-      fields: [{ key: 'narrative', label: 'Investigations', type: 'long-text' }],
+      fields: [
+        { key: 'narrative', label: 'Investigations', type: 'long-text' },
+      ],
     },
     {
       key: 'provisional_diagnosis',
       title: 'Provisional diagnosis',
       collapsible: true,
       hideable: true,
-      fields: [{ key: 'dx', label: 'Provisional diagnosis', type: 'long-text' }],
+      fields: [
+        { key: 'dx', label: 'Provisional diagnosis', type: 'long-text' },
+      ],
     },
     {
       key: 'analysis',
@@ -211,7 +242,9 @@ const CHRONIC_DETAILED_SCHEMA = {
 };
 
 // Section keys in template order — the engine must preserve this order.
-const SECTION_KEYS_IN_ORDER = CHRONIC_DETAILED_SCHEMA.sections.map((s) => s.key);
+const SECTION_KEYS_IN_ORDER = CHRONIC_DETAILED_SCHEMA.sections.map(
+  (s) => s.key,
+);
 
 const DEFAULT_TEMPLATE = {
   templateId: 'chronic_detailed',
@@ -535,10 +568,14 @@ describe('CaseForm (S08) — restore from autosaved state (CASE-005 headline, ac
 
     // The restored chief-complaint sensation is present.
     await waitFor(() =>
-      expect(screen.getByTestId('case-form-section-chief_complaints')).toBeInTheDocument(),
+      expect(
+        screen.getByTestId('case-form-section-chief_complaints'),
+      ).toBeInTheDocument(),
     );
     const cc = screen.getByTestId('case-form-complaint-1');
-    expect(within(cc).getByDisplayValue('Throbbing headache')).toBeInTheDocument();
+    expect(
+      within(cc).getByDisplayValue('Throbbing headache'),
+    ).toBeInTheDocument();
 
     // The restored free-text general is present.
     await user.click(screen.getByTestId('case-form-section-physical_generals'));
@@ -582,5 +619,135 @@ describe('CaseForm (S08) — send-to-repertory flagged off pre-R7 (064/CASE-006)
     ).not.toBeInTheDocument();
     // The R7-only stub command is never wired this slice.
     expect(rubricSearchPrefill).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HC-MVP1-M3ux — UX1 back navigation + UX2 side-rail section toggle (RED).
+//
+// UX1: CaseForm (S08) must render a first-class Back control
+// (`case-form-back`) that calls an `onBack` prop so the shell can route the
+// doctor back to the patient dashboard (00-conventions §3; "Back must never
+// discard data" — the clinical form already autosaves). Current code neither
+// accepts `onBack` nor renders the control, so these FAIL.
+//
+// UX2: clicking a side-rail section item (`case-form-section-<key>`) must
+// TOGGLE the section's visibility — a shown section is HIDDEN on click (and
+// re-shown on the next click) through the existing toggleHidden +
+// case_template_set_visibility persistence (one-txn-one-audit). Current code
+// only calls toggleExpanded(…, true) on a rail click, so the hide-on-click
+// behaviour is absent and these FAIL. The existing minus/Hide-sections dialog
+// path and the conditional female/child + persisted-hidden behaviour are
+// unchanged (covered above).
+// ---------------------------------------------------------------------------
+
+describe('CaseForm (S08) — UX1 back navigation (HC-MVP1-M3ux)', () => {
+  it('renders a Back control that calls the onBack prop', async () => {
+    const onBack = vi.fn();
+    const user = userEvent.setup();
+    renderForm({ onBack });
+    const back = await screen.findByTestId('case-form-back');
+
+    await user.click(back);
+
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render a Back control when no onBack is given (no dead end)', async () => {
+    renderForm();
+    await screen.findByTestId('case-form-section-chief_complaints');
+
+    // Without a destination there must be no dead-end Back button (ADR-0002).
+    expect(screen.queryByTestId('case-form-back')).not.toBeInTheDocument();
+  });
+});
+
+describe('CaseForm (S08) — UX2 side-rail section toggle (HC-MVP1-M3ux)', () => {
+  it('clicking a shown section in the rail hides it (toggles visibility off)', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    // `hpi` is a plain, non-conditional, hideable section shown in the rail.
+    await screen.findByTestId('case-form-section-hpi');
+
+    // It is a visible section panel to begin with (open it so the panel shows).
+    await user.click(screen.getByTestId('case-form-section-hpi'));
+    expect(screen.getByTestId('case-form-field-narrative')).toBeInTheDocument();
+
+    // Clicking the rail item again TOGGLES the section OFF: it persists the
+    // hidden state through the existing typed command (one-txn-one-audit)...
+    await user.click(screen.getByTestId('case-form-section-hpi'));
+    await waitFor(() =>
+      expect(templateSetVisibility).toHaveBeenCalledWith(
+        expect.objectContaining({ sectionKey: 'hpi', hidden: true }),
+      ),
+    );
+
+    // ...and the section panel is removed from the rendered form.
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('case-form-field-narrative'),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("a hidden section's rail item indicates hidden state and clicking it shows the section again", async () => {
+    const user = userEvent.setup();
+    renderForm();
+    const railHpi = await screen.findByTestId('case-form-section-hpi');
+
+    // Open then toggle the section off via the rail.
+    await user.click(railHpi);
+    await user.click(screen.getByTestId('case-form-section-hpi'));
+    await waitFor(() =>
+      expect(templateSetVisibility).toHaveBeenCalledWith(
+        expect.objectContaining({ sectionKey: 'hpi', hidden: true }),
+      ),
+    );
+
+    // A hidden section must stay DISCOVERABLE in the rail so the doctor can
+    // click it back on — its rail item indicates the hidden state (aria /
+    // data attribute), not disappear.
+    const hiddenRail = await screen.findByTestId('case-form-section-hpi');
+    const indicatesHidden =
+      hiddenRail.getAttribute('aria-pressed') === 'false' ||
+      hiddenRail.getAttribute('aria-expanded') === 'false' ||
+      hiddenRail.getAttribute('data-hidden') === 'true';
+    expect(indicatesHidden).toBe(true);
+
+    // Clicking the hidden section's rail item TOGGLES it back on (visibility
+    // persisted as hidden:false), and its panel returns.
+    templateSetVisibility.mockClear();
+    await user.click(hiddenRail);
+    await waitFor(() =>
+      expect(templateSetVisibility).toHaveBeenCalledWith(
+        expect.objectContaining({ sectionKey: 'hpi', hidden: false }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('case-form-section-hpi')).toBeInTheDocument(),
+    );
+  });
+
+  it('the Hide-sections dialog path still hides a section (UX2 coexists with the minus dialog)', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await screen.findByTestId('case-form-hide-sections');
+
+    // The existing minus/Hide-sections dialog persistence path is unchanged.
+    await user.click(screen.getByTestId('case-form-hide-sections'));
+    await user.click(
+      await screen.findByTestId('case-form-hide-toggle-investigations'),
+    );
+
+    await waitFor(() =>
+      expect(templateSetVisibility).toHaveBeenCalledWith(
+        expect.objectContaining({ sectionKey: 'investigations', hidden: true }),
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('case-form-section-investigations'),
+      ).not.toBeInTheDocument(),
+    );
   });
 });

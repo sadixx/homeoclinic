@@ -84,6 +84,13 @@ export interface CaseFormProps {
   readonly sex: 'male' | 'female';
   /** Patient age in whole years — drives the child-development section. */
   readonly ageYears: number;
+  /**
+   * Return to the logical parent (the patient dashboard). When provided, a
+   * first-class Back control is rendered top-left (00-conventions §3). Back
+   * never discards data — the clinical form already autosaves (CASE-005). When
+   * absent, no Back control is rendered (no dead end, ADR-0002).
+   */
+  readonly onBack?: () => void;
 }
 
 /** Answers for one repeatable chief-complaint block. */
@@ -192,6 +199,7 @@ export function CaseForm({
   visitId,
   sex,
   ageYears,
+  onBack,
 }: CaseFormProps): JSX.Element {
   const [schema, setSchema] = useState<TemplateSchema | null>(null);
   const [templateName, setTemplateName] = useState('');
@@ -202,6 +210,14 @@ export function CaseForm({
   const [vitals, setVitals] = useState<Vitals>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
+  // Sections the doctor hid by TOGGLING the rail item (UX2), as opposed to the
+  // Hide-sections dialog. Both persist the same hidden state, but a rail-
+  // toggled section STAYS in the rail (muted, discoverable to click back on),
+  // while a dialog-hidden section is removed from the rail entirely. Tracking
+  // the source keeps both behaviours correct.
+  const [railToggledHidden, setRailToggledHidden] = useState<
+    Record<string, boolean>
+  >({});
   const [complaintErrors, setComplaintErrors] = useState<
     Record<number, boolean>
   >({});
@@ -376,14 +392,11 @@ export function CaseForm({
     [scheduleSave],
   );
 
-  const validateComplaint = useCallback(
-    (index: number): void => {
-      const block = dataRef.current.chief_complaints[index];
-      const text = (block?.sensation ?? '').trim();
-      setComplaintErrors((prev) => ({ ...prev, [index]: text === '' }));
-    },
-    [],
-  );
+  const validateComplaint = useCallback((index: number): void => {
+    const block = dataRef.current.chief_complaints[index];
+    const text = (block?.sensation ?? '').trim();
+    setComplaintErrors((prev) => ({ ...prev, [index]: text === '' }));
+  }, []);
 
   // ---- Sections ------------------------------------------------------------
 
@@ -391,21 +404,59 @@ export function CaseForm({
     setExpanded((prev) => ({ ...prev, [key]: open }));
   }, []);
 
-  const toggleHidden = useCallback(async (key: string): Promise<void> => {
-    const nextHidden = !(hidden[key] ?? false);
-    setHidden((prev) => ({ ...prev, [key]: nextHidden }));
-    try {
-      // Per-doctor template visibility persists as their template (CASE-002).
-      await run(
-        commands.caseTemplateSetVisibility({
-          sectionKey: key,
-          hidden: nextHidden,
-        }),
-      );
-    } catch {
-      /* a persistence failure keeps the local choice; it is retried on reopen */
-    }
-  }, [hidden]);
+  const toggleHidden = useCallback(
+    async (key: string): Promise<void> => {
+      const nextHidden = !(hidden[key] ?? false);
+      setHidden((prev) => ({ ...prev, [key]: nextHidden }));
+      try {
+        // Per-doctor template visibility persists as their template (CASE-002).
+        await run(
+          commands.caseTemplateSetVisibility({
+            sectionKey: key,
+            hidden: nextHidden,
+          }),
+        );
+      } catch {
+        /* a persistence failure keeps the local choice; it is retried on reopen */
+      }
+    },
+    [hidden],
+  );
+
+  // Rail click TOGGLES the section (UX2), reusing the same toggleHidden +
+  // case_template_set_visibility persistence as the Hide-sections dialog
+  // (one-txn-one-audit) and coexisting with it:
+  //   - a HIDDEN section is re-shown (persisted hidden:false) and expanded so
+  //     its fields appear;
+  //   - a shown but COLLAPSED section is expanded (open its panel) — a doctor
+  //     navigating the rail opens a section before choosing to hide it;
+  //   - a shown and EXPANDED section is hidden (persisted hidden:true), which
+  //     is the "click again hides it" toggle-off the user asked for.
+  const toggleRailSection = useCallback(
+    (key: string): void => {
+      const isHidden = hidden[key] ?? false;
+      if (isHidden) {
+        // Re-show: clear the rail-toggled marker, expand, and persist shown.
+        setRailToggledHidden((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+        toggleExpanded(key, true);
+        void toggleHidden(key);
+        return;
+      }
+      if (expanded[key] ?? false) {
+        // Toggle OFF from the rail: mark the source so it stays in the rail
+        // (muted) rather than disappearing like a dialog-hidden section.
+        setRailToggledHidden((prev) => ({ ...prev, [key]: true }));
+        void toggleHidden(key);
+        return;
+      }
+      toggleExpanded(key, true);
+    },
+    [hidden, expanded, toggleExpanded, toggleHidden],
+  );
 
   // ---- Case summary (CASE-009) ---------------------------------------------
 
@@ -418,8 +469,25 @@ export function CaseForm({
     }
   }, [visitId]);
 
-  // The sections to render: schema order, minus patient-conditional and
-  // per-doctor hidden ones (CASE-002/001).
+  // The sections shown in the left rail: schema order, minus only the
+  // patient-conditional ones (CASE-001). Per-doctor HIDDEN sections stay in the
+  // rail so the doctor can click them back on — a hidden rail item carries a
+  // hidden-state indicator (UX2). The centre pane renders only non-hidden
+  // sections (CASE-002).
+  const railSections = useMemo(() => {
+    if (schema === null) return [];
+    return schema.sections.filter((s) => {
+      if (!sectionVisibleForPatient(s, sex, ageYears)) return false;
+      const isHidden = hidden[s.key] ?? false;
+      // A section hidden via the Hide-sections DIALOG leaves the rail; a rail-
+      // TOGGLED section stays (muted) so it is discoverable to click back on.
+      if (isHidden && !(railToggledHidden[s.key] ?? false)) return false;
+      return true;
+    });
+  }, [schema, sex, ageYears, hidden, railToggledHidden]);
+
+  // The sections to render in the centre pane: schema order, minus patient-
+  // conditional and per-doctor hidden ones (CASE-002/001).
   const visibleSections = useMemo(() => {
     if (schema === null) return [];
     return schema.sections.filter(
@@ -463,6 +531,7 @@ export function CaseForm({
         templates={templates}
         status={status}
         onForceSave={() => void flushSave()}
+        {...(onBack !== undefined ? { onBack } : {})}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -474,20 +543,39 @@ export function CaseForm({
           <h2 className="px-1 text-xs font-semibold uppercase text-slate-500">
             {t('case.form.sections.title')}
           </h2>
-          {visibleSections.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              data-testid={`case-form-section-${s.key}`}
-              onClick={() => toggleExpanded(s.key, true)}
-              className={[
-                'rounded px-2 py-1 text-left hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600',
-                expanded[s.key] ? 'bg-blue-50 font-medium' : '',
-              ].join(' ')}
-            >
-              {s.title}
-            </button>
-          ))}
+          {railSections.map((s) => {
+            const isHidden = hidden[s.key] ?? false;
+            const isExpanded = !isHidden && (expanded[s.key] ?? false);
+            return (
+              <button
+                key={s.key}
+                type="button"
+                data-testid={`case-form-section-${s.key}`}
+                // A rail click TOGGLES the section on/off (UX2). The state is
+                // surfaced for accessibility and test discovery: aria-pressed
+                // is true while shown, aria-expanded reflects the open panel,
+                // and data-hidden marks a hidden section so it stays clickable
+                // to restore.
+                aria-pressed={!isHidden}
+                aria-expanded={isExpanded}
+                data-hidden={isHidden ? 'true' : undefined}
+                title={
+                  isHidden ? t('case.form.sections.hiddenHint') : undefined
+                }
+                onClick={() => toggleRailSection(s.key)}
+                className={[
+                  'rounded px-2 py-1 text-left hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600',
+                  isHidden
+                    ? 'italic text-slate-400'
+                    : isExpanded
+                      ? 'bg-blue-50 font-medium'
+                      : '',
+                ].join(' ')}
+              >
+                {s.title}
+              </button>
+            );
+          })}
           <button
             type="button"
             data-testid="case-form-hide-sections"
@@ -546,10 +634,7 @@ export function CaseForm({
       ) : null}
 
       {summaryHtml !== null ? (
-        <SummaryView
-          html={summaryHtml}
-          onClose={() => setSummaryHtml(null)}
-        />
+        <SummaryView html={summaryHtml} onClose={() => setSummaryHtml(null)} />
       ) : null}
     </section>
   );
@@ -562,7 +647,10 @@ function restoreData(dataJson: string): CaseData {
     const raw = JSON.parse(dataJson) as Record<string, unknown>;
     if (raw && typeof raw === 'object') {
       const out: CaseData = { ...base, ...(raw as object) } as CaseData;
-      if (!Array.isArray(out.chief_complaints) || out.chief_complaints.length === 0) {
+      if (
+        !Array.isArray(out.chief_complaints) ||
+        out.chief_complaints.length === 0
+      ) {
         out.chief_complaints = [{}];
       }
       return out;
@@ -596,15 +684,31 @@ function HeaderBar({
   templates,
   status,
   onForceSave,
+  onBack,
 }: {
   readonly templateName: string;
   readonly templates: ReadonlyArray<{ id: string; name: string }>;
   readonly status: SaveStatus;
   readonly onForceSave: () => void;
+  readonly onBack?: () => void;
 }): JSX.Element {
   return (
     <header className="flex flex-none items-center justify-between gap-3 border-b border-slate-200 px-4 py-2">
       <div className="flex items-center gap-3">
+        {/* Back to the patient dashboard (00-conventions §3). Rendered only
+            when a destination is wired, so there is no dead-end control
+            (ADR-0002). Back never discards data — the form autosaves. */}
+        {onBack !== undefined ? (
+          <button
+            type="button"
+            data-testid="case-form-back"
+            aria-label={t('case.form.back')}
+            onClick={onBack}
+            className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            {t('case.form.back')}
+          </button>
+        ) : null}
         <span className="font-semibold">{templateName}</span>
         <label className="flex items-center gap-1 text-xs text-slate-600">
           {t('case.form.template')}
@@ -644,7 +748,11 @@ function HeaderBar({
 }
 
 /** Status-bar autosave indicator (Saving.../Saved hh:mm) (CASE-005). */
-function SaveIndicator({ status }: { readonly status: SaveStatus }): JSX.Element {
+function SaveIndicator({
+  status,
+}: {
+  readonly status: SaveStatus;
+}): JSX.Element {
   let text: string;
   if (status.kind === 'saving') {
     text = t('case.form.save.saving');
@@ -779,10 +887,7 @@ function ComplaintRepeater({
         const n = index + 1;
         const blockTitle = `${t('case.form.complaintTitle')} ${n}`;
         return (
-          <fieldset
-            key={index}
-            className="rounded border border-slate-200 p-3"
-          >
+          <fieldset key={index} className="rounded border border-slate-200 p-3">
             <legend className="flex items-center gap-2 px-1 text-xs font-semibold text-slate-600">
               {blockTitle}
               {blocks.length > 1 ? (
@@ -837,20 +942,20 @@ function ComplaintRepeater({
                 const label = t(COMPLAINT_FIELD_LABEL_KEYS[key]);
                 const testIdKey = COMPLAINT_FIELD_TESTID_SUFFIX[key] ?? key;
                 return (
-                    <label key={key} className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-slate-600">
-                        {label}
-                      </span>
-                      <input
-                        data-testid={`case-form-${testIdKey}-${n}`}
-                        value={block[key] ?? ''}
-                        onChange={(e) => onField(index, key, e.target.value)}
-                        onBlur={() => onBlur(index)}
-                        className="input"
-                        aria-label={label}
-                      />
-                    </label>
-                  );
+                  <label key={key} className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-600">
+                      {label}
+                    </span>
+                    <input
+                      data-testid={`case-form-${testIdKey}-${n}`}
+                      value={block[key] ?? ''}
+                      onChange={(e) => onField(index, key, e.target.value)}
+                      onBlur={() => onBlur(index)}
+                      className="input"
+                      aria-label={label}
+                    />
+                  </label>
+                );
               })}
             </div>
           </fieldset>
@@ -965,7 +1070,11 @@ function GenericFields({
 }: {
   readonly section: SchemaSection;
   readonly answers: ComplaintBlock;
-  readonly onField: (sectionKey: string, fieldKey: string, value: string) => void;
+  readonly onField: (
+    sectionKey: string,
+    fieldKey: string,
+    value: string,
+  ) => void;
   readonly onBlur: () => void;
 }): JSX.Element {
   // Physical-generals pick lists use the `generals` testid prefix. The
@@ -1062,7 +1171,11 @@ function renderField(
   }
   if (field.type === 'date') {
     return (
-      <input {...common} type="date" onChange={(e) => onChange(e.target.value)} />
+      <input
+        {...common}
+        type="date"
+        onChange={(e) => onChange(e.target.value)}
+      />
     );
   }
   return <input {...common} onChange={(e) => onChange(e.target.value)} />;
@@ -1102,7 +1215,10 @@ function HideSectionsDialog({
           {sections.map((s) => {
             const isHidden = hidden[s.key] ?? false;
             return (
-              <li key={s.key} className="flex items-center justify-between py-1">
+              <li
+                key={s.key}
+                className="flex items-center justify-between py-1"
+              >
                 <span>{s.title}</span>
                 <button
                   type="button"

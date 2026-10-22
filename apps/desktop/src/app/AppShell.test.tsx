@@ -889,4 +889,109 @@ describe('AppShell', () => {
       expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
     });
   });
+
+  // HC-MVP1-M3ux — UX1 consistent back navigation. The case form (S08) and the
+  // follow-up visit (S09) currently render with NO onBack, so a doctor who
+  // opens a visit is stranded there (the user-reported frustration). The shell
+  // must wire a Back that returns to the patient dashboard (/patients?id=:id),
+  // NOT Today, and honour the convention-mandated global Alt+Left (00-
+  // conventions §3), which must never fire mid-IME-composition. Back never
+  // discards data — the clinical forms already autosave. These exercise the
+  // real AppShell router; the case/followup bindings are faked dependencies.
+  // They FAIL on current code (no onBack wiring, no Alt+Left handler).
+  describe('UX1 back navigation: case/follow-up -> dashboard + Alt+Left (HC-MVP1-M3ux)', () => {
+    /** Drive an in-app navigation the way a nav click / deep link would. */
+    async function navigateViaHash(hash: string): Promise<void> {
+      await act(async () => {
+        window.location.hash = hash;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      });
+    }
+
+    it('case route Back returns to the patient dashboard, not Today', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patient/p-123/case/v-1');
+      await screen.findByTestId('case-form');
+
+      // Back on the case form returns to the S07 dashboard for this patient.
+      await user.click(await screen.findByTestId('case-form-back'));
+
+      expect(
+        await screen.findByTestId('patient-dash-demographics'),
+      ).toBeInTheDocument();
+      // It must be the dashboard, not a bounce to Today or the case form.
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('case-form')).not.toBeInTheDocument();
+    });
+
+    it('follow-up route Back returns to the patient dashboard, not Today', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patient/p-123/visit/v-f1/followup?prev=v-prev');
+      await screen.findByTestId('followup-screen');
+
+      await user.click(await screen.findByTestId('followup-back'));
+
+      expect(
+        await screen.findByTestId('patient-dash-demographics'),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('followup-screen')).not.toBeInTheDocument();
+    });
+
+    it('Alt+Left from the case form goes back one step (dashboard), not deeper', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // Walk into the dashboard, then deeper into the case form, so a single
+      // Alt+Left (Back) should return to the dashboard — the parent step.
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+      await navigateViaHash('#/patient/p-123/case/v-1');
+      await screen.findByTestId('case-form');
+
+      await user.keyboard('{Alt>}{ArrowLeft}{/Alt}');
+
+      // Alt+Left (00-conventions §3) is Back: one step up to the dashboard.
+      expect(
+        await screen.findByTestId('patient-dash-demographics'),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('case-form')).not.toBeInTheDocument();
+    });
+
+    it('Alt+Left does not fire while an IME composition is active', async () => {
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+      await navigateViaHash('#/patient/p-123/case/v-1');
+      await screen.findByTestId('case-form');
+
+      // A keydown that is part of an IME composition must be ignored: the
+      // handler must not steal the key or navigate mid-word (00-conventions
+      // §3: shortcuts never fire while an IME composition is active).
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'ArrowLeft',
+            altKey: true,
+            isComposing: true,
+          }),
+        );
+      });
+
+      // Still on the case form; no Back happened.
+      expect(screen.getByTestId('case-form')).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('patient-dash-demographics'),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

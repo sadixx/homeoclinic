@@ -297,6 +297,60 @@ function ShellFrame({
     return null;
   }, [location.pathname, location.search]);
 
+  // Global Alt+Left = Back (00-conventions §3): walk one step up the logical
+  // parent chain —
+  //   case/follow-up -> that patient's dashboard (/patients?id=:id)
+  //   dashboard (/patients?id=:id) -> patient list (/patients)
+  //   list / anything else -> Today (/today)
+  // It never fires mid-IME-composition and never steals a keystroke typed
+  // inside a text field (input / textarea / contenteditable), so typing a
+  // left-arrow in a clinical note is untouched. Back never discards data — the
+  // clinical forms autosave (CASE-005).
+  const goBack = useCallback((): void => {
+    const path = location.pathname;
+    const caseMatch = /^\/patient\/([^/]+)\/case\//.exec(path);
+    const followupMatch = /^\/patient\/([^/]+)\/visit\//.exec(path);
+    const deeper = caseMatch ?? followupMatch;
+    if (deeper && deeper[1] !== undefined) {
+      navigate(`/patients?id=${encodeURIComponent(deeper[1])}`);
+      return;
+    }
+    if (path === '/patients') {
+      const params = new URLSearchParams(location.search);
+      const id = params.get('id');
+      if (id !== null && id !== '') {
+        // On a patient dashboard -> the patient list.
+        navigate('/patients');
+        return;
+      }
+    }
+    // The list, Today or any other shell screen -> Today (the top).
+    navigate('/today');
+  }, [location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'ArrowLeft' || !e.altKey || e.isComposing) return;
+      // Do not hijack a left-arrow a doctor is typing inside a text control.
+      const el = e.target as HTMLElement | null;
+      if (el !== null) {
+        const tag = el.tagName;
+        if (
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          tag === 'SELECT' ||
+          el.isContentEditable
+        ) {
+          return;
+        }
+      }
+      e.preventDefault();
+      goBack();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [goBack]);
+
   // F5: new visit for the open patient (S08 keyboard). Feature-gated with the
   // case flag (R-DEL-002); never fires during IME composition (00-conventions).
   useEffect(() => {
@@ -395,13 +449,13 @@ function ShellFrame({
             {features.case ? (
               <Route
                 path="/patient/:patientId/case/:visitId"
-                element={<CaseRoute />}
+                element={<CaseRoute onBack={openPatient} />}
               />
             ) : null}
             {features.case ? (
               <Route
                 path="/patient/:patientId/visit/:visitId/followup"
-                element={<FollowupRoute />}
+                element={<FollowupRoute onBack={openPatient} />}
               />
             ) : null}
             {features.backup ? (
@@ -474,7 +528,11 @@ function PatientsRoute({
  * the typed `patient_get_dashboard` payload; the UI never reads SQL. The case
  * form itself opens-or-restores the visit's answers/vitals (CASE-005).
  */
-function CaseRoute(): JSX.Element {
+function CaseRoute({
+  onBack,
+}: {
+  readonly onBack: (patientId: string) => void;
+}): JSX.Element {
   const params = useParams<{ patientId: string; visitId: string }>();
   const patientId = params.patientId ?? '';
   const visitId = params.visitId ?? '';
@@ -519,6 +577,7 @@ function CaseRoute(): JSX.Element {
       visitId={visitId}
       sex={sex}
       ageYears={ageYears}
+      onBack={() => onBack(patientId)}
     />
   );
 }
@@ -531,7 +590,11 @@ function CaseRoute(): JSX.Element {
  * itself fetches the pre-loaded complaints and autosaves (VIS-002/003). UI ->
  * typed commands only.
  */
-function FollowupRoute(): JSX.Element {
+function FollowupRoute({
+  onBack,
+}: {
+  readonly onBack: (patientId: string) => void;
+}): JSX.Element {
   const params = useParams<{ patientId: string; visitId: string }>();
   const [query] = useSearchParams();
   const patientId = params.patientId ?? '';
@@ -542,6 +605,7 @@ function FollowupRoute(): JSX.Element {
       patientId={patientId}
       visitId={visitId}
       prevVisitId={prevVisitId}
+      onBack={() => onBack(patientId)}
     />
   );
 }

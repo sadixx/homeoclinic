@@ -12,7 +12,7 @@
 // Saving…/Saved hh:mm; there is no Save button on this clinical form
 // (CASE-005). Send-to-repertory (CASE-006) is flagged OFF pre-R7 and is not
 // rendered.
-import { $, browser } from '@wdio/globals';
+import { $, browser } from "@wdio/globals";
 
 function byTestId(id: string): ChainablePromiseElement {
   return $(`[data-testid="${id}"]`);
@@ -21,20 +21,95 @@ function byTestId(id: string): ChainablePromiseElement {
 export class CasePage {
   // ---- shell -------------------------------------------------------------
   get form(): ChainablePromiseElement {
-    return byTestId('case-form');
+    return byTestId("case-form");
   }
 
   get saveStatus(): ChainablePromiseElement {
-    return byTestId('case-form-save-status');
+    return byTestId("case-form-save-status");
   }
 
   get bmi(): ChainablePromiseElement {
-    return byTestId('case-form-bmi');
+    return byTestId("case-form-bmi");
   }
 
   // ---- section rail ------------------------------------------------------
   section(key: string): ChainablePromiseElement {
     return byTestId(`case-form-section-${key}`);
+  }
+
+  /** The first-class Back control (UX1); rendered only when onBack is wired. */
+  get back(): ChainablePromiseElement {
+    return byTestId("case-form-back");
+  }
+
+  /** True when the case-form Back control is present (no-dead-end guard). */
+  async hasBack(): Promise<boolean> {
+    return this.back.isExisting();
+  }
+
+  /** Click the case-form Back control (UX1 -> patient dashboard). */
+  async clickBack(timeout = 15000): Promise<void> {
+    await this.back.waitForClickable({ timeout });
+    await this.back.click();
+  }
+
+  /**
+   * Click a rail section to TOGGLE it (UX2). The production handler is three-
+   * state (hidden->re-show+expand; shown+collapsed->expand; shown+expanded->
+   * hide). Callers drive explicit before/after assertions around each click.
+   */
+  async railToggle(key: string, timeout = 15000): Promise<void> {
+    await this.section(key).waitForClickable({ timeout });
+    await this.section(key).click();
+  }
+
+  /**
+   * True when a section's rail item marks it HIDDEN (UX2 discoverability): the
+   * production rail sets data-hidden="true" and aria-pressed="false" on a
+   * rail-toggled-hidden section so the doctor can click it back on.
+   */
+  async sectionIsHidden(key: string): Promise<boolean> {
+    const el = this.section(key);
+    await el.waitForExist({ timeout: 15000 });
+    const dataHidden = await el.getAttribute("data-hidden");
+    const pressed = await el.getAttribute("aria-pressed");
+    return dataHidden === "true" || pressed === "false";
+  }
+
+  /** aria-expanded on a rail section (the centre-pane panel open state). */
+  async sectionIsExpanded(key: string): Promise<boolean> {
+    const el = this.section(key);
+    await el.waitForExist({ timeout: 15000 });
+    return (await el.getAttribute("aria-expanded")) === "true";
+  }
+
+  /**
+   * True when a section's EDIT PANEL is present in the centre pane. The panel
+   * renders only when the section is shown AND expanded, keyed by a known
+   * field in that section (chief_complaints -> case-form-sensation-1). A
+   * caller passes the section's panel-field testid.
+   */
+  async panelFieldExists(fieldTestId: string): Promise<boolean> {
+    return byTestId(fieldTestId).isExisting();
+  }
+
+  /**
+   * Send the global Alt+Left Back chord (00-conventions §3). Blurs any focused
+   * text control first (clicks the rail nav heading region via the chief-
+   * complaints rail button's parent is risky; instead focus the body) so the
+   * production guard that skips INPUT/TEXTAREA/SELECT/contentEditable does not
+   * suppress it — the chord must act as a shell-level Back.
+   */
+  async altLeftBack(): Promise<void> {
+    // Move focus off any text field onto document.body so the global handler
+    // (which ignores keystrokes inside text controls) treats this as a Back.
+    await browser.execute(() => {
+      const active = document.activeElement as HTMLElement | null;
+      if (active !== null && typeof active.blur === "function") active.blur();
+      document.body.setAttribute("tabindex", "-1");
+      document.body.focus();
+    });
+    await browser.keys(["Alt", "ArrowLeft"]);
   }
 
   // ---- fields ------------------------------------------------------------
@@ -65,7 +140,11 @@ export class CasePage {
    * known field of that section is present. The caller passes a field testid
    * to wait on (the section panel renders lazily when expanded).
    */
-  async expandSection(key: string, waitForTestId: string, timeout = 15000): Promise<void> {
+  async expandSection(
+    key: string,
+    waitForTestId: string,
+    timeout = 15000,
+  ): Promise<void> {
     await this.section(key).waitForDisplayed({ timeout });
     await this.section(key).click();
     await byTestId(waitForTestId).waitForDisplayed({ timeout });
@@ -76,7 +155,7 @@ export class CasePage {
   async valueOf(testId: string): Promise<string> {
     const el = byTestId(testId);
     await el.waitForExist({ timeout: 15000 });
-    return (await el.getValue()) ?? '';
+    return (await el.getValue()) ?? "";
   }
 
   /** The rendered BMI text (an <output>, read via text not value). */
@@ -97,7 +176,7 @@ export class CasePage {
    */
   async waitForSaved(timeout = 20000): Promise<string> {
     await browser.waitUntil(
-      async () => (await this.saveStatusText()).startsWith('Saved'),
+      async () => (await this.saveStatusText()).startsWith("Saved"),
       {
         timeout,
         timeoutMsg: 'autosave did not reach the "Saved" status within timeout',
@@ -113,7 +192,11 @@ export class CasePage {
    * via location.hash (browser.url rejects a bare hash), the same technique
    * the other page objects use.
    */
-  async openVisit(patientId: string, visitId: string, timeout = 20000): Promise<void> {
+  async openVisit(
+    patientId: string,
+    visitId: string,
+    timeout = 20000,
+  ): Promise<void> {
     await browser.execute(
       (pid: string, vid: string) => {
         window.location.hash = `#/patient/${encodeURIComponent(
@@ -145,7 +228,7 @@ export class CasePage {
 
   /** True when the (pre-R7) send-to-repertory control is present. */
   async hasSendToRepertory(): Promise<boolean> {
-    return byTestId('case-form-send-to-repertory').isExisting();
+    return byTestId("case-form-send-to-repertory").isExisting();
   }
 }
 

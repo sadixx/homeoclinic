@@ -75,6 +75,12 @@ export interface FollowupVisitProps {
   readonly onPrescribe?: () => void;
   /** Opens the patient dashboard (used by callers for back navigation). */
   readonly onOpenPatient?: (patientId: string) => void;
+  /**
+   * Return to the logical parent (the patient dashboard). When provided, a
+   * first-class Back control is rendered top-left (00-conventions §3). Back
+   * never discards data — the follow-up form already autosaves (CASE-005).
+   */
+  readonly onBack?: () => void;
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 2000;
@@ -131,6 +137,7 @@ export function FollowupVisit({
   prevVisitId,
   onPrescribe,
   onOpenPatient,
+  onBack,
 }: FollowupVisitProps): JSX.Element {
   const [type, setType] = useState<VisitType>('follow_up');
   const [complaints, setComplaints] = useState<ComplaintRow[]>([]);
@@ -345,30 +352,52 @@ export function FollowupVisit({
     >
       {/* Header: visit type + autosave status (CASE-005). */}
       <header className="flex flex-none items-center justify-between gap-3 border-b border-slate-200 px-4 py-2">
-        <fieldset
-          data-testid="followup-type"
-          role="radiogroup"
-          aria-label={t('followup.type.label')}
-          className="flex items-center gap-3"
-        >
-          <legend className="sr-only">{t('followup.type.label')}</legend>
-          {TYPE_OPTIONS.map((opt) => (
-            <label key={opt.value} className="flex items-center gap-1 text-sm">
-              <input
-                type="radio"
-                name="followup-type"
-                value={opt.value}
-                checked={type === opt.value}
-                onChange={() => {
-                  setType(opt.value);
-                  scheduleSave();
-                }}
-                className="focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-              {t(opt.key)}
-            </label>
-          ))}
-        </fieldset>
+        <div className="flex items-center gap-3">
+          {/* Back to the patient dashboard (00-conventions §3). Rendered when
+              a destination is wired (onBack preferred; onOpenPatient kept as a
+              fallback for existing callers), so there is no dead-end control
+              (ADR-0002). Back never discards data — the form autosaves. */}
+          {onBack !== undefined || onOpenPatient !== undefined ? (
+            <button
+              type="button"
+              data-testid="followup-back"
+              aria-label={t('followup.back')}
+              onClick={() =>
+                onBack !== undefined ? onBack() : onOpenPatient?.(patientId)
+              }
+              className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              {t('followup.back')}
+            </button>
+          ) : null}
+          <fieldset
+            data-testid="followup-type"
+            role="radiogroup"
+            aria-label={t('followup.type.label')}
+            className="flex items-center gap-3"
+          >
+            <legend className="sr-only">{t('followup.type.label')}</legend>
+            {TYPE_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className="flex items-center gap-1 text-sm"
+              >
+                <input
+                  type="radio"
+                  name="followup-type"
+                  value={opt.value}
+                  checked={type === opt.value}
+                  onChange={() => {
+                    setType(opt.value);
+                    scheduleSave();
+                  }}
+                  className="focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+                {t(opt.key)}
+              </label>
+            ))}
+          </fieldset>
+        </div>
         <SaveIndicator status={status} savedHhmm={prevLabel} />
       </header>
 
@@ -557,19 +586,6 @@ export function FollowupVisit({
           </button>
         </div>
       </div>
-
-      {/* A back affordance to the patient dashboard; keeps onOpenPatient wired
-          without a dead end for callers that pass it. */}
-      {onOpenPatient !== undefined ? (
-        <button
-          type="button"
-          data-testid="followup-back"
-          onClick={() => onOpenPatient(patientId)}
-          className="sr-only"
-        >
-          {t('patient.dash.back')}
-        </button>
-      ) : null}
     </section>
   );
 }

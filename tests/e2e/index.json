@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-21T19:21:06.784Z",
+  "generatedAt": "2026-10-22T08:27:29.510Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -59,6 +59,20 @@
         "CASE-005",
         "CASE-006",
         "CASE-009",
+        "VIS-001"
+      ],
+      "tier": "stable",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/case/case-nav-toggle.e2e.ts",
+      "reqs": [
+        "CASE-002",
+        "NFR-030",
+        "SUX-001",
         "VIS-001"
       ],
       "tier": "stable",

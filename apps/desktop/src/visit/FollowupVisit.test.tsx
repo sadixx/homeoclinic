@@ -380,3 +380,26 @@ describe('FollowupVisit (S09) — scope guardrails (R-DEL-002, ADR-0002)', () =>
     expect(prescribe).toBeDisabled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// HC-MVP1-M3ux — UX1 back navigation (RED).
+//
+// FollowupVisit (S09) must expose a first-class Back control
+// (`followup-back`) that calls an `onBack` prop, so the shell can route the
+// doctor back to the patient dashboard (00-conventions §3; Back never
+// discards data — the follow-up form already autosaves). The current build
+// renders only an `sr-only` affordance wired to `onOpenPatient`, so clicking a
+// visible `followup-back` does NOT invoke `onBack` and these FAIL.
+// ---------------------------------------------------------------------------
+describe('FollowupVisit (S09) — UX1 back navigation (HC-MVP1-M3ux)', () => {
+  it('renders a Back control that calls the onBack prop', async () => {
+    const onBack = vi.fn();
+    const user = userEvent.setup();
+    renderFollowup({ onBack });
+    const back = await screen.findByTestId('followup-back');
+
+    await user.click(back);
+
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+});

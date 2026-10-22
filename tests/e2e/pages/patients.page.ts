@@ -9,7 +9,7 @@
 // (browser.url rejects a bare "#/patients"). Deep-links carry ?view=new (S06
 // register) or ?id=<patientId> (S07 dashboard), exactly as AppShell's
 // PatientsRoute reads them.
-import { $, $$, browser } from '@wdio/globals';
+import { $, $$, browser } from "@wdio/globals";
 
 function byTestId(id: string): ChainablePromiseElement {
   return $(`[data-testid="${id}"]`);
@@ -19,11 +19,11 @@ function byTestId(id: string): ChainablePromiseElement {
 export class PatientsPage {
   // ---- S05 list ----------------------------------------------------------
   get listTitle(): ChainablePromiseElement {
-    return byTestId('patient-list-title');
+    return byTestId("patient-list-title");
   }
 
   get listResults(): ChainablePromiseElement {
-    return byTestId('patient-list-results');
+    return byTestId("patient-list-results");
   }
 
   get listRows(): ReturnType<typeof $$> {
@@ -32,106 +32,129 @@ export class PatientsPage {
 
   // ---- S06 register / edit form ------------------------------------------
   get form(): ChainablePromiseElement {
-    return byTestId('patient-form');
+    return byTestId("patient-form");
   }
 
   get formTitle(): ChainablePromiseElement {
-    return byTestId('patient-form-title');
+    return byTestId("patient-form-title");
   }
 
   get formCode(): ChainablePromiseElement {
-    return byTestId('patient-form-code');
+    return byTestId("patient-form-code");
   }
 
   get formName(): ChainablePromiseElement {
-    return byTestId('patient-form-name');
+    return byTestId("patient-form-name");
   }
 
   get formAge(): ChainablePromiseElement {
-    return byTestId('patient-form-age');
+    return byTestId("patient-form-age");
   }
 
   get formMobile(): ChainablePromiseElement {
-    return byTestId('patient-form-mobile');
+    return byTestId("patient-form-mobile");
   }
 
   get formCity(): ChainablePromiseElement {
-    return byTestId('patient-form-city');
+    return byTestId("patient-form-city");
   }
 
   get formSave(): ChainablePromiseElement {
-    return byTestId('patient-form-save');
+    return byTestId("patient-form-save");
   }
 
   // Photo column (PAT-038).
   get photoBox(): ChainablePromiseElement {
-    return byTestId('patient-form-photo');
+    return byTestId("patient-form-photo");
   }
 
   get photoImg(): ChainablePromiseElement {
-    return byTestId('patient-form-photo-img');
+    return byTestId("patient-form-photo-img");
   }
 
   get photoNone(): ChainablePromiseElement {
-    return byTestId('patient-form-photo-none');
+    return byTestId("patient-form-photo-none");
   }
 
   get photoWebcamBtn(): ChainablePromiseElement {
-    return byTestId('patient-form-photo-webcam');
+    return byTestId("patient-form-photo-webcam");
   }
 
   get photoFileInput(): ChainablePromiseElement {
-    return byTestId('patient-form-photo-file-input');
+    return byTestId("patient-form-photo-file-input");
   }
 
   get photoRemoveBtn(): ChainablePromiseElement {
-    return byTestId('patient-form-photo-remove');
+    return byTestId("patient-form-photo-remove");
   }
 
   get photoDenied(): ChainablePromiseElement {
-    return byTestId('patient-form-photo-denied');
+    return byTestId("patient-form-photo-denied");
   }
 
   // ---- S07 dashboard -----------------------------------------------------
   get dashDemographics(): ChainablePromiseElement {
-    return byTestId('patient-dash-demographics');
+    return byTestId("patient-dash-demographics");
   }
 
   get dashFamily(): ChainablePromiseElement {
-    return byTestId('patient-dash-family');
+    return byTestId("patient-dash-family");
   }
 
   get dashTimeline(): ChainablePromiseElement {
-    return byTestId('patient-dash-timeline');
+    return byTestId("patient-dash-timeline");
   }
 
   get dashEdit(): ChainablePromiseElement {
-    return byTestId('patient-dash-edit');
+    return byTestId("patient-dash-edit");
   }
 
   get dashDelete(): ChainablePromiseElement {
-    return byTestId('patient-dash-delete');
+    return byTestId("patient-dash-delete");
   }
 
   get dashDeleteConfirm(): ChainablePromiseElement {
-    return byTestId('patient-dash-delete-confirm');
+    return byTestId("patient-dash-delete-confirm");
   }
 
   get dashDeletedBanner(): ChainablePromiseElement {
-    return byTestId('patient-dash-deleted-banner');
+    return byTestId("patient-dash-deleted-banner");
   }
 
   get dashRestore(): ChainablePromiseElement {
-    return byTestId('patient-dash-restore');
+    return byTestId("patient-dash-restore");
   }
 
   // S08 consultation entry (R3, features.case): "New visit" / "Take case".
   get dashTakeCaseBtn(): ChainablePromiseElement {
-    return byTestId('patient-dash-take-case');
+    return byTestId("patient-dash-take-case");
   }
 
   get dashNewVisitBtn(): ChainablePromiseElement {
-    return byTestId('patient-dash-new-visit');
+    return byTestId("patient-dash-new-visit");
+  }
+
+  // S07 dashboard Back control (UX1): returns to the patient LIST.
+  get dashBackBtn(): ChainablePromiseElement {
+    return byTestId("patient-dash-back");
+  }
+
+  /** Click the dashboard Back control (UX1 -> patient list). */
+  async dashBack(timeout = 15000): Promise<void> {
+    await this.dashBackBtn.waitForClickable({ timeout });
+    await this.dashBackBtn.click();
+  }
+
+  /** Wait until the S07 dashboard demographics are shown (landed on dashboard). */
+  async waitForDashboard(timeout = 20000): Promise<void> {
+    await this.dashDemographics.waitForExist({ timeout });
+    await this.dashDemographics.waitForDisplayed({ timeout });
+  }
+
+  /** Wait until the S05 patient list title is shown (landed on the list). */
+  async waitForList(timeout = 20000): Promise<void> {
+    await this.listTitle.waitForExist({ timeout });
+    await this.listTitle.waitForDisplayed({ timeout });
   }
 
   /**
@@ -161,7 +184,7 @@ export class PatientsPage {
   /** Open the S06 register form via the deep-link the search overlay uses. */
   async openRegister(timeout = 20000): Promise<void> {
     await browser.execute(() => {
-      window.location.hash = '#/patients?view=new';
+      window.location.hash = "#/patients?view=new";
     });
     await this.form.waitForExist({ timeout });
     await this.form.waitForDisplayed({ timeout });
@@ -170,7 +193,7 @@ export class PatientsPage {
   /** Open the S05 list. */
   async openList(timeout = 20000): Promise<void> {
     await browser.execute(() => {
-      window.location.hash = '#/patients';
+      window.location.hash = "#/patients";
     });
     await this.listTitle.waitForExist({ timeout });
     await this.listTitle.waitForDisplayed({ timeout });
@@ -210,9 +233,10 @@ export class PatientsPage {
    * honours (photo.ts simulateCameraAccess), then click "Use webcam". With
    * 'grant' a captured frame is attached; with 'deny' the denied note shows.
    */
-  async setCameraOverride(mode: 'grant' | 'deny'): Promise<void> {
-    await browser.execute((m: 'grant' | 'deny') => {
-      (window as unknown as { __HC_E2E_CAMERA__?: string }).__HC_E2E_CAMERA__ = m;
+  async setCameraOverride(mode: "grant" | "deny"): Promise<void> {
+    await browser.execute((m: "grant" | "deny") => {
+      (window as unknown as { __HC_E2E_CAMERA__?: string }).__HC_E2E_CAMERA__ =
+        m;
     }, mode);
   }
 
@@ -235,11 +259,11 @@ export class PatientsPage {
         '[data-testid="patient-form-photo-file-input"]',
       ) as HTMLElement | null;
       if (el !== null) {
-        el.classList.remove('sr-only');
-        el.style.position = 'static';
-        el.style.width = 'auto';
-        el.style.height = 'auto';
-        el.style.clip = 'auto';
+        el.classList.remove("sr-only");
+        el.style.position = "static";
+        el.style.width = "auto";
+        el.style.height = "auto";
+        el.style.clip = "auto";
       }
     });
     await this.photoFileInput.setValue(localPath);
@@ -248,7 +272,7 @@ export class PatientsPage {
         '[data-testid="patient-form-photo-file-input"]',
       ) as HTMLElement | null;
       if (el !== null) {
-        el.classList.add('sr-only');
+        el.classList.add("sr-only");
       }
     });
   }
@@ -289,10 +313,13 @@ export class PatientsPage {
   /** Restore the open (soft-deleted) patient from the recycle bin. */
   async restore(timeout = 15000): Promise<void> {
     await this.dashRestore.click();
-    await browser.waitUntil(async () => !(await this.dashDeletedBanner.isExisting()), {
-      timeout,
-      timeoutMsg: 'patient still shows the recycle-bin banner after restore',
-    });
+    await browser.waitUntil(
+      async () => !(await this.dashDeletedBanner.isExisting()),
+      {
+        timeout,
+        timeoutMsg: "patient still shows the recycle-bin banner after restore",
+      },
+    );
   }
 }
 
