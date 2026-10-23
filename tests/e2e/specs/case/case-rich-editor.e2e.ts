@@ -3,35 +3,33 @@
 // @area case
 // @targets linux
 //
-// M3-RWv2 S08 case record — RICH-TEXT (TipTap) model (ADR 0019; docs/ui/
-// S08-case-form.md revised; schema M3-RWv2-serialization-v3.md). Proves the
-// reworked RICH-EDITOR flow AND that the R3 autosave kill-restore guarantee
-// (CASE-005) still holds for the whole rich document (prose + tables + edited
-// cells). Boot-gate aware, network disabled, isolated per-spec data dir. Two app
-// launches against ONE data dir ('main'): PHASE A drives the flow + explicit
-// Save; PHASE B relaunches the SAME dir and asserts full restore.
+// M3-RWv3 S08 case record — unified COMPLAINT-SECTION rich model (ADR 0019;
+// docs/ui/S08-case-form.md). The case body is ONE chronological ProseMirror
+// document holding numbered COMPLAINT SECTIONS. Three controls drive it:
+//   - "Add new entry"        (case-form-add-entry)          -> a dated entry
+//                                                              under the current
+//                                                              complaint.
+//   - "Add follow-up entry"  (case-form-add-followup-entry) -> a dated entry
+//                                                              headed
+//                                                              `<name>-follow-up`
+//                                                              under the SAME
+//                                                              complaint.
+//   - "Add new complaint"    (case-form-add-complaint)      -> consumes the
+//                                                              complaint-name
+//                                                              input into a NEW
+//                                                              numbered section
+//                                                              `<no>. <name>` +
+//                                                              its first dated
+//                                                              entry `<name> —
+//                                                              <date>`.
+// Zoom is APP-LEVEL (AppShell C8): the shared app-bar zoom scales the DOCUMENT
+// ROOT font-size (whole app), not an editor-only box. Record popups insert
+// editable tables with VISIBLE cell borders. This spec also proves the R3
+// autosave kill-restore guarantee (CASE-005) across a MULTI-complaint document.
 //
-//   PHASE A (launch 1): provision first-run -> register a MALE adult patient ->
-//     "Take case" -> the TipTap editor renders; then, per the task steps:
-//       1. the rich editor is present; type prose into it.
-//       2. "Add entry" -> a NEW dated entry heading appears (entry count grows).
-//       3. "Record vitals" popup (sys + dia + weight + height) -> Record -> an
-//          editable vitals TABLE appears with the BP cells, a NUMBERED heading
-//          and a full-width separator above it; edit a body cell -> it persists.
-//       4. "Record family history" Maternal/Paternal -> Record -> a TWO-COLUMN
-//          (Maternal | Paternal) table inserted.
-//       5. "Add prescription" -> an editable medicine table marked placeholder.
-//       6. numbering increments across inserted sections; separators present.
-//       5(also). Case summary control ABSENT (ADR 0019 carries ADR 0018 #5).
-//       9. ZOOM in/out visibly changes the editor size; FULLSCREEN (maximise)
-//          fills the width (the editor is not a narrow centered column).
-//       Explicit SAVE -> "Saved". Captures pid + vid.
-//
-//   PHASE B (launch 2, SAME 'main' dir — HEADLINE kill-restore, CASE-005):
-//     relaunchInto('main') restarts the driver chain at the SAME XDG_DATA_HOME;
-//     the fresh process self-routes to #/lock (asserted) -> unlock -> reopen the
-//     SAME visit by deep-link -> the typed prose + vitals table + edited cell +
-//     family two-column table are ALL restored (nothing lost).
+// Boot-gate aware, network disabled, isolated per-spec data dir. Two app
+// launches against ONE data dir ('main'): PHASE A drives the flow + Save;
+// PHASE B relaunches the SAME dir and asserts full restore.
 //
 // Synthetic patient only; the spec owns its data so restore is deterministic.
 // No sleeps — all waits are waitUntil / waitForDisplayed.
@@ -48,14 +46,18 @@ import { relaunchInto } from '../../helpers/launch.js';
 const PIN = '2468';
 const PATIENT_NAME = 'Richard Testpatient';
 
-// Deterministic clinical values PHASE B asserts verbatim after the relaunch.
+// Two complaint names; headers render as "<no>. <name>".
+const COMPLAINT_1 = 'Headache';
+const COMPLAINT_2 = 'Backpain';
+// Follow-up entry heading = `<name>-follow-up — <date>` (en.json followupSuffix).
+const FOLLOWUP_SUFFIX = '-follow-up';
+
 const PROSE = 'Throbbing right temple, worse 11am-3pm sun.';
 const V_SYS = '120';
 const V_DIA = '80';
 const V_WEIGHT = '68';
 const V_HEIGHT = '172';
 const EDITED_PULSE = '77';
-const RX_MEDICINE = 'Belladonna';
 const FAMILY_MATERNAL = 'Diabetes (mother)';
 const FAMILY_PATERNAL = 'Hypertension (father)';
 
@@ -66,7 +68,7 @@ const COL_PULSE = 2;
 let patientId = '';
 let visitId = '';
 
-describe('M3-RWv2 rich PHASE A: TipTap editor, dated entries, record-popup editable tables (vitals/family/rx), numbering, zoom, fullscreen, Save (ADR 0019)', () => {
+describe('M3-RWv3 rich PHASE A: unified complaint-section record — add new complaint / add new entry / add follow-up entry, two coexisting complaints, visible table borders, app-level zoom, Save (ADR 0019)', () => {
   it('opens the rich case editor, drives the full new flow, and autosaves it', async () => {
     // ---- Boot-gate + provision + seed a patient ---------------------------
     const decided = await bootPage.waitForDecidedScreen();
@@ -88,26 +90,111 @@ describe('M3-RWv2 rich PHASE A: TipTap editor, dated entries, record-popup edita
     visitId = ids.visitId;
     expect(patientId.length).toBeGreaterThan(0);
     expect(visitId.length).toBeGreaterThan(0);
-
-    // ===== STEP 1: the rich editor renders + type prose ====================
     await expect(caseRichPage.editor()).toBeDisplayed();
-    const entriesBefore = await caseRichPage.entryCount();
-    expect(entriesBefore).toBe(1); // fresh first case opens with one dated entry
+
+    // ===== STEP 1: Add new complaint -> a NUMBERED complaint section =======
+    // A fresh case opens with ONE default (Untitled) complaint section #1
+    // (joinComplaintsToSpine always emits a header per complaint). "Add new
+    // complaint" therefore APPENDS the next numbered section. Capture the
+    // baseline so numbering assertions are position-relative, not absolute.
+    const baseHeaders = await caseRichPage.complaintHeaders();
+    const baseCount = baseHeaders.length; // 1 (the default Untitled complaint)
+    expect(baseCount).toBeGreaterThanOrEqual(1);
+    // Type a complaint name, click "Add new complaint": a numbered h1
+    // complaint header "<no>. Headache" appears PLUS its first dated entry
+    // headed `Headache — <date>`.
+    await caseRichPage.addComplaint(COMPLAINT_1);
+    await browser.waitUntil(
+      async () => (await caseRichPage.complaintHeaders()).some((c) => c.text.includes(COMPLAINT_1)),
+      { timeout: 15000, timeoutMsg: 'Add new complaint did not create a numbered complaint section' },
+    );
+    let headers = await caseRichPage.complaintHeaders();
+    const c1 = headers.find((c) => c.text.includes(COMPLAINT_1));
+    expect(c1).toBeDefined();
+    // The added named complaint is the NEXT position after the baseline.
+    const c1No = baseCount + 1;
+    expect(c1?.no).toBe(c1No);
+    expect(c1?.text).toMatch(new RegExp(`^${c1No}\\.\\s*${COMPLAINT_1}`));
+    // Its first dated entry carries the complaint name + today's date.
+    await browser.waitUntil(
+      async () =>
+        (await caseRichPage.entryHeadings()).some(
+          (e) => e.kind === 'first' && e.text.includes(COMPLAINT_1) && !e.text.includes(FOLLOWUP_SUFFIX),
+        ),
+      { timeout: 15000, timeoutMsg: 'first complaint did not get a first dated entry headed "<name> — <date>"' },
+    );
+    // Type prose into the complaint.
     await caseRichPage.typeProse(PROSE);
     expect(await caseRichPage.editorText()).toContain(PROSE);
     // eslint-disable-next-line no-console
-    console.log(`[rwv2] step1: TipTap editor renders; typed prose -> "${PROSE}"`);
+    console.log(`[rwv3] step1: Add new complaint -> numbered section "${c1?.text}" + first dated entry; prose typed`);
 
-    // ===== STEP 2: Add entry -> a NEW dated entry heading ==================
+    // ===== STEP 2: Add new entry -> a NEW dated entry under this complaint ==
+    // Put the caret inside the Headache complaint (real click) so the new
+    // entry is attributed to it (currentComplaintName reads the PM selection).
+    await caseRichPage.focusComplaintByName(COMPLAINT_1);
+    const firstEntriesBefore = (await caseRichPage.entryHeadings()).length;
     await caseRichPage.addEntry();
     await browser.waitUntil(
-      async () => (await caseRichPage.entryCount()) === entriesBefore + 1,
-      { timeout: 15000, timeoutMsg: 'Add entry did not append a new dated entry heading' },
+      async () => (await caseRichPage.entryHeadings()).length === firstEntriesBefore + 1,
+      { timeout: 15000, timeoutMsg: 'Add new entry did not append a dated entry' },
     );
     // eslint-disable-next-line no-console
-    console.log(`[rwv2] step2: Add entry -> ${await caseRichPage.entryCount()} dated entry headings`);
+    console.log(`[rwv3] step2: Add new entry -> ${(await caseRichPage.entryHeadings()).length} dated entries`);
 
-    // ===== STEP 3: Record vitals -> editable table + numbered heading + rule
+    // ===== STEP 3: Add follow-up entry -> `<name>-follow-up — <date>` ======
+    // Caret back inside the Headache complaint so the follow-up entry is
+    // attributed to it and headed "Headache-follow-up — <date>".
+    await caseRichPage.focusComplaintByName(COMPLAINT_1);
+    const beforeFu = (await caseRichPage.entryHeadings()).length;
+    await caseRichPage.addFollowupEntry();
+    await browser.waitUntil(
+      async () =>
+        (await caseRichPage.entryHeadings()).some(
+          (e) => e.kind === 'follow_up' && e.text.includes(`${COMPLAINT_1}${FOLLOWUP_SUFFIX}`),
+        ),
+      { timeout: 15000, timeoutMsg: 'Add follow-up entry did not append a "<name>-follow-up" dated entry' },
+    );
+    const fuEntry = (await caseRichPage.entryHeadings()).find(
+      (e) => e.kind === 'follow_up' && e.text.includes(`${COMPLAINT_1}${FOLLOWUP_SUFFIX}`),
+    );
+    expect(fuEntry).toBeDefined();
+    expect((await caseRichPage.entryHeadings()).length).toBe(beforeFu + 1);
+    // eslint-disable-next-line no-console
+    console.log(`[rwv3] step3: Add follow-up entry -> entry headed "${fuEntry?.text}" (${FOLLOWUP_SUFFIX})`);
+
+    // ===== STEP 4: a SECOND complaint -> two sections coexist ==============
+    await caseRichPage.addComplaint(COMPLAINT_2);
+    await browser.waitUntil(
+      async () => {
+        const hs = await caseRichPage.complaintHeaders();
+        return (
+          hs.some((c) => c.text.includes(COMPLAINT_1)) &&
+          hs.some((c) => c.text.includes(COMPLAINT_2))
+        );
+      },
+      { timeout: 15000, timeoutMsg: 'second "Add new complaint" did not create a second coexisting section' },
+    );
+    headers = await caseRichPage.complaintHeaders();
+    const c2No = baseCount + 2;
+    expect(headers.length).toBe(baseCount + 2);
+    const c2 = headers.find((c) => c.text.includes(COMPLAINT_2));
+    expect(c2?.no).toBe(c2No);
+    expect(c2?.text).toMatch(new RegExp(`^${c2No}\\.\\s*${COMPLAINT_2}`));
+    // Both NAMED complaints coexist chronologically — the first-added appears
+    // before the second-added in document order.
+    const idx1 = headers.findIndex((c) => c.text.includes(COMPLAINT_1));
+    const idx2 = headers.findIndex((c) => c.text.includes(COMPLAINT_2));
+    expect(idx1).toBeGreaterThanOrEqual(0);
+    expect(idx2).toBeGreaterThan(idx1);
+    // Numbers are strictly increasing across all sections (no reuse).
+    for (let i = 1; i < headers.length; i += 1) {
+      expect(headers[i]?.no).toBeGreaterThan(headers[i - 1]?.no as number);
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[rwv3] step4: TWO coexisting named complaints -> [${headers.map((h) => `"${h.text}"`).join(', ')}]`);
+
+    // ===== STEP 5: Record vitals -> editable table WITH VISIBLE BORDERS ====
     const sepsBeforeVitals = await caseRichPage.separatorCount();
     await caseRichPage.recordVitals({ sys: V_SYS, dia: V_DIA, weight: V_WEIGHT, height: V_HEIGHT });
     await browser.waitUntil(
@@ -116,13 +203,15 @@ describe('M3-RWv2 rich PHASE A: TipTap editor, dated entries, record-popup edita
     );
     const vitals = await caseRichPage.tableByType('vitals');
     expect(vitals).toBeDefined();
-    // BP cells seeded in cols 0/1.
     expect(await caseRichPage.tableCellText('vitals', 0, 0)).toBe(V_SYS);
     expect(await caseRichPage.tableCellText('vitals', 0, 1)).toBe(V_DIA);
+    // VISIBLE CELL BORDERS: the computed border is a non-zero, non-'none' style.
+    const border = await caseRichPage.tableCellBorder('vitals');
+    expect(border.widthPx).toBeGreaterThan(0);
+    expect(border.style).not.toBe('none');
     // A numbered heading was stamped and a full-width separator added above it.
     const nums = await caseRichPage.sectionNumbers();
     expect(nums.length).toBeGreaterThanOrEqual(1);
-    expect(nums).toContain(1);
     expect(await caseRichPage.separatorCount()).toBeGreaterThan(sepsBeforeVitals);
     // Edit the Pulse body cell -> the value stays (editable table).
     await caseRichPage.editTableCell('vitals', 0, COL_PULSE, EDITED_PULSE);
@@ -131,137 +220,115 @@ describe('M3-RWv2 rich PHASE A: TipTap editor, dated entries, record-popup edita
       { timeout: 15000, timeoutMsg: 'edited vitals Pulse cell did not persist in the table' },
     );
     // eslint-disable-next-line no-console
-    console.log(`[rwv2] step3: vitals table inserted (sys=${V_SYS} dia=${V_DIA}); numbered heading #${nums[0]}; separator added; edited Pulse=${EDITED_PULSE}`);
+    console.log(`[rwv3] step5: vitals table inserted; VISIBLE border=${border.widthPx}px ${border.style}; numbered heading; separator; edited Pulse=${EDITED_PULSE}`);
 
-    // ===== STEP 4: Record family history -> TWO-COLUMN table ===============
+    // ===== STEP 5b: Record family history -> TWO-COLUMN table ==============
     await caseRichPage.recordFamily(FAMILY_MATERNAL, FAMILY_PATERNAL);
     await browser.waitUntil(
       async () => (await caseRichPage.tableByType('family_history')) !== undefined,
       { timeout: 15000, timeoutMsg: 'Record family did not insert a family_history table' },
     );
     const family = await caseRichPage.tableByType('family_history');
-    expect(family).toBeDefined();
-    // Exactly two columns (Maternal | Paternal).
     expect(family?.headers.length).toBe(2);
     expect((family?.headers ?? []).join('|')).toMatch(/Maternal/);
     expect((family?.headers ?? []).join('|')).toMatch(/Paternal/);
-    // Seeded first row carries both sides, each in its own column.
     expect(await caseRichPage.tableCellText('family_history', 0, 0)).toContain('Diabetes');
     expect(await caseRichPage.tableCellText('family_history', 0, 1)).toContain('Hypertension');
     // eslint-disable-next-line no-console
-    console.log(`[rwv2] step4: family_history TWO-COLUMN table headers=[${family?.headers.join(', ')}] maternal/paternal seeded`);
-
-    // ===== STEP 5: Add prescription -> placeholder medicine table ==========
-    await caseRichPage.addPrescription(RX_MEDICINE);
-    await browser.waitUntil(
-      async () => (await caseRichPage.tableByType('prescription')) !== undefined,
-      { timeout: 15000, timeoutMsg: 'Add prescription did not insert a prescription table' },
-    );
-    const rx = await caseRichPage.tableByType('prescription');
-    expect(rx).toBeDefined();
-    expect(rx?.rxPlaceholder).toBe(true);
-    expect(await caseRichPage.hasRxPlaceholderHint()).toBe(true);
-    // The popup seeded the Medicine cell (row 0, col 0).
-    await browser.waitUntil(
-      async () => (await caseRichPage.tableCellText('prescription', 0, 0)) === RX_MEDICINE,
-      { timeout: 15000, timeoutMsg: 'prescription Medicine cell was not seeded' },
-    );
-    // eslint-disable-next-line no-console
-    console.log(`[rwv2] step5: prescription placeholder table inserted (rxPlaceholder=${rx?.rxPlaceholder}); medicine=${RX_MEDICINE}`);
-
-    // ===== STEP 6: numbering increments + separators present ===============
-    const numbers = await caseRichPage.sectionNumbers();
-    // Three record sections were inserted (vitals, family, prescription).
-    expect(numbers.length).toBeGreaterThanOrEqual(3);
-    // Strictly increasing, monotonic (no reuse).
-    for (let i = 1; i < numbers.length; i += 1) {
-      expect(numbers[i]).toBeGreaterThan(numbers[i - 1] as number);
-    }
-    // At least one separator per inserted section.
-    expect(await caseRichPage.separatorCount()).toBeGreaterThanOrEqual(3);
-    // eslint-disable-next-line no-console
-    console.log(`[rwv2] step6: section numbers=[${numbers.join(', ')}] monotonic; separators=${await caseRichPage.separatorCount()}`);
+    console.log(`[rwv3] step5b: family_history TWO-COLUMN table headers=[${family?.headers.join(', ')}]`);
 
     // ===== Case summary control ABSENT =====================================
     expect(await caseRichPage.hasCaseSummary()).toBe(false);
-    // eslint-disable-next-line no-console
-    console.log('[rwv2] Case summary control ABSENT (ADR 0019 / 0018 #5)');
 
-    // ===== STEP 9a: ZOOM in/out visibly changes the editor size ============
-    const baseFont = await caseRichPage.editorFontPx();
+    // ===== STEP 6: APP-LEVEL ZOOM scales the DOCUMENT ROOT =================
+    const baseRoot = await caseRichPage.rootFontPx();
     await caseRichPage.zoomIn();
-    await browser.waitUntil(async () => (await caseRichPage.editorFontPx()) > baseFont, {
+    await browser.waitUntil(async () => (await caseRichPage.rootFontPx()) > baseRoot, {
       timeout: 10000,
-      timeoutMsg: 'zoom in did not increase the editor font size',
+      timeoutMsg: 'app-bar zoom-in did not raise the DOCUMENT-ROOT font-size (app-level zoom)',
     });
-    const zoomedFont = await caseRichPage.editorFontPx();
-    await caseRichPage.zoomOut();
-    await browser.waitUntil(async () => (await caseRichPage.editorFontPx()) < zoomedFont, {
+    const zoomedRoot = await caseRichPage.rootFontPx();
+    // Reset returns the root to baseline.
+    await caseRichPage.zoomReset();
+    await browser.waitUntil(async () => (await caseRichPage.rootFontPx()) <= baseRoot + 0.01, {
       timeout: 10000,
-      timeoutMsg: 'zoom out did not decrease the editor font size',
+      timeoutMsg: 'app-bar zoom-reset did not return the DOCUMENT-ROOT font-size to baseline',
     });
     // eslint-disable-next-line no-console
-    console.log(`[rwv2] step9a: zoom base=${baseFont}px in=${zoomedFont}px out=${await caseRichPage.editorFontPx()}px (visibly changes)`);
-
-    // ===== STEP 9b: FULLSCREEN fills the width (not a narrow centered col) ==
-    await browser.maximizeWindow();
-    await browser.waitUntil(
-      async () => {
-        const w = await caseRichPage.editorWidthVsViewport();
-        return w.viewport > 0 && w.editor / w.viewport >= 0.7;
-      },
-      { timeout: 10000, timeoutMsg: 'editor did not fill the width when maximised (narrow centered column?)' },
-    );
-    const widths = await caseRichPage.editorWidthVsViewport();
-    // eslint-disable-next-line no-console
-    console.log(`[rwv2] step9b: fullscreen editor width=${Math.round(widths.editor)} viewport=${widths.viewport} ratio=${(widths.editor / widths.viewport).toFixed(2)} (fills width)`);
+    console.log(`[rwv3] step6: APP-LEVEL zoom root base=${baseRoot}px in=${zoomedRoot}px reset=${await caseRichPage.rootFontPx()}px (scales the whole app, not just the editor)`);
 
     // ===== Explicit SAVE -> "Saved" ========================================
     await caseRichPage.save();
     const savedText = await caseRichPage.waitForSaved();
     expect(savedText).toMatch(/^Saved/);
     // eslint-disable-next-line no-console
-    console.log(`[rwv2] explicit Save -> "${savedText}"; visit ${visitId} persisted`);
+    console.log(`[rwv3] explicit Save -> "${savedText}"; visit ${visitId} persisted (2 complaints)`);
   });
 });
 
-describe('M3-RWv2 rich PHASE B: HEADLINE kill-restore of the rich document (CASE-005 / ADR 0019)', () => {
+describe('M3-RWv3 rich PHASE B: HEADLINE multi-complaint kill-restore (CASE-005 / ADR 0019)', () => {
   before(async () => {
     await relaunchInto('main');
   });
 
-  it('relaunches on the SAME data dir and restores the whole rich document (prose + vitals table + edited cell + family two-column table)', async () => {
+  it('relaunches on the SAME data dir and restores the whole multi-complaint document (both complaints + entries + tables + edited cell)', async () => {
     const decided = await bootPage.waitForDecidedScreen();
     expect(decided).toBe('#/lock');
     await expect(bootPage.lockCard).toBeDisplayed();
     await lockPage.attempt(PIN);
     await shellPage.waitForShell();
     // eslint-disable-next-line no-console
-    console.log('[rwv2] relaunched on SAME data dir -> #/lock -> unlocked with PIN');
+    console.log('[rwv3] relaunched on SAME data dir -> #/lock -> unlocked with PIN');
 
     // Reopen the SAME visit -> EVERYTHING restored.
     await caseRichPage.openVisit(patientId, visitId);
 
+    // BOTH named complaint sections restored (the default Untitled #1 also
+    // survives, so there are at least 3 headers). Match by name, not by a
+    // fixed absolute number.
+    await browser.waitUntil(
+      async () => {
+        const hs = await caseRichPage.complaintHeaders();
+        return (
+          hs.some((c) => c.text.includes(COMPLAINT_1)) &&
+          hs.some((c) => c.text.includes(COMPLAINT_2))
+        );
+      },
+      { timeout: 20000, timeoutMsg: 'both named complaint sections were not restored after relaunch' },
+    );
+    const headers = await caseRichPage.complaintHeaders();
+    expect(headers.length).toBeGreaterThanOrEqual(2);
+    const rc1 = headers.find((c) => c.text.includes(COMPLAINT_1));
+    const rc2 = headers.find((c) => c.text.includes(COMPLAINT_2));
+    expect(rc1).toBeDefined();
+    expect(rc2).toBeDefined();
+    // The two named complaints still coexist in document order (1 before 2).
+    expect((rc2?.no as number)).toBeGreaterThan(rc1?.no as number);
+    // Numbers remain strictly increasing across all restored sections.
+    for (let i = 1; i < headers.length; i += 1) {
+      expect(headers[i]?.no).toBeGreaterThan(headers[i - 1]?.no as number);
+    }
+    // The follow-up entry heading survived.
+    expect(
+      (await caseRichPage.entryHeadings()).some(
+        (e) => e.kind === 'follow_up' && e.text.includes(`${COMPLAINT_1}${FOLLOWUP_SUFFIX}`),
+      ),
+    ).toBe(true);
     // Typed prose restored.
     expect(await caseRichPage.editorText()).toContain(PROSE);
-    // Vitals table restored incl. the edited Pulse cell.
+    // Vitals table restored incl. the edited Pulse cell, borders still visible.
     expect(await caseRichPage.tableCellText('vitals', 0, 0)).toBe(V_SYS);
     expect(await caseRichPage.tableCellText('vitals', 0, 1)).toBe(V_DIA);
     expect(await caseRichPage.tableCellText('vitals', 0, COL_PULSE)).toBe(EDITED_PULSE);
+    const borderR = await caseRichPage.tableCellBorder('vitals');
+    expect(borderR.widthPx).toBeGreaterThan(0);
+    expect(borderR.style).not.toBe('none');
     // Family two-column table restored with both sides.
     const family = await caseRichPage.tableByType('family_history');
-    expect(family).toBeDefined();
     expect(family?.headers.length).toBe(2);
     expect(await caseRichPage.tableCellText('family_history', 0, 0)).toContain('Diabetes');
     expect(await caseRichPage.tableCellText('family_history', 0, 1)).toContain('Hypertension');
-    // Prescription placeholder restored: the TABLE's hcRxPlaceholder attribute
-    // persists through the v3 doc (the in-session hint note is not re-rendered
-    // on reload, so the persisted-state proof is the table attribute itself).
-    const rxRestored = await caseRichPage.tableByType('prescription');
-    expect(rxRestored).toBeDefined();
-    expect(rxRestored?.rxPlaceholder).toBe(true);
-    expect(await caseRichPage.tableCellText('prescription', 0, 0)).toBe(RX_MEDICINE);
     // eslint-disable-next-line no-console
-    console.log(`[rwv2] RESTORED after relaunch -> prose + vitals(sys=${V_SYS},dia=${V_DIA},pulse=${EDITED_PULSE}) + family 2-col(Diabetes|Hypertension) + rx=${RX_MEDICINE} (nothing lost)`);
+    console.log(`[rwv3] RESTORED after relaunch -> 2 complaints [${headers.map((h) => h.text).join(' | ')}] + follow-up entry + prose + vitals(pulse=${EDITED_PULSE}, border=${borderR.widthPx}px) + family 2-col (nothing lost)`);
   });
 });

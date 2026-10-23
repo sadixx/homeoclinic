@@ -27,8 +27,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Minus, Plus } from 'lucide-react';
-
 import { EditorContent, useEditor } from '@tiptap/react';
 import type { Editor } from '@tiptap/react';
 
@@ -46,7 +44,9 @@ import {
 } from '@/case/caseRich';
 import {
   caseEditorExtensions,
+  currentComplaintName,
   initialContent,
+  insertComplaint,
   insertDatedEntry,
   insertSectionNodes,
   v3DocFromEditor,
@@ -92,11 +92,6 @@ type SaveStatus =
   | { kind: 'error' };
 
 const AUTOSAVE_DEBOUNCE_MS = 2000;
-
-/** The editor document-root zoom bounds (ADR 0019 #11; SET-005 extension). */
-const ZOOM_MIN = 0.7;
-const ZOOM_MAX = 1.8;
-const ZOOM_STEP = 0.1;
 
 /** camelCase vitals keys the backend BMI recompute understands (schema §4a). */
 const VITALS_WEIGHT = 'weightKg';
@@ -154,7 +149,6 @@ export function CaseForm({
   const [savedOnce, setSavedOnce] = useState(false);
   const [nextFollowupOn, setNextFollowupOn] = useState<string | null>(null);
   const [popup, setPopup] = useState<OpenPopup>(null);
-  const [zoom, setZoom] = useState(1);
   // True once an Rx placeholder table has been inserted; shows the R4 hint.
   const [rxInserted, setRxInserted] = useState(false);
 
@@ -166,6 +160,9 @@ export function CaseForm({
   // Complaint identity for the active editor (R3 renders the first complaint).
   const complaintIdRef = useRef('cc1');
   const complaintTitleRef = useRef('');
+  // The live complaint-name <input>, so "Add new complaint" can clear it after
+  // consuming the name into a new section header (uncontrolled input + ref).
+  const complaintTitleInputRef = useRef<HTMLInputElement | null>(null);
 
   // Autosave debounce timer + a ref to the live editor so blur/force-flush read
   // the newest in-editor state (incl. in-place cell edits), never a stale snap.
@@ -225,7 +222,7 @@ export function CaseForm({
   const editor = useEditor(
     {
       extensions: caseEditorExtensions(),
-      content: doc !== null ? initialContent(doc.complaints[0]!) : '',
+      content: doc !== null ? initialContent(doc) : '',
       editable: true,
       editorProps: {
         // The editor region has its own scroll container; we never need
@@ -310,7 +307,40 @@ export function CaseForm({
   const onAddEntry = useCallback((): void => {
     const ed = editorRef.current;
     if (ed === null) return;
-    insertDatedEntry(ed, todayIsoDate(), visitId);
+    insertDatedEntry(
+      ed,
+      todayIsoDate(),
+      visitId,
+      currentComplaintName(ed),
+      'first',
+    );
+    void flushSave();
+  }, [visitId, flushSave]);
+
+  const onAddFollowupEntry = useCallback((): void => {
+    const ed = editorRef.current;
+    if (ed === null) return;
+    insertDatedEntry(
+      ed,
+      todayIsoDate(),
+      visitId,
+      currentComplaintName(ed),
+      'follow_up',
+    );
+    void flushSave();
+  }, [visitId, flushSave]);
+
+  const onAddComplaint = useCallback((): void => {
+    const ed = editorRef.current;
+    if (ed === null) return;
+    const name = complaintTitleRef.current.trim();
+    insertComplaint(ed, { name, date: todayIsoDate(), visitId });
+    // The complaint name has been consumed into its own section header; clear
+    // the shared input so the next complaint starts blank (M3-RWv3 §5).
+    complaintTitleRef.current = '';
+    if (complaintTitleInputRef.current !== null) {
+      complaintTitleInputRef.current.value = '';
+    }
     void flushSave();
   }, [visitId, flushSave]);
 
@@ -383,13 +413,6 @@ export function CaseForm({
       <HeaderBar
         status={status}
         nextFollowupOn={nextFollowupOn}
-        zoom={zoom}
-        onZoomIn={() =>
-          setZoom((z) => Math.min(ZOOM_MAX, round1(z + ZOOM_STEP)))
-        }
-        onZoomOut={() =>
-          setZoom((z) => Math.max(ZOOM_MIN, round1(z - ZOOM_STEP)))
-        }
         onForceSave={() => void flushSave()}
         {...(onBack !== undefined ? { onBack } : {})}
       />
@@ -401,40 +424,64 @@ export function CaseForm({
           data-adaptive="true"
           className="flex min-w-0 flex-1 flex-col overflow-auto p-4"
         >
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
             <label className="flex min-w-0 flex-1 items-center gap-2">
               <span className="sr-only">
                 {t('case.form.complaint.titleLabel')}
               </span>
               <input
+                ref={complaintTitleInputRef}
                 data-testid="case-form-complaint-title"
                 defaultValue={complaintTitleRef.current}
                 onChange={(e) => {
                   complaintTitleRef.current = e.target.value;
-                  scheduleSave();
                 }}
-                onBlur={() => void flushSave()}
                 placeholder={t('case.form.complaint.titlePlaceholder')}
                 aria-label={t('case.form.complaint.titleLabel')}
                 className="input w-full text-base font-semibold"
               />
             </label>
-            <button
-              type="button"
-              data-testid="case-form-add-entry"
-              onClick={onAddEntry}
-              className="flex-none rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-            >
-              {t('case.form.addEntry')}
-            </button>
+            {/* The three complaint/entry actions (M3-RWv3 §5), replacing the
+                single legacy "Add entry". Each is a labelled, keyboard-focusable
+                button with its own data-testid. */}
+            <div className="flex flex-none flex-wrap gap-2">
+              <button
+                type="button"
+                data-testid="case-form-add-entry"
+                onClick={onAddEntry}
+                className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {t('case.form.addNewEntry')}
+              </button>
+              <button
+                type="button"
+                data-testid="case-form-add-followup-entry"
+                onClick={onAddFollowupEntry}
+                className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {t('case.form.addFollowupEntry')}
+              </button>
+              <button
+                type="button"
+                data-testid="case-form-add-complaint"
+                onClick={onAddComplaint}
+                className="rounded border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {t('case.form.addNewComplaint')}
+              </button>
+            </div>
           </div>
 
-          {/* The single WYSIWYG notepad. The document root scales with the fixed
-              zoom (ADR 0019 #11); full-width adaptive (no capped column). */}
+          {/* The single WYSIWYG notepad. Zoom is driven app-level: the shared
+              app-bar zoom controls + Ctrl+= / Ctrl+- / Ctrl+0 scale the
+              DOCUMENT ROOT font-size (useZoom -> AppShell, C8), which scales
+              every rem-based unit — chrome AND this editor — uniformly. The
+              editor no longer carries its own fontSize scale (that editor-only
+              override scaled just this box, competing with the app-level zoom).
+              Full-width adaptive (no capped column). */}
           <div
             data-testid={`case-form-editor-${complaintId}`}
             className="min-h-[16rem] w-full flex-1 rounded border border-slate-200 p-3"
-            style={{ fontSize: `${zoom}rem` }}
           >
             <EditorContent editor={editor} />
           </div>
@@ -601,11 +648,6 @@ export function CaseForm({
   );
 }
 
-/** Round to one decimal place (zoom steps stay clean, no float drift). */
-function round1(value: number): number {
-  return Math.round(value * 10) / 10;
-}
-
 /** A record-toolbar button (opens a popup). */
 function RecordButton({
   testId,
@@ -628,21 +670,15 @@ function RecordButton({
   );
 }
 
-/** Top header: next F/U display, zoom, Save + status. */
+/** Top header: next F/U display, Save + status. */
 function HeaderBar({
   status,
   nextFollowupOn,
-  zoom,
-  onZoomIn,
-  onZoomOut,
   onForceSave,
   onBack,
 }: {
   readonly status: SaveStatus;
   readonly nextFollowupOn: string | null;
-  readonly zoom: number;
-  readonly onZoomIn: () => void;
-  readonly onZoomOut: () => void;
   readonly onForceSave: () => void;
   readonly onBack?: () => void;
 }): JSX.Element {
@@ -672,27 +708,6 @@ function HeaderBar({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          data-testid="case-form-zoom-out"
-          aria-label={t('case.form.zoomOut')}
-          onClick={onZoomOut}
-          className="rounded border border-slate-300 p-1 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-        >
-          <Minus className="h-4 w-4" aria-hidden="true" />
-        </button>
-        <span className="w-10 text-center text-xs tabular-nums text-slate-500">
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          type="button"
-          data-testid="case-form-zoom-in"
-          aria-label={t('case.form.zoomIn')}
-          onClick={onZoomIn}
-          className="rounded border border-slate-300 p-1 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-        </button>
         <SaveIndicator status={status} />
         <button
           type="button"

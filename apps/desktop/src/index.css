@@ -11,6 +11,71 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Rich case-editor tables (S08 / ADR 0019 #6). TipTap/ProseMirror emits bare
+   <table>/<tr>/<th>/<td> markup with NO default borders, so the inserted
+   vitals / family-history / modalities / prescription tables rendered as an
+   invisible grid. These rules scope visible Office-style grid lines to the
+   case editor's content root only (the `ProseMirror hc-case-editor` element,
+   CaseForm.tsx), so other tables in the app are untouched.
+
+   All sizes are in rem/em so the borders and padding scale WITH the app-level
+   document-root font-scale zoom (useZoom -> :root font-size); the grid stays
+   visible at the 1.0 baseline and grows/shrinks as the doctor zooms. Colours
+   use the Tailwind slate palette (slate-300 #cbd5e1 grid, slate-400 #94a3b8
+   selected-cell outline, slate-100 #f1f5f9 header row) for a consistent look
+   with the rest of the UI. Content-only (style-src 'self'); no network.
+   --------------------------------------------------------------------------- */
+.hc-case-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+  table-layout: fixed;
+  overflow: hidden;
+}
+
+.hc-case-editor th,
+.hc-case-editor td {
+  border: 1px solid #cbd5e1; /* slate-300 */
+  padding: 0.25rem 0.5rem; /* ~4px 8px, rem so it scales with zoom */
+  min-width: 4rem; /* a sensible minimum cell width */
+  vertical-align: top;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.hc-case-editor th {
+  background-color: #f1f5f9; /* slate-100 header-row fill */
+  font-weight: 600;
+  text-align: left;
+}
+
+/* ProseMirror selected-cell affordance: a translucent slate tint so the doctor
+   can see which cell(s) the table selection covers. */
+.hc-case-editor .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(148, 163, 184, 0.25); /* slate-400 @ 25% */
+  pointer-events: none;
+}
+
+/* ProseMirror column-resize handle (table extension): a thin slate-400 grip on
+   the cell's right edge so columns can be dragged to width. */
+.hc-case-editor .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: #94a3b8; /* slate-400 */
+  pointer-events: none;
+}
+
+.hc-case-editor.resize-cursor {
+  cursor: col-resize;
+}
+
 :root {
   /* Normal font size baseline (SET-005 / 00-conventions §1): 14px. */
   font-size: 14px;

@@ -120,8 +120,40 @@ export interface SectionNodesArgs {
   readonly seed: TableSeed;
 }
 
-/** Args for the dated-entry ("Add entry") node builder. */
+/**
+ * The kind of a dated entry under a complaint (M3-RWv3 §3a): the FIRST entry
+ * when a complaint is created, or a per-complaint `follow_up` entry added later
+ * in the same document (the in-editor "Add follow-up entry" button).
+ */
+export type EntryKind = 'first' | 'follow_up';
+
+/**
+ * Args for the dated-entry node builder. `complaintName`/`kind` are OPTIONAL
+ * for back-compat with the pre-RWv3 callers (which emitted a bare dated entry);
+ * when omitted, `kind` defaults to `'first'` and the header degrades to a
+ * date-only line (M3-RWv3 §3c edge case).
+ */
 export interface DatedEntryArgs {
+  readonly date: string;
+  readonly visitId: string;
+  /** The owning complaint's name, denormalised onto the entry heading (§3a). */
+  readonly complaintName?: string;
+  /** `'first'` (default) or `'follow_up'` (M3-RWv3 §3a). */
+  readonly kind?: EntryKind;
+}
+
+/** Args for the numbered complaint-header node builder (M3-RWv3 §3a). */
+export interface ComplaintHeaderArgs {
+  readonly complaintNo: number;
+  readonly complaintId: string;
+  readonly name: string;
+}
+
+/** Args for the "Add new complaint" kernel builder (M3-RWv3 §5). */
+export interface NewComplaintArgs {
+  readonly complaintNo: number;
+  readonly complaintId: string;
+  readonly name: string;
   readonly date: string;
   readonly visitId: string;
 }
@@ -341,7 +373,9 @@ export function upcastJournalToRich(
     let nextNo = 1;
     const content: ProseMirrorNode[] = [];
     for (const entry of c.entries) {
-      content.push(entryHeading(entry.entry_date, entry.visit_id));
+      content.push(
+        entryHeading(entry.entry_date, entry.visit_id, c.title, 'first'),
+      );
       for (const block of entry.blocks) {
         if (block.kind === 'text') {
           for (const line of splitParagraphs(block.text)) {
@@ -548,23 +582,269 @@ function sectionNodesFor(
 }
 
 /**
- * Build the nodes "Add entry" appends (handoff §3a): a dated entry heading
- * (`hcKind=entry`, `hcDate`, `hcVisitId`) followed by an empty paragraph for
- * the caret.
+ * Compose the visible text of a dated entry heading (M3-RWv3 §3c). Pure and
+ * localisable: the `-follow-up` suffix and the `name — date` separator both
+ * come from en.json (R-UI-007), never a hardcoded English literal.
+ *
+ * - first  : `<name><sep><date>`               e.g. `Headache — 02-10-2026`
+ * - follow : `<name><suffix><sep><date>`        e.g. `Headache-follow-up — 02-10-2026`
+ *
+ * When `name` is empty the base degrades to just the date (first) or the bare
+ * `<suffix><sep><date>` (follow-up), so an unnamed complaint still reads
+ * sensibly (§3c edge case).
+ */
+export function entryHeadingText(
+  name: string,
+  kind: EntryKind,
+  date: string,
+  translate: Translate,
+): string {
+  const sep = translate('case.form.entry.dateSeparator');
+  const suffix =
+    kind === 'follow_up' ? translate('case.form.entry.followupSuffix') : '';
+  const base = `${name}${suffix}`;
+  const display = displayDate(date);
+  return base === '' ? display : `${base}${sep}${display}`;
+}
+
+/**
+ * Build the nodes a dated entry appends (M3-RWv3 §3a/§5): a dated entry heading
+ * (`hcKind=entry`, `hcDate`, `hcVisitId`, `hcEntryKind`, `hcComplaintName`)
+ * followed by an empty paragraph for the caret. `kind` defaults to `'first'`
+ * and `complaintName` to `''` so pre-RWv3 callers keep working unchanged.
  */
 export function buildDatedEntryNodes(
   args: DatedEntryArgs,
 ): readonly ProseMirrorNode[] {
-  return [entryHeading(args.date, args.visitId), { type: 'paragraph' }];
+  const kind: EntryKind = args.kind ?? 'first';
+  const name = args.complaintName ?? '';
+  return [
+    entryHeading(args.date, args.visitId, name, kind),
+    { type: 'paragraph' },
+  ];
 }
 
-/** A dated-entry heading node (handoff §3). */
-function entryHeading(date: string, visitId: string): ProseMirrorNode {
+/**
+ * Build a numbered COMPLAINT-SECTION header node (M3-RWv3 §3a): an h1 heading
+ * carrying `hcKind=complaint`, the 1-based `hcComplaintNo`, the `hcComplaintId`
+ * (`cc<n>`) and the rendered text `"<no>. <name>"`. An empty name renders the
+ * `case.form.complaint.untitled` placeholder so the numbered section is visible.
+ */
+export function buildComplaintHeaderNode(
+  args: ComplaintHeaderArgs,
+): ProseMirrorNode {
+  const name = args.name === '' ? t('case.form.complaint.untitled') : args.name;
   return {
     type: 'heading',
-    attrs: { level: 2, hcKind: 'entry', hcDate: date, hcVisitId: visitId },
-    content: [{ type: 'text', text: displayDate(date) }],
+    attrs: {
+      level: 1,
+      hcKind: 'complaint',
+      hcComplaintNo: args.complaintNo,
+      hcComplaintId: args.complaintId,
+    },
+    content: [{ type: 'text', text: `${args.complaintNo}. ${name}` }],
   };
+}
+
+/**
+ * Build the nodes "Add new complaint" appends (M3-RWv3 §5): the numbered
+ * complaint header, its FIRST dated entry (headed `<name> — <date>`) and the
+ * caret paragraph the first entry already provides.
+ */
+export function buildNewComplaintNodes(
+  args: NewComplaintArgs,
+): readonly ProseMirrorNode[] {
+  return [
+    buildComplaintHeaderNode({
+      complaintNo: args.complaintNo,
+      complaintId: args.complaintId,
+      name: args.name,
+    }),
+    ...buildDatedEntryNodes({
+      date: args.date,
+      visitId: args.visitId,
+      complaintName: args.name,
+      kind: 'first',
+    }),
+  ];
+}
+
+/**
+ * A dated-entry heading node (M3-RWv3 §3). Carries the entry kind and the
+ * denormalised complaint name so the header text can be derived without walking
+ * back to the complaint header, and so the FTS mirror sees the name on every
+ * entry.
+ */
+function entryHeading(
+  date: string,
+  visitId: string,
+  complaintName: string,
+  kind: EntryKind,
+): ProseMirrorNode {
+  return {
+    type: 'heading',
+    attrs: {
+      level: 2,
+      hcKind: 'entry',
+      hcEntryKind: kind,
+      hcComplaintName: complaintName,
+      hcDate: date,
+      hcVisitId: visitId,
+    },
+    content: [
+      { type: 'text', text: entryHeadingText(complaintName, kind, date, t) },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Spine <-> complaints[] (representation a, M3-RWv3 §2/§3b).
+// ---------------------------------------------------------------------------
+
+/**
+ * Join the canonical `complaints[]` into ONE "spine" ProseMirror doc: in
+ * complaint order, each complaint's numbered header (derived from its array
+ * position) followed by that complaint's own `doc.content` (M3-RWv3 §3b). The
+ * inverse of {@link splitSpineToComplaints}.
+ */
+export function joinComplaintsToSpine(
+  complaints: readonly RichComplaint[],
+): ProseMirrorNode {
+  const content: ProseMirrorNode[] = [];
+  complaints.forEach((complaint, index) => {
+    content.push(
+      buildComplaintHeaderNode({
+        complaintNo: index + 1,
+        complaintId: complaint.id,
+        name: complaint.title,
+      }),
+    );
+    for (const node of complaint.doc.content ?? []) content.push(node);
+  });
+  return { type: 'doc', content };
+}
+
+/**
+ * Split a spine doc back into `complaints[]` (M3-RWv3 §3b): each top-level
+ * `hcKind:"complaint"` header starts a new complaint; everything until the next
+ * complaint header (or end) is that complaint's `doc.content`. The complaint
+ * header node itself is NOT copied into the per-complaint doc; `id`/`title`
+ * come from its attrs. Nodes before the first complaint header (there should be
+ * none in a well-formed spine) are attached to the first complaint.
+ */
+export function splitSpineToComplaints(
+  spine: ProseMirrorNode,
+): RichComplaint[] {
+  const complaints: RichComplaint[] = [];
+  const top = spine.content ?? [];
+  let current: {
+    id: string;
+    title: string;
+    content: ProseMirrorNode[];
+  } | null = null;
+  const flush = (): void => {
+    if (current === null) return;
+    complaints.push({
+      id: current.id,
+      title: current.title,
+      next_section_no: nextSectionNoOf(current.content),
+      doc: { type: 'doc', content: current.content },
+    });
+  };
+  for (const node of top) {
+    if (node.type === 'heading' && node.attrs?.['hcKind'] === 'complaint') {
+      flush();
+      const idAttr = node.attrs?.['hcComplaintId'];
+      const id =
+        typeof idAttr === 'string' ? idAttr : `cc${complaints.length + 1}`;
+      current = { id, title: complaintTitleFromHeader(node), content: [] };
+    } else {
+      if (current === null) {
+        current = { id: 'cc1', title: '', content: [] };
+      }
+      current.content.push(node);
+    }
+  }
+  flush();
+  return complaints;
+}
+
+/**
+ * Resolve the caret's owning complaint id: the `hcComplaintId` of the nearest
+ * complaint header at or before `caretPos`, measured in REAL ProseMirror
+ * positions (M3-RWv3 §5). `caretPos` is `editor.state.selection.head`, so the
+ * spine must be walked by actual node sizes — NOT a serialised-string length —
+ * or the two scales disagree and every caret collapses onto complaint #1.
+ *
+ * ProseMirror position model: the first top-level child begins at position 0;
+ * each top-level child spans {@link proseMirrorNodeSize} positions, so the next
+ * child begins at the running sum. A complaint "owns" the caret when its start
+ * position is `<= caretPos` and no later complaint header also qualifies. Falls
+ * back to the first complaint when the caret precedes every header, else `cc1`.
+ */
+export function currentComplaintId(
+  spine: ProseMirrorNode,
+  caretPos: number,
+): string {
+  const top = spine.content ?? [];
+  let pos = 0;
+  let owning: string | null = null;
+  for (const node of top) {
+    if (node.type === 'heading' && node.attrs?.['hcKind'] === 'complaint') {
+      const id = node.attrs?.['hcComplaintId'];
+      if (typeof id === 'string') {
+        if (pos <= caretPos) owning = id;
+        else if (owning === null) owning = id;
+      }
+    }
+    pos += proseMirrorNodeSize(node);
+  }
+  if (owning !== null) return owning;
+  const firstHeader = top.find(
+    (n) => n.type === 'heading' && n.attrs?.['hcKind'] === 'complaint',
+  );
+  const firstId = firstHeader?.attrs?.['hcComplaintId'];
+  return typeof firstId === 'string' ? firstId : 'cc1';
+}
+
+/**
+ * The ProseMirror `nodeSize` of a JSON node, matching `Node.nodeSize` on a live
+ * document: a text leaf spans its string length; any other leaf (no `content`)
+ * spans 1; a non-leaf (block) spans `2 + Σ child sizes` (one token for each
+ * boundary). Used by {@link currentComplaintId} so caret resolution runs in the
+ * same position scale as `editor.state.selection.head`.
+ */
+function proseMirrorNodeSize(node: ProseMirrorNode): number {
+  if (node.type === 'text') return node.text?.length ?? 0;
+  const children = node.content ?? [];
+  if (children.length === 0) return 1;
+  let inner = 0;
+  for (const child of children) inner += proseMirrorNodeSize(child);
+  return inner + 2;
+}
+
+/** Recover a complaint title from its header text (`"<no>. <name>"`). */
+function complaintTitleFromHeader(header: ProseMirrorNode): string {
+  const raw = (header.content ?? [])
+    .map((c) => (c.type === 'text' && typeof c.text === 'string' ? c.text : ''))
+    .join('');
+  const stripped = raw.replace(/^\s*\d+\.\s*/, '');
+  if (stripped === t('case.form.complaint.untitled')) return '';
+  return stripped;
+}
+
+/** Derive a per-complaint `next_section_no` from its existing section headings. */
+function nextSectionNoOf(content: readonly ProseMirrorNode[]): number {
+  let max = 0;
+  const walk = (n: ProseMirrorNode): void => {
+    if (n.type === 'heading' && n.attrs?.['hcKind'] === 'section') {
+      const no = n.attrs?.['hcSectionNo'];
+      if (typeof no === 'number' && no > max) max = no;
+    }
+    for (const c of n.content ?? []) walk(c);
+  };
+  for (const n of content) walk(n);
+  return max + 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -709,8 +989,14 @@ function normalizeV3(
   const complaintsRaw = Array.isArray(obj['complaints'])
     ? obj['complaints']
     : [];
+  // A v3 payload our own serialiser produced always carries the top-level `text`
+  // mirror (serializeRich). Its absence marks a RAW / hand-authored legacy v3
+  // doc that predates RWv3 and whose entry headings must be back-filled to
+  // `hcEntryKind:'first'` + `hcComplaintName` (M3-RWv3 §6). A doc that already
+  // has `text` round-trips verbatim (the attrs are authoritative as written).
+  const normalizeEntries = obj['text'] === undefined;
   const complaints: RichComplaint[] = complaintsRaw
-    .map((c, i) => normalizeComplaint(c, i))
+    .map((c, i) => normalizeComplaint(c, i, normalizeEntries))
     .filter((c): c is RichComplaint => c !== null);
   if (complaints.length === 0) {
     return emptyRichDoc(ctx);
@@ -729,7 +1015,11 @@ function normalizeV3(
 }
 
 /** Normalise one v3 complaint, guaranteeing a doc and a counter. */
-function normalizeComplaint(raw: unknown, index: number): RichComplaint | null {
+function normalizeComplaint(
+  raw: unknown,
+  index: number,
+  normalizeEntries: boolean,
+): RichComplaint | null {
   if (!isRecord(raw)) return null;
   const id = typeof raw['id'] === 'string' ? raw['id'] : `cc${index + 1}`;
   const title = typeof raw['title'] === 'string' ? raw['title'] : '';
@@ -738,7 +1028,42 @@ function normalizeComplaint(raw: unknown, index: number): RichComplaint | null {
   const doc = isRecord(raw['doc'])
     ? (raw['doc'] as unknown as ProseMirrorNode)
     : { type: 'doc', content: [] };
-  return { id, title, doc, next_section_no };
+  const normalisedDoc = normalizeEntries
+    ? normalizeEntryHeadings(doc, title)
+    : doc;
+  return { id, title, doc: normalisedDoc, next_section_no };
+}
+
+/**
+ * Back-fill legacy v3 entry headings that predate RWv3 (M3-RWv3 §6): an `entry`
+ * heading with NO `hcEntryKind` is stamped `'first'`, and a missing
+ * `hcComplaintName` is filled from the owning complaint `title`. Non-entry
+ * nodes pass through untouched; the walk is immutable (returns a new tree).
+ */
+function normalizeEntryHeadings(
+  node: ProseMirrorNode,
+  complaintTitle: string,
+): ProseMirrorNode {
+  const children = node.content?.map((c) =>
+    normalizeEntryHeadings(c, complaintTitle),
+  );
+  let next: ProseMirrorNode =
+    children === undefined ? node : { ...node, content: children };
+  if (next.type === 'heading' && next.attrs?.['hcKind'] === 'entry') {
+    const attrs = next.attrs ?? {};
+    const kind =
+      attrs['hcEntryKind'] === 'follow_up' ? 'follow_up' : ('first' as const);
+    const name =
+      typeof attrs['hcComplaintName'] === 'string' &&
+      attrs['hcComplaintName'] !== ''
+        ? (attrs['hcComplaintName'] as string)
+        : complaintTitle;
+    next = {
+      ...next,
+      attrs: { ...attrs, hcEntryKind: kind, hcComplaintName: name },
+    };
+  }
+  return next;
 }
 
 // ---------------------------------------------------------------------------

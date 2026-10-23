@@ -327,3 +327,65 @@ as tables) and kept only transitionally as a read source during upcast. See
   over budget, switch from `starter-kit` to individually-imported base nodes.
 - R4 (S13/S14): read v3 `doc` prescription tables (`rx_placeholder`) to seed the
   real Rx engine, and render the v3 `doc` to the printable case record.
+
+---
+
+## Increment M3-RWv3 — complaint-section restructure (2026-10-23)
+
+Status: Accepted (increment on this ADR, branch `HC-MVP1-M3a-case-visits`).
+Detail handoff: `.worklog/HC-MVP1-M3/handoffs/M3-RWv3-complaint-sections.md`.
+This note records the decision; the handoff is the full spec.
+
+This increment generalises §5 ("ONE editor per complaint"): the single editor
+document now holds **multiple complaint SECTIONS, chronologically**, instead of
+the UI rendering only `complaints[0]`. It does NOT change the storage contract,
+the library, the CSP, or the record-section popups.
+
+- **Serialization: EXTEND v3, no v4 bump.** The payload stays
+  `schema:"case-rich", version:3`. The change is additive inside the opaque
+  `ProseMirrorDoc`: a new heading kind `hcKind:"complaint"` (a NUMBERED
+  complaint-section header carrying `hcComplaintNo` + `hcComplaintId` + the
+  name) and a new `heading.attrs.hcEntryKind` (`"first" | "follow_up"`, missing ⇒
+  `"first"`), plus a denormalised `hcComplaintName` on entry headings. Every
+  existing v3 document is already a valid RWv3 document (single complaint ⇒
+  complaint section #1; legacy entries ⇒ `hcEntryKind:"first"`,
+  `hcComplaintName = title`). A version bump is reserved for a breaking change;
+  this is forward/backward tolerant. (If a discriminator is ever wanted, add an
+  additive `"rwv3":true` flag, never a version bump.)
+
+- **Complaint SECTION** = a numbered header (`"<n>. <name>"`) created by typing a
+  name in the complaint-name field and pressing **Add new complaint**. Under it
+  sit dated ENTRIES. The complaint number is the 1-based position in document
+  order (complaints renumber on add/remove); record-SECTION numbers keep the
+  existing stable, never-reused rule (§8). **Entries carry no visible number** —
+  they are identified by their name-based header + date.
+
+- **Entry headers.** The FIRST entry under a complaint is headed `"<name> — <date>"`;
+  a FOLLOW-UP entry is headed `"<name>-follow-up — <date>"`. The `-follow-up`
+  suffix is a **localisable literal** (en.json `case.form.entry.followupSuffix`),
+  NOT hardcoded English; the header text is derived from attrs at render time and
+  cannot drift (same discipline as section headings).
+
+- **Three toolbar buttons replace the single "Add entry":** *Add new entry*
+  (new dated `first` entry under the current complaint), *Add follow-up entry*
+  (a `<name>-follow-up` dated entry under the current complaint — the in-editor
+  per-complaint follow-up), *Add new complaint* (reads the name field → new
+  numbered complaint section + its first dated entry). Record-section buttons
+  (vitals/family/etc.) are unchanged and still insert a numbered, hr-separated,
+  bordered editable table into the CURRENT entry; family stays Maternal|Paternal
+  two-column.
+
+- **Follow-up reconciliation.** The dashboard visit-level follow-up (S09) is
+  unchanged: `seed_followup_data_json` still copies the prior document forward
+  and the UI reopens the multi-complaint record. It does not conflict with the
+  in-editor per-complaint "Add follow-up entry" — the former chooses the initial
+  document for a new visit, the latter appends an entry within the open document.
+  Both produce identically-shaped `hcEntryKind:"follow_up"` entries.
+
+- **FTS mirror** (`text`, §9) is extended to include every complaint-header text,
+  every entry-header text (including the `-follow-up` suffix) and every cell, so
+  all names/headers/cells stay searchable with no trigger change. Autosave
+  (2 s + blur) + explicit Save + kill-restore, app-level zoom, visible table
+  borders and full-width layout are all preserved. The orphaned
+  `case.form.zoomIn/zoomOut` en.json keys (editor no longer has its own zoom) are
+  pruned.

@@ -20,7 +20,9 @@
 // hc-e2e-testing rules honoured: specs use page objects; the only selectors are
 // data-testid (controls) + scoped structural queries inside the editor root; no
 // sleeps — all waits go through waitUntil / waitForDisplayed.
-import { $, browser } from '@wdio/globals';
+import { $, $$, browser } from '@wdio/globals';
+
+import { appBarPage } from './appbar.page.js';
 
 function byTestId(id: string): ChainablePromiseElement {
   return $(`[data-testid="${id}"]`);
@@ -98,12 +100,13 @@ export class CaseRichPage {
     return byTestId('case-form-back');
   }
 
-  get zoomInButton(): ChainablePromiseElement {
-    return byTestId('case-form-zoom-in');
+  // M3-RWv3: the two extra complaint/entry actions beside "Add new entry".
+  get addFollowupEntryButton(): ChainablePromiseElement {
+    return byTestId('case-form-add-followup-entry');
   }
 
-  get zoomOutButton(): ChainablePromiseElement {
-    return byTestId('case-form-zoom-out');
+  get addComplaintButton(): ChainablePromiseElement {
+    return byTestId('case-form-add-complaint');
   }
 
   // ---- vitals popup ------------------------------------------------------
@@ -364,9 +367,56 @@ export class CaseRichPage {
     await this.saveButton.click();
   }
 
+  /**
+   * Put the ProseMirror caret INSIDE a specific complaint by NAME via a real
+   * WebDriver click on that complaint's header element. A native click is
+   * essential: ProseMirror tracks its own `editor.state.selection`, which is
+   * what "Add new entry"/"Add follow-up entry" read (currentComplaintName).
+   * Directly mutating `window.getSelection()` does NOT update ProseMirror's
+   * state, so the new entry would be attributed to the wrong complaint. The
+   * click lands on the rendered h1[data-hc-kind="complaint"] whose text
+   * contains `name`, which ProseMirror maps to a selection inside that
+   * complaint section.
+   */
+  async focusComplaintByName(name: string, cid = DEFAULT_CID): Promise<void> {
+    const sel = `[data-testid="case-form-editor-${cid}"] [data-hc-kind="complaint"]`;
+    const els = await $$(sel);
+    for (const el of els) {
+      const txt = (await el.getText()).trim();
+      if (txt.includes(name)) {
+        await el.click();
+        return;
+      }
+    }
+    throw new Error(`complaint header containing "${name}" not found to focus`);
+  }
+
   async addEntry(timeout = 15000): Promise<void> {
     await this.addEntryButton.waitForClickable({ timeout });
     await this.addEntryButton.click();
+  }
+
+  /**
+   * M3-RWv3: "Add follow-up entry" appends a dated entry headed
+   * `<complaint-name>-follow-up — <date>` under the CURRENT complaint (same
+   * section), proving the follow-up suffix path.
+   */
+  async addFollowupEntry(timeout = 15000): Promise<void> {
+    await this.addFollowupEntryButton.waitForClickable({ timeout });
+    await this.addFollowupEntryButton.click();
+  }
+
+  /**
+   * M3-RWv3: type a complaint name into the shared complaint-name input, then
+   * click "Add new complaint". Production consumes the input value into a NEW
+   * numbered complaint section (h1 hcKind=complaint, text "<no>. <name>") plus
+   * its first dated entry headed `<name> — <date>`, and clears the input.
+   */
+  async addComplaint(name: string, timeout = 15000): Promise<void> {
+    await this.complaintTitle.waitForDisplayed({ timeout });
+    await this.complaintTitle.setValue(name);
+    await this.addComplaintButton.waitForClickable({ timeout });
+    await this.addComplaintButton.click();
   }
 
   /** Open Record vitals, fill the given fields (BP sys+dia are two fields), Record. */
@@ -446,24 +496,113 @@ export class CaseRichPage {
     return byTestId('case-form-case-summary').isExisting();
   }
 
-  // ---- zoom / fullscreen -------------------------------------------------
-  /** The current font-size (px) of the editor document root (zoom = rem scale). */
-  async editorFontPx(cid = DEFAULT_CID): Promise<number> {
+  // ---- complaint sections & dated entries (M3-RWv3) ----------------------
+  /**
+   * Every numbered COMPLAINT-SECTION header in the document, in order. Each
+   * complaint renders an h1 `data-hc-kind="complaint"` carrying
+   * `data-hc-complaint-no`, `data-hc-complaint-id` and text `"<no>. <name>"`.
+   */
+  async complaintHeaders(cid = DEFAULT_CID): Promise<
+    { no: number; id: string | null; text: string }[]
+  > {
     return browser.execute((selector: string) => {
-      const el = document.querySelector(selector) as HTMLElement | null;
-      if (el === null) return 0;
-      return parseFloat(window.getComputedStyle(el).fontSize);
-    }, `[data-testid="case-form-editor-${cid}"]`);
+      const root = document.querySelector(selector);
+      if (root === null) return [] as unknown[];
+      return Array.from(root.querySelectorAll('[data-hc-kind="complaint"]')).map(
+        (el) => {
+          const h = el as HTMLElement;
+          return {
+            no: Number(h.getAttribute('data-hc-complaint-no')),
+            id: h.getAttribute('data-hc-complaint-id'),
+            text: (h.textContent ?? '').trim(),
+          };
+        },
+      );
+    }, `[data-testid="case-form-editor-${cid}"]`) as Promise<
+      { no: number; id: string | null; text: string }[]
+    >;
   }
 
+  /**
+   * Every dated-entry heading in the document, in order: its rendered text and
+   * its entry kind (`first` | `follow_up`, from `data-hc-entry-kind`).
+   */
+  async entryHeadings(cid = DEFAULT_CID): Promise<{ text: string; kind: string | null }[]> {
+    return browser.execute((selector: string) => {
+      const root = document.querySelector(selector);
+      if (root === null) return [] as unknown[];
+      return Array.from(root.querySelectorAll('[data-hc-kind="entry"]')).map((el) => {
+        const h = el as HTMLElement;
+        return {
+          text: (h.textContent ?? '').trim(),
+          kind: h.getAttribute('data-hc-entry-kind'),
+        };
+      });
+    }, `[data-testid="case-form-editor-${cid}"]`) as Promise<
+      { text: string; kind: string | null }[]
+    >;
+  }
+
+  /**
+   * The computed border of the FIRST body cell of the table with hcTableType
+   * `type`: width (px) and style, read from getComputedStyle. Proves the
+   * RWv3 "visible table cell borders" CSS actually renders (border-width > 0
+   * and border-style not 'none').
+   */
+  async tableCellBorder(
+    type: string,
+    cid = DEFAULT_CID,
+  ): Promise<{ widthPx: number; style: string }> {
+    return browser.execute(
+      (selector: string, tType: string) => {
+        const root = document.querySelector(selector);
+        if (root === null) return { widthPx: 0, style: 'none' };
+        const tbl = Array.from(root.querySelectorAll('table')).find(
+          (t) => t.getAttribute('data-hc-table-type') === tType,
+        );
+        if (tbl === undefined) return { widthPx: 0, style: 'none' };
+        const cell = tbl.querySelector('td') ?? tbl.querySelector('th');
+        if (cell === null) return { widthPx: 0, style: 'none' };
+        const cs = window.getComputedStyle(cell as HTMLElement);
+        return {
+          widthPx: Number.parseFloat(cs.borderTopWidth) || 0,
+          style: cs.borderTopStyle,
+        };
+      },
+      `[data-testid="case-form-editor-${cid}"]`,
+      type,
+    ) as Promise<{ widthPx: number; style: string }>;
+  }
+
+  // ---- app-level zoom (M3-RWv3 C8) ---------------------------------------
+  /**
+   * The current DOCUMENT-ROOT font-size in px. App-level zoom (AppShell C8)
+   * sets `document.documentElement.style.fontSize = 14 * scale + 'px'`, so a
+   * zoom-in must raise THIS value (the whole app scales), not an editor-only
+   * override. Reads the inline value, falling back to the computed root size.
+   */
+  async rootFontPx(): Promise<number> {
+    return browser.execute(() => {
+      const root = document.documentElement;
+      const inline = Number.parseFloat(root.style.fontSize);
+      if (!Number.isNaN(inline) && inline > 0) return inline;
+      return Number.parseFloat(window.getComputedStyle(root).fontSize);
+    });
+  }
+
+  /** Click the shared APP-BAR zoom-in (scales the whole app via the root). */
   async zoomIn(timeout = 15000): Promise<void> {
-    await this.zoomInButton.waitForClickable({ timeout });
-    await this.zoomInButton.click();
+    await appBarPage.zoomIn(timeout);
   }
 
+  /** Click the shared APP-BAR zoom-out. */
   async zoomOut(timeout = 15000): Promise<void> {
-    await this.zoomOutButton.waitForClickable({ timeout });
-    await this.zoomOutButton.click();
+    await appBarPage.zoomOut(timeout);
+  }
+
+  /** Click the shared APP-BAR zoom-reset (returns the root to baseline). */
+  async zoomReset(timeout = 15000): Promise<void> {
+    await appBarPage.zoomReset(timeout);
   }
 
   /** The editor's rendered width in px and the viewport width (for fullscreen). */
