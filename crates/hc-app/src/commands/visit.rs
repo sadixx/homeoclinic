@@ -14,10 +14,11 @@ use crate::error::{map_error, to_user_result, AppError, UserFacingError};
 use crate::state::AppState;
 use crate::visit::{
     AutosaveResponse, CaseAutosaveRequest, CreateFollowupRequest, CreateFollowupResponse,
-    DefaultTemplateResponse, FollowupAutosaveRequest, OkResponse, OpenOrCreateRequest,
-    OpenOrCreateResponse, RubricSearchPrefillRequest, RubricSearchPrefillResponse,
-    SetNextFollowupRequest, SetVisibilityRequest, SummaryRenderRequest, SummaryRenderResponse,
-    TemplateListResponse, TodayOverviewRequest, TodayOverviewResponse, VisitService,
+    DefaultTemplateResponse, FollowupAutosaveRequest, HasSavedFirstCaseRequest,
+    HasSavedFirstCaseResponse, OkResponse, OpenOrCreateRequest, OpenOrCreateResponse,
+    RubricSearchPrefillRequest, RubricSearchPrefillResponse, SetNextFollowupRequest,
+    SetVisibilityRequest, SummaryRenderRequest, SummaryRenderResponse, TemplateListResponse,
+    TodayOverviewRequest, TodayOverviewResponse, VisitService,
 };
 
 /// Build a [`VisitService`] over the managed state's injected clock.
@@ -126,6 +127,23 @@ pub fn visit_set_next_followup(
     req: SetNextFollowupRequest,
 ) -> Result<OkResponse, UserFacingError> {
     with_pool(&state, |pool| service(&state).set_next_followup(pool, req))
+}
+
+/// Whether a saved first case exists, for first-case gating (M3-RW A5). The UI
+/// greys out "New visit / first case" once this is true. Read-only.
+#[tauri::command]
+#[specta::specta]
+pub fn visit_has_saved_first_case(
+    state: State<'_, AppState>,
+    req: HasSavedFirstCaseRequest,
+) -> Result<HasSavedFirstCaseResponse, UserFacingError> {
+    with_pool(&state, |pool| {
+        service(&state)
+            .has_saved_first_case(pool, &req.patient_id)
+            .map(|has_saved_first_case| HasSavedFirstCaseResponse {
+                has_saved_first_case,
+            })
+    })
 }
 
 /// The Today overview: due / overdue / registered-today (VIS-005).

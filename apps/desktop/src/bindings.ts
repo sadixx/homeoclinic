@@ -162,6 +162,11 @@ export const commands = {
 	visitAutosave: (req: FollowupAutosaveRequest) => typedError<AutosaveResponse, UserFacingError>(__TAURI_INVOKE("visit_autosave", { req })),
 	/**  Set the next follow-up date on the visit + patient (VIS-004). */
 	visitSetNextFollowup: (req: SetNextFollowupRequest) => typedError<OkResponse, UserFacingError>(__TAURI_INVOKE("visit_set_next_followup", { req })),
+	/**
+	 *  Whether a saved first case exists, for first-case gating (M3-RW A5). The UI
+	 *  greys out "New visit / first case" once this is true. Read-only.
+	 */
+	visitHasSavedFirstCase: (req: HasSavedFirstCaseRequest) => typedError<HasSavedFirstCaseResponse, UserFacingError>(__TAURI_INVOKE("visit_has_saved_first_case", { req })),
 	/**  The Today overview: due / overdue / registered-today (VIS-005). */
 	todayGetOverview: (req: TodayOverviewRequest) => typedError<TodayOverviewResponse, UserFacingError>(__TAURI_INVOKE("today_get_overview", { req })),
 	/**  Send-to-repertory STUB (CASE-006, R7) — flagged unavailable, no dead end. */
@@ -185,6 +190,16 @@ export const commands = {
 	 *  filesystem read — `visit_attach_report` reads the bytes itself. Interactive,
 	 *  so E2E/UI-tested, not cargo-tested. The chosen path is never logged
 	 *  (R-PRIV-001).
+	 * 
+	 *  Determinism seam (DEV/E2E ONLY, feature `e2e-test-keys` — ADR 0017): the
+	 *  native GTK file chooser cannot be driven by webdriver, so under the
+	 *  E2E-only build feature this command FIRST consults the `HC_E2E_REPORT_FILE`
+	 *  env var; if it is set to a path that exists, that path is returned as the
+	 *  picked file and the native dialog is skipped. This mirrors the webcam
+	 *  precedent (`window.__HC_E2E_CAMERA__` in `apps/desktop/src/patients/photo.ts`)
+	 *  and the `e2e-test-keys` gating of `patient_import_fixture`. The seam is
+	 *  compiled OUT of the release/public build, which always opens the native
+	 *  picker only — behaviour unchanged for real doctors.
 	 */
 	visitPickReportFile: () => typedError<PickReportFileResponse, UserFacingError>(__TAURI_INVOKE("visit_pick_report_file")),
 };
@@ -361,6 +376,11 @@ export type CreateFollowupResponse = {
 	visitAt: string,
 	/**  The previous visit's complaints, pre-loaded with status to be set. */
 	prevComplaints: PrevComplaint[],
+	/**
+	 *  The previously scheduled next follow-up date for the header (VIS-004),
+	 *  or `None`. Additive read field (M3-RW A4).
+	 */
+	nextFollowupOn: string | null,
 };
 
 /**
@@ -591,6 +611,21 @@ export type GetDashboardRequest = {
 	patientId: string,
 };
 
+/**  `visit_has_saved_first_case` request (M3-RW A5) — first-case gating signal. */
+export type HasSavedFirstCaseRequest = {
+	/**  The patient whose first-case state is queried. */
+	patientId: string,
+};
+
+/**  `visit_has_saved_first_case` response (M3-RW A5). */
+export type HasSavedFirstCaseResponse = {
+	/**
+	 *  True once a non-deleted `first`-type visit exists, so the UI can grey
+	 *  out starting another first case.
+	 */
+	hasSavedFirstCase: boolean,
+};
+
 /**
  *  Read-only health summary returned by [`health_check`].
  * 
@@ -759,6 +794,11 @@ export type OpenOrCreateResponse = {
 	vitalsJson: string,
 	/**  RFC3339 visit instant. */
 	visitAt: string,
+	/**
+	 *  The scheduled next follow-up date for the header (VIS-004), or `None`
+	 *  when none is set. Additive read field (M3-RW A4).
+	 */
+	nextFollowupOn: string | null,
 };
 
 /**

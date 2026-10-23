@@ -46,6 +46,7 @@ const {
   caseVisitAutosave,
   caseSummaryRender,
   caseTemplateSetVisibility,
+  visitHasSavedFirstCase,
   todayGetOverview,
 } = vi.hoisted(() => ({
   setupGetState: vi.fn(),
@@ -72,6 +73,9 @@ const {
   caseVisitAutosave: vi.fn(),
   caseSummaryRender: vi.fn(),
   caseTemplateSetVisibility: vi.fn(),
+  // First-case gating read (Slice C5) the PatientDashboard fires on open; it
+  // decides whether the dashboard surfaces the dedicated Follow-up button.
+  visitHasSavedFirstCase: vi.fn(),
   // S03 Today upgrade (R3): the TodayScreen now calls today_get_overview on
   // mount, so every Today-routed AppShell render depends on it. Default to an
   // all-empty overview so the shell renders Today's empty state.
@@ -127,12 +131,14 @@ vi.mock('@/bindings', () => ({
     caseVisitAutosave,
     caseSummaryRender,
     caseTemplateSetVisibility,
+    visitHasSavedFirstCase,
     // S03 Today overview read (R3) the TodayScreen fires on mount.
     todayGetOverview,
   },
 }));
 
 import { AppShell } from './AppShell';
+import en from '@/locales/en.json';
 
 /** A never-resolving promise to hold the boot reads "pending". */
 function pending<T>(): Promise<T> {
@@ -260,6 +266,10 @@ beforeEach(() => {
   });
   caseTemplateList.mockReset();
   caseTemplateList.mockResolvedValue({ templates: [] });
+  // Gate open by default (no saved first case): the dashboard shows an enabled
+  // New visit and no Follow-up button unless a test overrides this.
+  visitHasSavedFirstCase.mockReset();
+  visitHasSavedFirstCase.mockResolvedValue({ hasSavedFirstCase: false });
 });
 
 describe('AppShell', () => {
@@ -992,6 +1002,98 @@ describe('AppShell', () => {
       expect(
         screen.queryByTestId('patient-dash-demographics'),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  // D1 (user-reported dead click): the dashboard Follow-up click opened
+  // nothing. The dashboard fix fires onNewFollowup(patientId) unconditionally;
+  // AppShell.startFollowupForPatient must then open-or-create the follow-up and
+  // navigate into the JOURNAL CaseForm (visitType='follow_up'), i.e. the
+  // /patient/:id/case/:vid/followup route. And when the open REJECTS, the shell
+  // must SURFACE a non-crash, patient-data-free alert (R-UI-008) instead of the
+  // old silent catch {} — a failed open must be observable, not a dead click.
+  describe('D1 follow-up open path: navigate + surface error on reject', () => {
+    /** Drive an in-app navigation the way a nav click / deep link would. */
+    async function navigateViaHash(hash: string): Promise<void> {
+      await act(async () => {
+        window.location.hash = hash;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      });
+    }
+
+    it('opens-or-creates a follow-up and routes into the journal case form', async () => {
+      // Gate the first case so the dashboard surfaces the Follow-up button, and
+      // resolve the follow-up open to a fresh visit id.
+      visitHasSavedFirstCase.mockResolvedValue({ hasSavedFirstCase: true });
+      caseVisitOpenOrCreate.mockResolvedValue({
+        visitId: 'v-fu-1',
+        templateId: 'chronic_detailed',
+        dataJson: '{}',
+        vitalsJson: '{}',
+        visitAt: '2026-10-23T10:42:00Z',
+      });
+
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // Open the dashboard; the first case is saved so the Follow-up button
+      // shows even though the visit timeline is empty (the D1 stale state).
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+
+      await user.click(await screen.findByTestId('patient-dash-followup'));
+
+      // The backend resolves the prior visit itself, so the UI opens-or-creates
+      // a follow-up with the patient id alone (no prevVisitId threaded).
+      await waitFor(() =>
+        expect(caseVisitOpenOrCreate).toHaveBeenCalledWith({
+          patientId: 'p-123',
+          visitType: 'follow_up',
+        }),
+      );
+      // CaseRoute mounts in follow-up mode (the /followup route), proving the
+      // click is no longer a silent no-op.
+      expect(await screen.findByTestId('case-form')).toBeInTheDocument();
+      expect(window.location.hash).toContain('/followup');
+    });
+
+    it('surfaces a non-crash error (not a silent catch) when the follow-up open rejects', async () => {
+      visitHasSavedFirstCase.mockResolvedValue({ hasSavedFirstCase: true });
+      // The open rejects like a backend/transport failure.
+      caseVisitOpenOrCreate.mockRejectedValue(new Error('open failed'));
+      const errSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+
+      await user.click(await screen.findByTestId('patient-dash-followup'));
+
+      // A visible, non-crash alert appears (observable, not a dead click).
+      const alert = await screen.findByTestId('app-open-error');
+      expect(alert).toHaveAttribute('role', 'alert');
+      expect(alert).toHaveTextContent(en['app.case.openFailed']);
+      // No case form mounted, and the shell did not crash.
+      expect(screen.queryByTestId('case-form')).not.toBeInTheDocument();
+      expect(screen.getByTestId('app-shell')).toBeInTheDocument();
+      // One fixed console.error line with NO patient id / SQL / path / stack.
+      expect(errSpy).toHaveBeenCalledWith('[AppShell] follow-up open failed');
+      const logged = errSpy.mock.calls.flat().join(' ');
+      expect(logged).not.toContain('p-123');
+
+      // Dismissible by the doctor.
+      await user.click(screen.getByTestId('app-open-error-dismiss'));
+      await waitFor(() =>
+        expect(screen.queryByTestId('app-open-error')).not.toBeInTheDocument(),
+      );
+
+      errSpy.mockRestore();
     });
   });
 });

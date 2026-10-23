@@ -173,6 +173,25 @@ pub fn latest_visit_for_patient(
     Ok(row)
 }
 
+/// True when the patient has at least one non-deleted `first`-type visit
+/// (M3-RW A5). Drives the UI "New visit / first case" gating: once a first case
+/// is saved the control is greyed out so a second first case cannot be started;
+/// a soft-deleted first case does NOT count. Parameterised (R-SEC-001) and
+/// bounded (`EXISTS` short-circuits); uses the
+/// `visit(patient_id, visit_at DESC)` index to seek the patient's rows
+/// (R-DATA-008).
+pub fn has_saved_first_case(conn: &Connection, patient_id: &str) -> Result<bool, StorageError> {
+    let found: bool = conn.query_row(
+        "SELECT EXISTS( \
+           SELECT 1 FROM visit \
+           WHERE patient_id = ?1 AND type = 'first' AND deleted_at IS NULL \
+         )",
+        params![patient_id],
+        |r| r.get::<_, i64>(0).map(|n| n != 0),
+    )?;
+    Ok(found)
+}
+
 /// Update the mutable visit fields on autosave (the 0009 `AFTER UPDATE` trigger
 /// re-syncs `visit_fts` in the same transaction, R-DATA-006). Bumps
 /// `row_version`. Does NOT write an audit row — the service does.

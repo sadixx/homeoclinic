@@ -1,21 +1,36 @@
-// Page object for the S08 first (detailed) case form (docs/ui/S08-case-form.md;
-// CASE-001..006, CASE-009, VIS-001). hc-e2e-testing rule: specs use page
-// objects; selectors are data-testid only, never raw CSS/XPath in specs. No
-// sleeps — all waits go through waitUntil / WebdriverIO auto-waiting
-// waitForDisplayed.
+// Page object for the S08 case record — doctor-journal model (docs/ui/
+// S08-case-form.md revised; ADR 0018; schema M3-RW-data-json-schema.md).
+// hc-e2e-testing rule: specs use page objects; selectors are data-testid only,
+// never raw CSS/XPath in specs. No sleeps — all waits go through waitUntil /
+// WebdriverIO auto-waiting waitForDisplayed.
 //
-// The case form is a schema-driven engine: the left rail lists one
-// `case-form-section-<key>` button per visible template section, and sections
-// other than chief_complaints start COLLAPSED, so a field in another section
-// must have its section expanded (click its rail button) before the field is
-// in the DOM. The autosave status bar (`case-form-save-status`) shows
-// Saving…/Saved hh:mm; there is no Save button on this clinical form
-// (CASE-005). Send-to-repertory (CASE-006) is flagged OFF pre-R7 and is not
-// rendered.
-import { $, browser } from "@wdio/globals";
+// The journal case form is one BIG editable box per complaint: a dated running
+// log of editable text + table blocks. A brand-new first case opens with ONE
+// complaint ("cc1") that has ONE dated entry with NO blocks, so a text block is
+// created by "Add text" or "Add entry". Buttons insert editable tables:
+// Record vitals (a popup seeds the first row), Add prescription (a labelled
+// placeholder medicine table). The explicit Save button force-flushes autosave
+// (CASE-005). Structured side sections (family Maternal/Paternal tabs,
+// investigations Suggested/Submitted tabs, generals, diagnosis) live in a
+// COLLAPSED rail — expand the section before its fields/tabs are in the DOM.
+//
+// Table cell test ids (schema §4): body cell `case-cell-<cid>-<bid>-<r>-<c>`,
+// header cell `case-cell-<cid>-<bid>-h-<c>`. The default complaint id is "cc1".
+import { $, $$, browser } from "@wdio/globals";
 
 function byTestId(id: string): ChainablePromiseElement {
   return $(`[data-testid="${id}"]`);
+}
+
+/** The vitals a Record-vitals popup can seed (all optional; strings). */
+export interface VitalsInput {
+  sys?: string;
+  dia?: string;
+  pulse?: string;
+  weight?: string;
+  height?: string;
+  temp?: string;
+  spo2?: string;
 }
 
 export class CasePage {
@@ -24,156 +39,128 @@ export class CasePage {
     return byTestId("case-form");
   }
 
+  get content(): ChainablePromiseElement {
+    return byTestId("case-form-content");
+  }
+
+  get journalBox(): ChainablePromiseElement {
+    return byTestId("case-form-journal-box");
+  }
+
   get saveStatus(): ChainablePromiseElement {
     return byTestId("case-form-save-status");
   }
 
-  get bmi(): ChainablePromiseElement {
-    return byTestId("case-form-bmi");
+  get saveButton(): ChainablePromiseElement {
+    return byTestId("case-form-save");
   }
 
-  // ---- section rail ------------------------------------------------------
-  section(key: string): ChainablePromiseElement {
-    return byTestId(`case-form-section-${key}`);
-  }
-
-  /** The first-class Back control (UX1); rendered only when onBack is wired. */
   get back(): ChainablePromiseElement {
     return byTestId("case-form-back");
   }
 
-  /** True when the case-form Back control is present (no-dead-end guard). */
-  async hasBack(): Promise<boolean> {
-    return this.back.isExisting();
+  get complaintTitle(): ChainablePromiseElement {
+    return byTestId("case-form-complaint-title");
   }
 
-  /** Click the case-form Back control (UX1 -> patient dashboard). */
-  async clickBack(timeout = 15000): Promise<void> {
-    await this.back.waitForClickable({ timeout });
-    await this.back.click();
+  // ---- journal controls --------------------------------------------------
+  get addEntryButton(): ChainablePromiseElement {
+    return byTestId("case-form-add-entry");
   }
 
-  /**
-   * Click a rail section to TOGGLE it (UX2). The production handler is three-
-   * state (hidden->re-show+expand; shown+collapsed->expand; shown+expanded->
-   * hide). Callers drive explicit before/after assertions around each click.
-   */
-  async railToggle(key: string, timeout = 15000): Promise<void> {
-    await this.section(key).waitForClickable({ timeout });
-    await this.section(key).click();
+  get addTextButton(): ChainablePromiseElement {
+    return byTestId("case-form-add-text");
   }
 
-  /**
-   * True when a section's rail item marks it HIDDEN (UX2 discoverability): the
-   * production rail sets data-hidden="true" and aria-pressed="false" on a
-   * rail-toggled-hidden section so the doctor can click it back on.
-   */
-  async sectionIsHidden(key: string): Promise<boolean> {
-    const el = this.section(key);
-    await el.waitForExist({ timeout: 15000 });
-    const dataHidden = await el.getAttribute("data-hidden");
-    const pressed = await el.getAttribute("aria-pressed");
-    return dataHidden === "true" || pressed === "false";
+  get recordVitalsButton(): ChainablePromiseElement {
+    return byTestId("case-form-record-vitals");
   }
 
-  /** aria-expanded on a rail section (the centre-pane panel open state). */
-  async sectionIsExpanded(key: string): Promise<boolean> {
-    const el = this.section(key);
-    await el.waitForExist({ timeout: 15000 });
-    return (await el.getAttribute("aria-expanded")) === "true";
+  get addPrescriptionButton(): ChainablePromiseElement {
+    return byTestId("case-form-add-prescription");
   }
 
-  /**
-   * True when a section's EDIT PANEL is present in the centre pane. The panel
-   * renders only when the section is shown AND expanded, keyed by a known
-   * field in that section (chief_complaints -> case-form-sensation-1). A
-   * caller passes the section's panel-field testid.
-   */
-  async panelFieldExists(fieldTestId: string): Promise<boolean> {
-    return byTestId(fieldTestId).isExisting();
+  get rxPlaceholderHint(): ChainablePromiseElement {
+    return byTestId("case-form-rx-placeholder-hint");
   }
 
-  /**
-   * Send the global Alt+Left Back chord (00-conventions §3). Blurs any focused
-   * text control first (clicks the rail nav heading region via the chief-
-   * complaints rail button's parent is risky; instead focus the body) so the
-   * production guard that skips INPUT/TEXTAREA/SELECT/contentEditable does not
-   * suppress it — the chord must act as a shell-level Back.
-   */
-  async altLeftBack(): Promise<void> {
-    // Move focus off any text field onto document.body so the global handler
-    // (which ignores keystrokes inside text controls) treats this as a Back.
-    await browser.execute(() => {
-      const active = document.activeElement as HTMLElement | null;
-      if (active !== null && typeof active.blur === "function") active.blur();
-      document.body.setAttribute("tabindex", "-1");
-      document.body.focus();
-    });
-    await browser.keys(["Alt", "ArrowLeft"]);
+  /** A dated entry header for complaint `cid` at 0-based index `idx`. */
+  entryHeader(cid: string, idx: number): ChainablePromiseElement {
+    return byTestId(`case-form-entry-${cid}-${idx}`);
   }
 
-  // ---- fields ------------------------------------------------------------
-  /** The chief-complaint sensation textarea for block n (1-based). */
-  sensation(n = 1): ChainablePromiseElement {
-    return byTestId(`case-form-sensation-${n}`);
+  /** A block element (text textarea or table wrapper) by complaint + block id. */
+  block(cid: string, bid: string): ChainablePromiseElement {
+    return byTestId(`case-block-${cid}-${bid}`);
   }
 
-  /** A physical-generals pick list / field by key (e.g. thermal, thirst). */
-  generals(key: string): ChainablePromiseElement {
-    return byTestId(`case-form-generals-${key}`);
+  /** A body cell input of a table block. */
+  cell(cid: string, bid: string, row: number, col: number): ChainablePromiseElement {
+    return byTestId(`case-cell-${cid}-${bid}-${row}-${col}`);
   }
 
-  /** An examination vital input by field key (e.g. weight_kg, height_cm). */
-  vital(key: string): ChainablePromiseElement {
-    return byTestId(`case-form-vital-${key}`);
+  /** A header (column) cell input of a table block. */
+  headerCell(cid: string, bid: string, col: number): ChainablePromiseElement {
+    return byTestId(`case-cell-${cid}-${bid}-h-${col}`);
+  }
+
+  // ---- vitals popup ------------------------------------------------------
+  get vitalsPopup(): ChainablePromiseElement {
+    return byTestId("case-form-vitals-popup");
+  }
+
+  get vitalsConfirm(): ChainablePromiseElement {
+    return byTestId("case-form-record-vitals-confirm");
+  }
+
+  get vitalsCancel(): ChainablePromiseElement {
+    return byTestId("case-form-record-vitals-cancel");
+  }
+
+  get vitalsBmi(): ChainablePromiseElement {
+    return byTestId("case-vitals-bmi");
+  }
+
+  // ---- side-section rail -------------------------------------------------
+  section(key: string): ChainablePromiseElement {
+    return byTestId(`case-form-section-${key}`);
+  }
+
+  get familyMaternalTab(): ChainablePromiseElement {
+    return byTestId("case-form-family-maternal-tab");
+  }
+
+  get familyPaternalTab(): ChainablePromiseElement {
+    return byTestId("case-form-family-paternal-tab");
+  }
+
+  get familyMaternal(): ChainablePromiseElement {
+    return byTestId("case-form-family-maternal");
+  }
+
+  get familyPaternal(): ChainablePromiseElement {
+    return byTestId("case-form-family-paternal");
+  }
+
+  get investSuggestedTab(): ChainablePromiseElement {
+    return byTestId("case-form-invest-suggested-tab");
+  }
+
+  get investSubmittedTab(): ChainablePromiseElement {
+    return byTestId("case-form-invest-submitted-tab");
+  }
+
+  get investSuggested(): ChainablePromiseElement {
+    return byTestId("case-form-invest-suggested");
   }
 
   // ---- waits -------------------------------------------------------------
-  /** Wait until the case form shell is rendered. */
   async waitForForm(timeout = 20000): Promise<void> {
     await this.form.waitForExist({ timeout });
     await this.form.waitForDisplayed({ timeout });
+    await this.journalBox.waitForDisplayed({ timeout });
   }
 
-  /**
-   * Expand a collapsed section by clicking its rail button, then wait until a
-   * known field of that section is present. The caller passes a field testid
-   * to wait on (the section panel renders lazily when expanded).
-   */
-  async expandSection(
-    key: string,
-    waitForTestId: string,
-    timeout = 15000,
-  ): Promise<void> {
-    await this.section(key).waitForDisplayed({ timeout });
-    await this.section(key).click();
-    await byTestId(waitForTestId).waitForDisplayed({ timeout });
-  }
-
-  // ---- read helpers ------------------------------------------------------
-  /** The current value of a text/textarea/number input by its testid. */
-  async valueOf(testId: string): Promise<string> {
-    const el = byTestId(testId);
-    await el.waitForExist({ timeout: 15000 });
-    return (await el.getValue()) ?? "";
-  }
-
-  /** The rendered BMI text (an <output>, read via text not value). */
-  async bmiText(): Promise<string> {
-    await this.bmi.waitForExist({ timeout: 15000 });
-    return (await this.bmi.getText()).trim();
-  }
-
-  /** The current autosave status bar text. */
-  async saveStatusText(): Promise<string> {
-    await this.saveStatus.waitForExist({ timeout: 15000 });
-    return (await this.saveStatus.getText()).trim();
-  }
-
-  /**
-   * Wait until autosave reports Saved (status text begins with the en.json
-   * "Saved" prefix). Returns the final status text for logging/evidence.
-   */
   async waitForSaved(timeout = 20000): Promise<string> {
     await browser.waitUntil(
       async () => (await this.saveStatusText()).startsWith("Saved"),
@@ -185,18 +172,175 @@ export class CasePage {
     return this.saveStatusText();
   }
 
-  // ---- navigation --------------------------------------------------------
+  async saveStatusText(): Promise<string> {
+    await this.saveStatus.waitForExist({ timeout: 15000 });
+    return (await this.saveStatus.getText()).trim();
+  }
+
+  // ---- actions -----------------------------------------------------------
+  /** Click the explicit Save button (force-flush autosave). */
+  async save(timeout = 15000): Promise<void> {
+    await this.saveButton.waitForClickable({ timeout });
+    await this.saveButton.click();
+  }
+
+  /** Click "Add text" to append a fresh text block to the newest entry. */
+  async addTextBlock(timeout = 15000): Promise<void> {
+    await this.addTextButton.waitForClickable({ timeout });
+    await this.addTextButton.click();
+  }
+
+  /** Click "Add entry" to append a NEW dated entry (with a fresh text block). */
+  async addEntry(timeout = 15000): Promise<void> {
+    await this.addEntryButton.waitForClickable({ timeout });
+    await this.addEntryButton.click();
+  }
+
   /**
-   * Navigate the HashRouter directly to a visit's case form (deep-link). Used
-   * after a same-data-dir relaunch to reopen the exact visit. Driven in-page
-   * via location.hash (browser.url rejects a bare hash), the same technique
-   * the other page objects use.
+   * The id (`b<n>`) of the first text-block textarea currently in the journal
+   * box, parsed from its data-testid. The brand-new first case has no block
+   * until Add text / Add entry is clicked, so call that first.
    */
-  async openVisit(
-    patientId: string,
-    visitId: string,
-    timeout = 20000,
+  async firstBlockId(cid = "cc1", timeout = 15000): Promise<string> {
+    await browser.waitUntil(
+      async () => (await this.blockTestIds(cid)).length > 0,
+      { timeout, timeoutMsg: "no block appeared in the journal box" },
+    );
+    const ids = await this.blockTestIds(cid);
+    const first = ids[0];
+    if (first === undefined) throw new Error("no block id found");
+    return first;
+  }
+
+  /** Every block id (`b<n>`) present for complaint `cid`, in DOM order. */
+  async blockTestIds(cid = "cc1"): Promise<string[]> {
+    const els = await $$(`[data-testid^="case-block-${cid}-"]`);
+    const out: string[] = [];
+    for await (const el of els) {
+      const testId = await el.getAttribute("data-testid");
+      // Skip the per-block remove button (case-block-remove-<bid>).
+      const m = new RegExp(`^case-block-${cid}-(b\\d+)$`).exec(testId ?? "");
+      if (m && m[1] !== undefined) out.push(m[1]);
+    }
+    return out;
+  }
+
+  /** Number of dated entry headers present for complaint `cid`. */
+  async entryCount(cid = "cc1"): Promise<number> {
+    const els = await $$(`[data-testid^="case-form-entry-${cid}-"]`);
+    return els.length;
+  }
+
+  /** Type into a text block textarea by id. */
+  async typeInBlock(cid: string, bid: string, text: string): Promise<void> {
+    const el = this.block(cid, bid);
+    await el.waitForDisplayed({ timeout: 15000 });
+    await el.setValue(text);
+  }
+
+  /** Read the current value of a block textarea by id. */
+  async blockValue(cid: string, bid: string): Promise<string> {
+    const el = this.block(cid, bid);
+    await el.waitForExist({ timeout: 15000 });
+    return (await el.getValue()) ?? "";
+  }
+
+  /**
+   * Open the Record-vitals popup, fill the given fields (BP sys + dia are TWO
+   * separate fields — ADR 0018 #3), and confirm. The app inserts an editable
+   * vitals table block into the newest entry.
+   */
+  async recordVitals(v: VitalsInput, timeout = 15000): Promise<void> {
+    await this.recordVitalsButton.waitForClickable({ timeout });
+    await this.recordVitalsButton.click();
+    await this.vitalsPopup.waitForDisplayed({ timeout });
+    const fill = async (testId: string, value?: string): Promise<void> => {
+      if (value === undefined) return;
+      const el = byTestId(testId);
+      await el.waitForDisplayed({ timeout });
+      await el.setValue(value);
+    };
+    await fill("case-vitals-bp-sys", v.sys);
+    await fill("case-vitals-bp-dia", v.dia);
+    await fill("case-vitals-pulse", v.pulse);
+    await fill("case-vitals-weight", v.weight);
+    await fill("case-vitals-height", v.height);
+    await fill("case-vitals-temp", v.temp);
+    await fill("case-vitals-spo2", v.spo2);
+    await this.vitalsConfirm.waitForClickable({ timeout });
+    await this.vitalsConfirm.click();
+    await this.vitalsPopup.waitForDisplayed({ reverse: true, timeout });
+  }
+
+  /** Click "Add prescription" to insert a placeholder medicine table. */
+  async addPrescription(timeout = 15000): Promise<void> {
+    await this.addPrescriptionButton.waitForClickable({ timeout });
+    await this.addPrescriptionButton.click();
+  }
+
+  /** True when the rx-placeholder hint note is shown. */
+  async hasRxPlaceholderHint(): Promise<boolean> {
+    return this.rxPlaceholderHint.isExisting();
+  }
+
+  /** Edit a table body cell and blur to flush autosave. */
+  async editCell(
+    cid: string,
+    bid: string,
+    row: number,
+    col: number,
+    value: string,
   ): Promise<void> {
+    const el = this.cell(cid, bid, row, col);
+    await el.waitForDisplayed({ timeout: 15000 });
+    await el.setValue(value);
+    // Blur onto the complaint title to fire the onBlur autosave flush.
+    await this.complaintTitle.click();
+  }
+
+  /** Read a table body cell value. */
+  async cellValue(cid: string, bid: string, row: number, col: number): Promise<string> {
+    const el = this.cell(cid, bid, row, col);
+    await el.waitForExist({ timeout: 15000 });
+    return (await el.getValue()) ?? "";
+  }
+
+  /** The block id of the only/first table block present for `cid` (vitals/rx). */
+  async tableBlockIds(cid = "cc1"): Promise<string[]> {
+    // A table block wrapper shares the case-block-<cid>-<bid> id with text
+    // blocks; distinguish by the presence of a header cell (case-cell-...-h-0).
+    const ids = await this.blockTestIds(cid);
+    const out: string[] = [];
+    for (const bid of ids) {
+      // eslint-disable-next-line no-await-in-loop
+      if (await this.headerCell(cid, bid, 0).isExisting()) out.push(bid);
+    }
+    return out;
+  }
+
+  /** True when a Case summary control is present (must be ABSENT, ADR 0018 #5). */
+  async hasCaseSummary(): Promise<boolean> {
+    return byTestId("case-form-case-summary").isExisting();
+  }
+
+  /** Expand a collapsed side-section; optionally wait for a field to render. */
+  async expandSection(
+    key: string,
+    waitForTestId?: string,
+    timeout = 15000,
+  ): Promise<void> {
+    await this.section(key).waitForDisplayed({ timeout });
+    if ((await this.section(key).getAttribute("aria-expanded")) !== "true") {
+      await this.section(key).click();
+    }
+    if (waitForTestId !== undefined) {
+      await byTestId(waitForTestId).waitForDisplayed({ timeout });
+    }
+  }
+
+  // ---- navigation --------------------------------------------------------
+  /** Deep-link the HashRouter to a visit's journal case form. */
+  async openVisit(patientId: string, visitId: string, timeout = 20000): Promise<void> {
     await browser.execute(
       (pid: string, vid: string) => {
         window.location.hash = `#/patient/${encodeURIComponent(
@@ -210,10 +354,49 @@ export class CasePage {
   }
 
   /**
-   * Read the patientId + visitId the app routed to after Take case, parsed
-   * from the self-navigated hash (#/patient/<pid>/case/<vid>). Never sets the
-   * hash — pure observation of the route startCaseForPatient chose.
+   * Deep-link the HashRouter to a visit's journal case form in FOLLOW-UP mode
+   * (ADR 0018 #2): `/patient/:id/case/:vid/followup` renders the SAME journal
+   * CaseForm with visitType='follow_up', so the box pre-opens with the prior
+   * visit's content, the prior complaints pre-load (VIS-002) and the insert
+   * buttons read "Update vitals"/"Update prescription". This is the deep-linkable
+   * entry the dashboard "Follow-up" button navigates to.
    */
+  async openFollowupVisit(
+    patientId: string,
+    visitId: string,
+    timeout = 20000,
+  ): Promise<void> {
+    await browser.execute(
+      (pid: string, vid: string) => {
+        window.location.hash = `#/patient/${encodeURIComponent(
+          pid,
+        )}/case/${encodeURIComponent(vid)}/followup`;
+      },
+      patientId,
+      visitId,
+    );
+    await this.waitForForm(timeout);
+  }
+
+  /** The current value of a complaint-title input (the pre-loaded title, VIS-002). */
+  async complaintTitleValue(timeout = 15000): Promise<string> {
+    await this.complaintTitle.waitForDisplayed({ timeout });
+    return (await this.complaintTitle.getValue()) ?? "";
+  }
+
+  /** The visible label of the Record/Update-vitals button (follow-up reads "Update vitals"). */
+  async recordVitalsButtonText(timeout = 15000): Promise<string> {
+    await this.recordVitalsButton.waitForDisplayed({ timeout });
+    return (await this.recordVitalsButton.getText()).trim();
+  }
+
+  /** The visible label of the Add/Update-prescription button (follow-up reads "Update prescription"). */
+  async addPrescriptionButtonText(timeout = 15000): Promise<string> {
+    await this.addPrescriptionButton.waitForDisplayed({ timeout });
+    return (await this.addPrescriptionButton.getText()).trim();
+  }
+
+  /** Parse patientId + visitId from the self-navigated case hash. */
   async routeIds(): Promise<{ patientId: string; visitId: string }> {
     const hash = await browser.execute(() => window.location.hash);
     const m = /#\/patient\/([^/]+)\/case\/([^/?]+)/.exec(hash);
@@ -224,11 +407,6 @@ export class CasePage {
       patientId: decodeURIComponent(m[1]),
       visitId: decodeURIComponent(m[2]),
     };
-  }
-
-  /** True when the (pre-R7) send-to-repertory control is present. */
-  async hasSendToRepertory(): Promise<boolean> {
-    return byTestId("case-form-send-to-repertory").isExisting();
   }
 }
 

@@ -204,6 +204,22 @@ export function TodayScreen({
           ) : null}
         </div>
       )}
+
+      {/* Clear-dues PLACEHOLDER (Slice C6): billing arrives in R5 (BILL-001..
+          002). Rendered as a clearly-disabled, no-op control so there is no
+          dead end (R-DEL-002) and no fake money / math / network. */}
+      <div className="flex flex-none justify-end border-t border-slate-100 pt-2">
+        <button
+          type="button"
+          data-testid="today-clear-dues"
+          disabled
+          aria-disabled="true"
+          title={t('today.clearDues.disabledHint')}
+          className="cursor-not-allowed rounded border border-slate-300 bg-slate-100 px-3 py-1.5 text-sm text-slate-400"
+        >
+          {t('today.clearDues.label')}
+        </button>
+      </div>
     </section>
   );
 }

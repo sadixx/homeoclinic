@@ -101,6 +101,9 @@ pub struct OpenOrCreateResponse {
     pub vitals_json: String,
     /// RFC3339 visit instant.
     pub visit_at: String,
+    /// The scheduled next follow-up date for the header (VIS-004), or `None`
+    /// when none is set. Additive read field (M3-RW A4).
+    pub next_followup_on: Option<String>,
 }
 
 /// `case_visit_autosave` request (CASE-005).
@@ -175,6 +178,9 @@ pub struct CreateFollowupResponse {
     pub visit_at: String,
     /// The previous visit's complaints, pre-loaded with status to be set.
     pub prev_complaints: Vec<PrevComplaint>,
+    /// The previously scheduled next follow-up date for the header (VIS-004),
+    /// or `None`. Additive read field (M3-RW A4).
+    pub next_followup_on: Option<String>,
 }
 
 /// `visit_autosave` request (VIS-002/003) — the follow-up fields.
@@ -214,6 +220,23 @@ pub struct SetNextFollowupRequest {
 pub struct OkResponse {
     /// Whether the update succeeded.
     pub ok: bool,
+}
+
+/// `visit_has_saved_first_case` request (M3-RW A5) — first-case gating signal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct HasSavedFirstCaseRequest {
+    /// The patient whose first-case state is queried.
+    pub patient_id: String,
+}
+
+/// `visit_has_saved_first_case` response (M3-RW A5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct HasSavedFirstCaseResponse {
+    /// True once a non-deleted `first`-type visit exists, so the UI can grey
+    /// out starting another first case.
+    pub has_saved_first_case: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -389,31 +412,46 @@ impl<'a> VisitService<'a> {
 
         // If a latest non-deleted visit for this patient was registered today
         // AND is the same type, reuse it (the doctor re-opened the case form).
+        // The latest prior visit is ALSO the one a follow-up carries its journal
+        // forward from (ADR 0018 #2 / VIS-002), so keep it after the reuse check.
         let existing =
             pool.with_reader(|conn| visit_repo::latest_visit_for_patient(conn, &req.patient_id))?;
-        if let Some(v) = existing {
+        if let Some(v) = existing.as_ref() {
             if date_part(&v.visit_at) == today && v.visit_type == req.visit_type {
                 return Ok(OpenOrCreateResponse {
-                    visit_id: v.id,
+                    visit_id: v.id.clone(),
                     template_id: v
                         .template_id
+                        .clone()
                         .unwrap_or_else(|| tpl_repo::CHRONIC_DETAILED_ID.to_string()),
-                    data_json: v.data_json.unwrap_or_else(|| "{}".to_string()),
-                    vitals_json: v.vitals_json.unwrap_or_else(|| "{}".to_string()),
-                    visit_at: v.visit_at,
+                    data_json: v.data_json.clone().unwrap_or_else(|| "{}".to_string()),
+                    vitals_json: v.vitals_json.clone().unwrap_or_else(|| "{}".to_string()),
+                    visit_at: v.visit_at.clone(),
+                    next_followup_on: v.next_followup_on.clone(),
                 });
             }
         }
 
         let template_id = tpl_repo::CHRONIC_DETAILED_ID.to_string();
         let visit_id = uuid::Uuid::now_v7().to_string();
+        // A follow-up REUSES the journal (ADR 0018 #2 / S09-delta): the new
+        // follow-up visit opens with the prior visit's complaint boxes carried
+        // forward and a NEW empty dated entry appended to each, so the box
+        // pre-opens with prior content and the prior complaints pre-load
+        // (VIS-002). A first/acute/tele visit starts with an empty document.
+        // `data_json` stays opaque TEXT (ADR 0007); this only chooses its seed.
+        let data_json = if req.visit_type == "follow_up" {
+            seed_followup_data_json(existing.as_ref(), &visit_id, &today)
+        } else {
+            "{}".to_string()
+        };
         let row = VisitRow {
             id: visit_id.clone(),
             patient_id: req.patient_id.clone(),
             visit_at: now.clone(),
             visit_type: req.visit_type.clone(),
             template_id: Some(template_id.clone()),
-            data_json: Some("{}".to_string()),
+            data_json: Some(data_json.clone()),
             vitals_json: Some("{}".to_string()),
             ..Default::default()
         };
@@ -440,9 +478,11 @@ impl<'a> VisitService<'a> {
         Ok(OpenOrCreateResponse {
             visit_id,
             template_id,
-            data_json: "{}".to_string(),
+            data_json,
             vitals_json: "{}".to_string(),
             visit_at: now,
+            // A brand-new visit has no next follow-up scheduled yet (A4).
+            next_followup_on: None,
         })
     }
 
@@ -521,6 +561,8 @@ impl<'a> VisitService<'a> {
             .with_reader(|conn| visit_repo::get_visit(conn, &req.prev_visit_id))?
             .ok_or(AppError::NotFound)?;
         let prev_complaints = extract_complaints(prev.data_json.as_deref());
+        // Carry the previously scheduled next follow-up to the header (A4).
+        let prev_next_followup_on = prev.next_followup_on.clone();
 
         let visit_id = uuid::Uuid::now_v7().to_string();
         let row = VisitRow {
@@ -554,6 +596,7 @@ impl<'a> VisitService<'a> {
             visit_id,
             visit_at: now,
             prev_complaints,
+            next_followup_on: prev_next_followup_on,
         })
     }
 
@@ -645,6 +688,16 @@ impl<'a> VisitService<'a> {
         })?;
 
         Ok(OkResponse { ok: true })
+    }
+
+    /// True when a non-deleted `first`-type visit exists for the patient
+    /// (M3-RW A5). The UI uses this to grey out "New visit / first case" after
+    /// the first case is saved so a second first case cannot be started; a
+    /// soft-deleted first case does not count. Read-only; no audit row; reads
+    /// no patient name/dob (R-PRIV-001).
+    pub fn has_saved_first_case(&self, pool: &Pool, patient_id: &str) -> Result<bool, AppError> {
+        pool.with_reader(|conn| visit_repo::has_saved_first_case(conn, patient_id))
+            .map_err(AppError::from)
     }
 
     /// The Today overview: due-today / overdue / registered-today, bounded
@@ -769,9 +822,20 @@ fn recompute_bmi(vitals_json: &str) -> String {
 }
 
 /// Extract the chief complaints from a visit's `data_json` for follow-up
-/// pre-load (VIS-002). Reads `data_json.chief_complaints` as either a single
-/// object or an array of objects; each becomes a [`PrevComplaint`] with `key`,
-/// `text` (sensation) and `location`. Returns an empty list when absent.
+/// pre-load (VIS-002).
+///
+/// The document is opaque to storage (ADR 0007); two shapes are understood:
+/// - **Doctor-journal (ADR 0018, `schema == "case-journal"`)**: the complaints
+///   live at the top level as `complaints[]`, each `{ id, title, entries[] }`.
+///   The `title` is the complaint label (`text`) and the id becomes the `key`;
+///   the location is unused by the journal model so it is empty. A follow-up on
+///   a journal first case therefore pre-loads the prior complaint titles.
+/// - **Legacy R3 structured**: `data_json.chief_complaints` as either a single
+///   object or an array of objects (`sensation`/`text` + `location`). Retained
+///   so follow-ups on old structured visits still pre-load.
+///
+/// Returns an empty list when absent or unparseable. No patient text is logged
+/// (R-PRIV-001).
 fn extract_complaints(data_json: Option<&str>) -> Vec<PrevComplaint> {
     let Some(raw) = data_json else {
         return Vec::new();
@@ -779,6 +843,11 @@ fn extract_complaints(data_json: Option<&str>) -> Vec<PrevComplaint> {
     let Ok(v) = serde_json::from_str::<Value>(raw) else {
         return Vec::new();
     };
+    // Doctor-journal document: read the top-level `complaints[]` (ADR 0018).
+    if v.get("schema").and_then(Value::as_str) == Some("case-journal") {
+        return extract_journal_complaints(&v);
+    }
+    // Legacy R3 structured document: read `data_json.chief_complaints`.
     let Some(cc) = v.get("chief_complaints") else {
         return Vec::new();
     };
@@ -812,6 +881,143 @@ fn extract_complaints(data_json: Option<&str>) -> Vec<PrevComplaint> {
                 text,
                 location,
             })
+        })
+        .collect()
+}
+
+/// Pre-load the complaints from a doctor-journal document (ADR 0018): each
+/// top-level `complaints[]` entry contributes its `id` as the key and its
+/// `title` as the text. Untitled complaints keep an empty text (the follow-up
+/// still carries the box forward). Location is empty — the journal has none.
+fn extract_journal_complaints(v: &Value) -> Vec<PrevComplaint> {
+    let Some(complaints) = v.get("complaints").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    complaints
+        .iter()
+        .enumerate()
+        .filter_map(|(i, c)| {
+            let obj = c.as_object()?;
+            let key = obj
+                .get("id")
+                .and_then(Value::as_str)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| format!("cc{}", i + 1));
+            let text = obj
+                .get("title")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            Some(PrevComplaint {
+                key,
+                text,
+                location: String::new(),
+            })
+        })
+        .collect()
+}
+
+/// Seed a new follow-up visit's `data_json` by carrying the prior visit's
+/// doctor-journal forward (ADR 0018 #2 / S09-delta): every prior complaint box
+/// is kept with its title and its prior dated entries, and a NEW empty dated
+/// entry (today, this follow-up's id) is appended to each so the box pre-opens
+/// with prior content and "Add entry" semantics are preserved.
+///
+/// The prior document is opaque; this only understands the journal shape. When
+/// the prior visit is a legacy R3 structured document (no `schema ==
+/// "case-journal"`), its complaints are carried forward as journal complaint
+/// boxes (title from the structured sensation/location) so a follow-up on an
+/// old case still pre-opens. When there is no prior visit, no prior complaints,
+/// or the prior document is unparseable, the follow-up starts with a single
+/// empty complaint box holding one empty dated entry.
+fn seed_followup_data_json(prev: Option<&VisitRow>, visit_id: &str, today: &str) -> String {
+    let complaints = prev
+        .and_then(|v| v.data_json.as_deref())
+        .map(prior_journal_complaints)
+        .unwrap_or_default();
+
+    let entries_with_new = |title_id: (String, String), prior_entries: Vec<Value>| -> Value {
+        let (id, title) = title_id;
+        let mut entries = prior_entries;
+        entries.push(json!({
+            "entry_date": today,
+            "visit_id": visit_id,
+            "blocks": [],
+        }));
+        json!({ "id": id, "title": title, "entries": entries })
+    };
+
+    let seeded: Vec<Value> = if complaints.is_empty() {
+        vec![entries_with_new(
+            ("cc1".to_string(), String::new()),
+            Vec::new(),
+        )]
+    } else {
+        complaints
+            .into_iter()
+            .map(|(id, title, prior_entries)| entries_with_new((id, title), prior_entries))
+            .collect()
+    };
+
+    json!({
+        "schema": "case-journal",
+        "version": 2,
+        "complaints": seeded,
+    })
+    .to_string()
+}
+
+/// Read the prior visit's journal complaints as `(id, title, prior_entries)`
+/// triples. A journal document yields its `complaints[]` verbatim (id, title,
+/// entries carried forward). A legacy R3 document yields one complaint per
+/// `chief_complaints[]` entry with an empty prior-entries list (the old
+/// structured body is not re-materialised here; the UI's read-time upcast
+/// still handles an old visit opened directly). Empty on absence/parse error.
+fn prior_journal_complaints(data_json: &str) -> Vec<(String, String, Vec<Value>)> {
+    let Ok(v) = serde_json::from_str::<Value>(data_json) else {
+        return Vec::new();
+    };
+    if v.get("schema").and_then(Value::as_str) == Some("case-journal") {
+        let Some(complaints) = v.get("complaints").and_then(Value::as_array) else {
+            return Vec::new();
+        };
+        return complaints
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| {
+                let obj = c.as_object()?;
+                let id = obj
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| format!("cc{}", i + 1));
+                let title = obj
+                    .get("title")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let prior_entries = obj
+                    .get("entries")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default();
+                Some((id, title, prior_entries))
+            })
+            .collect();
+    }
+    // Legacy structured prior visit: carry titles forward as fresh boxes.
+    extract_complaints(Some(data_json))
+        .into_iter()
+        .enumerate()
+        .map(|(i, pc)| {
+            let title = if pc.location.is_empty() {
+                pc.text
+            } else if pc.text.is_empty() {
+                pc.location
+            } else {
+                format!("{} ({})", pc.text, pc.location)
+            };
+            (format!("cc{}", i + 1), title, Vec::new())
         })
         .collect()
 }

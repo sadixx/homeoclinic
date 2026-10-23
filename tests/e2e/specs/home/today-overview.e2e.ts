@@ -51,9 +51,12 @@ async function seedPatientWithFollowup(
   await patientsPage.dashTakeCase();
   await casePage.waitForForm();
   const ids = await casePage.routeIds();
-  await casePage.sensation(1).waitForDisplayed({ timeout: 15000 });
-  await casePage.sensation(1).setValue(`Chief complaint for ${name}`);
-  await casePage.section('chief_complaints').click();
+  await casePage.complaintTitle.waitForDisplayed({ timeout: 15000 });
+  await casePage.complaintTitle.setValue(`Chief complaint for ${name}`);
+  await casePage.addTextBlock();
+  const blockId = await casePage.firstBlockId('cc1');
+  await casePage.typeInBlock('cc1', blockId, `Chief complaint for ${name}`);
+  await casePage.save();
   const caseSaved = await casePage.waitForSaved();
   expect(caseSaved).toMatch(/^Saved/);
 

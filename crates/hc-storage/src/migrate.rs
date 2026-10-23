@@ -84,6 +84,17 @@ pub fn migrations() -> &'static [Migration] {
             target: 10,
             sql: include_str!("migrations/0010_attachment.sql"),
         },
+        // M3-RW Slice A1: migrate the 3 seeded case_template schema_json rows to
+        // the doctor-journal side-section schema (ADR 0018) — physical_generals
+        // gains Constitution/Diet/Sun-aggravation(yes/no)/Notes; family_history
+        // becomes Maternal/Paternal; investigations becomes Suggested/Submitted;
+        // chief_complaints/hpi/personal_history/examination are removed (the
+        // journal body replaces them). UPDATE-only; does not touch any
+        // visit.data_json row. Forward-only (R-DATA-002).
+        Migration {
+            target: 11,
+            sql: include_str!("migrations/0011_case_template_journal.sql"),
+        },
     ]
 }
 

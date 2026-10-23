@@ -41,12 +41,15 @@ export interface PatientDashboardProps {
    */
   readonly onTakeCase?: (patientId: string) => void;
   /**
-   * Start a Follow-up visit (S09) for this patient, carrying the previous
-   * visit whose complaints pre-load (VIS-002). When a prior visit exists the
-   * "New visit" action resolves to a follow-up rather than a fresh First case
-   * (S09 entry points; F5 resolution). Shipped at R3.
+   * Start a Follow-up visit for this patient (ADR 0018 #2: opens the journal
+   * CaseForm in follow-up mode). The backend resolves the prior visit itself
+   * (crates/hc-app visit::open_or_create -> latest_visit_for_patient +
+   * seed_followup_data_json; VIS-002), so the UI does NOT need to pass one.
+   * `prevVisitId` is therefore OPTIONAL and vestigial — a follow-up fires with
+   * the patient id alone, even when the dashboard's visit list is empty/stale
+   * right after the first case is saved (D1 fix). Shipped at R3.
    */
-  readonly onNewFollowup?: (patientId: string, prevVisitId: string) => void;
+  readonly onNewFollowup?: (patientId: string, prevVisitId?: string) => void;
   /** Render already in the recycle bin (deep-link into a soft-deleted row). */
   readonly initiallyDeleted?: boolean;
 }
@@ -66,6 +69,11 @@ export function PatientDashboard({
   const [deleted, setDeleted] = useState(initiallyDeleted);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  // First-case gating (Slice C5, ADR 0018): once a saved `first` visit exists
+  // for this patient, starting another first case is greyed and a Follow-up is
+  // offered instead. The signal comes from the typed Slice A command, never a
+  // client-side guess.
+  const [hasSavedFirstCase, setHasSavedFirstCase] = useState(false);
 
   // Load the full patient in one call and record the open in the recent list
   // (PSR-007). A fresh load whenever the patient id changes (family switch).
@@ -93,6 +101,29 @@ export function PatientDashboard({
       cancelled = true;
     };
   }, [patientId, initiallyDeleted]);
+
+  // First-case gating (Slice C5, ADR 0018): ask the typed Slice A command
+  // whether a saved `first` visit already exists for this patient. A failed or
+  // absent read leaves the gate OPEN (New visit enabled) so a genuine first
+  // case is never blocked by a transport blip (no dead end). No patient data
+  // is read into logs (R-PRIV-001).
+  useEffect(() => {
+    let cancelled = false;
+    setHasSavedFirstCase(false);
+    const cmd = commands.visitHasSavedFirstCase;
+    if (typeof cmd !== 'function') return undefined;
+    void (async (): Promise<void> => {
+      try {
+        const res = await run(cmd({ patientId }));
+        if (!cancelled) setHasSavedFirstCase(res.hasSavedFirstCase);
+      } catch {
+        /* leave the gate open on failure — never block a real first case */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId]);
 
   const onConfirmDelete = useCallback(async (): Promise<void> => {
     if (busy) return;
@@ -316,21 +347,59 @@ export function PatientDashboard({
           <button
             type="button"
             data-testid="patient-dash-new-visit"
+            disabled={hasSavedFirstCase}
+            aria-disabled={hasSavedFirstCase ? true : undefined}
+            title={
+              hasSavedFirstCase
+                ? t('patient.dash.newVisit.gatedHint')
+                : undefined
+            }
             onClick={() => {
-              // A patient with a prior visit routes to a Follow-up (S09),
-              // carrying the newest visit as the one whose complaints pre-load
-              // (VIS-002). With no prior visit, start a First case (S08).
-              const prev = data.visits[0];
-              if (prev !== undefined && onNewFollowup !== undefined) {
-                onNewFollowup(patientId, prev.visitId);
+              // Once the first case is saved (ADR 0018), starting another first
+              // case is greyed — the doctor uses Follow-up instead.
+              if (hasSavedFirstCase) return;
+              // A patient with a prior visit routes to a Follow-up (S09); with
+              // no prior visit, start a First case (S08). The follow-up does
+              // NOT need a prevVisitId — the backend resolves the prior visit
+              // itself (open_or_create -> latest_visit_for_patient), so the
+              // click fires even when `data.visits` is empty/stale (D1 fix).
+              const hasPrior = data.visits.length > 0;
+              if (hasPrior && onNewFollowup !== undefined) {
+                onNewFollowup(patientId);
               } else {
                 onTakeCase?.(patientId);
               }
             }}
-            className="rounded bg-blue-600 px-3 py-1.5 font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700"
+            className={[
+              'rounded px-3 py-1.5 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700',
+              hasSavedFirstCase
+                ? 'cursor-not-allowed bg-slate-200 text-slate-500'
+                : 'bg-blue-600 text-white hover:bg-blue-700',
+            ].join(' ')}
           >
             {t('patient.dash.newVisit')}
           </button>
+          {/* When the first case is gated, offer Follow-up instead so there is
+              no dead end (ADR 0018: "offer Follow-up instead"). */}
+          {hasSavedFirstCase ? (
+            <button
+              type="button"
+              data-testid="patient-dash-followup"
+              onClick={() => {
+                // D1 fix: fire the follow-up UNCONDITIONALLY — do NOT gate on
+                // `data.visits`. Right after the first case is saved the visit
+                // list is empty/stale, so the old `prev !== undefined` guard
+                // made this click a silent no-op (CaseRoute never mounted). The
+                // backend resolves the prior visit itself (open_or_create ->
+                // latest_visit_for_patient + seed_followup_data_json, VIS-002),
+                // so the patient id alone is enough; prevVisitId is vestigial.
+                onNewFollowup?.(patientId);
+              }}
+              className="rounded bg-blue-600 px-3 py-1.5 font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700"
+            >
+              {t('patient.dash.followup')}
+            </button>
+          ) : null}
           <button
             type="button"
             data-testid="patient-dash-take-case"

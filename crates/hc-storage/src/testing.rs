@@ -199,6 +199,52 @@ pub fn seed_patient(pool: &Pool, code: &str, name: &str) -> String {
     id_ret
 }
 
+/// Seed ONE synthetic patient with explicit `dob` and/or `age_years` and return
+/// its id (R-TEST-004: synthetic only). Used by the M3-RW A3 read tests that
+/// assert the patient read derives age from DOB when present and falls back to
+/// the stored `age_years` when DOB is NULL — so the caller must be able to store
+/// a genuinely-null DOB (which the create path's DOB estimation would not give).
+/// Inserts the required NOT NULL search columns directly; the FTS triggers fire
+/// in-txn.
+pub fn seed_patient_demographics(
+    pool: &Pool,
+    code: &str,
+    name: &str,
+    dob: Option<&str>,
+    age_years: Option<i64>,
+) -> String {
+    let id = uuid::Uuid::now_v7().to_string();
+    let id_ret = id.clone();
+    let now = "2026-10-20T00:00:00Z";
+    pool.with_writer(|c| {
+        let tx = c.transaction()?;
+        tx.execute(
+            "INSERT INTO patient \
+               (id, code, name, name_norm, name_phonetic, code_digits, \
+                dob, age_years, \
+                created_at, updated_at, row_version) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, 0)",
+            rusqlite::params![
+                id,
+                code,
+                name,
+                name.to_lowercase(),
+                name.to_lowercase(),
+                code.chars()
+                    .filter(|c| c.is_ascii_digit())
+                    .collect::<String>(),
+                dob,
+                age_years,
+                now,
+            ],
+        )?;
+        tx.commit()?;
+        Ok(())
+    })
+    .expect("seed synthetic patient with demographics");
+    id_ret
+}
+
 /// Insert a synthetic visit for `patient_id` through the REAL [`visit`] repo +
 /// denormalise path, so Today tests seed due/overdue/registered rows the same
 /// way production writes them (R-TEST-003). Sets `visit_at`, optional

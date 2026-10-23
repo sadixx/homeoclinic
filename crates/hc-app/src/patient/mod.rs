@@ -775,10 +775,15 @@ impl<'a> PatientService<'a> {
         })?;
         let row = row.ok_or(AppError::NotFound)?;
 
+        // Age is DERIVED from DOB (preferred) anchored to the app clock, so it
+        // auto-updates on read and stays deterministic (A3/ADR 0018). Falls
+        // back to the stored `age_years` when DOB is absent. The date part of
+        // the clock instant is the `today` the pure helper needs (R-ARCH-002).
+        let today = date_part(&self.clock.now_rfc3339());
         let demographics = Demographics {
             code: row.code,
             name: row.name,
-            age_label: age_label(row.dob.as_deref(), row.age_years),
+            age_label: hc_domain::age::age_label(row.dob.as_deref(), row.age_years, &today),
             sex: row.sex,
             mobile: row.mobile,
             city: row.city,
@@ -847,10 +852,11 @@ impl<'a> PatientService<'a> {
         // Enrich each hit (which carries only id/code/name/rank) with the row
         // columns the S04 row shows. A hit whose row vanished (e.g. just
         // soft-deleted) is dropped rather than shown with blanks.
+        let today = date_part(&self.clock.now_rfc3339());
         let mut results = Vec::with_capacity(page.hits.len());
         for hit in &page.hits {
             if let Some(row) = pool.with_reader(|c| repo::get_list_row(c, &hit.patient_id))? {
-                results.push(search_row_from(&row, match_type_for_rank(hit.rank)));
+                results.push(search_row_from(&row, match_type_for_rank(hit.rank), &today));
             }
         }
 
@@ -870,11 +876,12 @@ impl<'a> PatientService<'a> {
     ) -> Result<RecentResponse, AppError> {
         let limit = req.limit.max(0) as usize;
         let ids = pool.with_reader(|c| repo::list_recent_ids(c, limit))?;
+        let today = date_part(&self.clock.now_rfc3339());
         let mut results = Vec::with_capacity(ids.len());
         for id in &ids {
             if let Some(row) = pool.with_reader(|c| repo::get_list_row(c, id))? {
                 // Recent rows are not ranked search hits, so no match tag.
-                results.push(search_row_from(&row, String::new()));
+                results.push(search_row_from(&row, String::new(), &today));
             }
         }
         Ok(RecentResponse { results })
@@ -910,9 +917,10 @@ impl<'a> PatientService<'a> {
             None
         };
 
+        let today = date_part(&self.clock.now_rfc3339());
         let out = rows
             .iter()
-            .map(|r| search_row_from(r, String::new()))
+            .map(|r| search_row_from(r, String::new(), &today))
             .collect();
         Ok(ListQueryResponse {
             rows: out,
@@ -937,7 +945,7 @@ impl<'a> PatientService<'a> {
         let rows =
             pool.with_reader(|c| repo::list_query(c, &filter, field, dir, None, CSV_EXPORT_CAP))?;
 
-        let csv = render_patient_csv(&rows);
+        let csv = render_patient_csv(&rows, &date_part(&self.clock.now_rfc3339()));
         let dir_path = self.data_dir.join("exports");
         std::fs::create_dir_all(&dir_path).map_err(|e| AppError::Storage(Box::new(e)))?;
         let path = dir_path.join("patient-list.csv");
@@ -1222,31 +1230,6 @@ fn tags_json(tags: &Option<Vec<String>>) -> Option<String> {
         .and_then(|t| serde_json::to_string(t).ok())
 }
 
-/// Human age label for the dashboard: `"{n}y"` from DOB (preferred) else the
-/// entered age, or an empty string when neither is known.
-fn age_label(dob: Option<&str>, age_years: Option<i64>) -> String {
-    if let Some(dob) = dob {
-        if let Ok(d) = time::Date::parse(
-            dob,
-            time::macros::format_description!("[year]-[month]-[day]"),
-        ) {
-            let today = time::OffsetDateTime::now_utc().date();
-            let mut years = today.year() - d.year();
-            // Subtract one if this year's birthday has not occurred yet.
-            if (today.month() as u8, today.day()) < (d.month() as u8, d.day()) {
-                years -= 1;
-            }
-            if years >= 0 {
-                return format!("{years}y");
-            }
-        }
-    }
-    match age_years {
-        Some(a) => format!("{a}y"),
-        None => String::new(),
-    }
-}
-
 /// Add `days` to an RFC3339 (`Z`-suffixed) instant and re-format with the `Z`
 /// suffix. On an unparseable input the input is returned unchanged so the
 /// caller never panics (R-RUST-002); valid service inputs always parse.
@@ -1356,8 +1339,9 @@ fn search_to_storage_err(e: hc_search::SearchError) -> hc_storage::StorageError 
 
 /// Human age label (`"{n}y"`) from DOB preferred, else the entered age, else
 /// empty. Shares the dashboard's rule so the search/list row reads the same.
-fn age_label_for(row: &repo::PatientListRow) -> String {
-    age_label(row.dob.as_deref(), row.age_years)
+/// `today` anchors DOB derivation to the app clock (A3), not the wall clock.
+fn age_label_for(row: &repo::PatientListRow, today: &str) -> String {
+    hc_domain::age::age_label(row.dob.as_deref(), row.age_years, today)
 }
 
 /// Map the search engine's rank bucket to the S04 match-type tag (PSR-004).
@@ -1376,13 +1360,14 @@ fn match_type_for_rank(rank: i64) -> String {
 
 /// Build a [`SearchRow`] from a storage [`repo::PatientListRow`] + a match tag.
 /// `dues_paise` is always 0 at R2 (billing is R5, R-DEL-002). Mobile is the
-/// FULL number in MVP1 (no masking, PSR-005 open-Q).
-fn search_row_from(row: &repo::PatientListRow, match_type: String) -> SearchRow {
+/// FULL number in MVP1 (no masking, PSR-005 open-Q). `today` anchors the age
+/// label to the app clock (A3).
+fn search_row_from(row: &repo::PatientListRow, match_type: String, today: &str) -> SearchRow {
     SearchRow {
         patient_id: row.patient_id.clone(),
         code: row.code.clone(),
         name: row.name.clone(),
-        age_label: age_label_for(row),
+        age_label: age_label_for(row, today),
         sex: row.sex.clone(),
         mobile: row.mobile.clone(),
         city: row.city.clone(),
@@ -1547,11 +1532,11 @@ fn decode_list_cursor(token: Option<&str>) -> Result<Option<repo::ListCursor>, A
 /// Render the filtered list as CSV (PSR-011). A header row plus one data row per
 /// patient. Fields are RFC-4180 quoted when they contain a comma, quote or
 /// newline. `dues` is 0 at R2 (billing is R5, R-DEL-002).
-fn render_patient_csv(rows: &[repo::PatientListRow]) -> String {
+fn render_patient_csv(rows: &[repo::PatientListRow], today: &str) -> String {
     let mut out = String::new();
     out.push_str("code,name,sex,age,mobile,city,last_visit,next_followup,dues\n");
     for r in rows {
-        let age = age_label_for(r);
+        let age = age_label_for(r, today);
         let fields = [
             r.code.clone(),
             r.name.clone(),

@@ -98,6 +98,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::visit::visit_create_followup,
                 commands::visit::visit_autosave,
                 commands::visit::visit_set_next_followup,
+                commands::visit::visit_has_saved_first_case,
                 commands::visit::today_get_overview,
                 // Send-to-repertory STUB (CASE-006, R7) — flagged unavailable,
                 // registered for a stable binding (no dead end, R-DEL-002).
@@ -164,6 +165,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::visit::visit_create_followup,
                 commands::visit::visit_autosave,
                 commands::visit::visit_set_next_followup,
+                commands::visit::visit_has_saved_first_case,
                 commands::visit::today_get_overview,
                 commands::visit::rubric_search_prefill,
                 // Visit lab-report attachments (PAT-009, M3ux3).

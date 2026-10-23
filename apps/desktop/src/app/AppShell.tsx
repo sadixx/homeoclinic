@@ -27,6 +27,7 @@
 // threaded into ShellFrame's idle timer (replacing the hardcoded fallback when
 // a value is present). UI -> typed commands only.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   HashRouter,
   Navigate,
@@ -38,11 +39,13 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 
+import { AppBar } from '@/app/AppBar';
 import { LockScreen } from '@/app/LockScreen';
 import { SearchOverlay } from '@/app/SearchOverlay';
 import { SideNav, type NavRoute } from '@/app/SideNav';
 import { StatusBar } from '@/app/StatusBar';
 import { TopBar } from '@/app/TopBar';
+import { useZoom } from '@/app/useZoom';
 import { BackupScreen } from '@/backup/BackupScreen';
 import { commands } from '@/bindings';
 import { CaseForm } from '@/case/CaseForm';
@@ -51,6 +54,7 @@ import { PatientsPage } from '@/patients/PatientsPage';
 import { SetupWizard } from '@/setup/SetupWizard';
 import { run } from '@/shared/command';
 import { features } from '@/shared/features';
+import { t } from '@/shared/strings';
 import { FollowupVisit } from '@/visit/FollowupVisit';
 
 /**
@@ -189,6 +193,20 @@ function ShellFrame({
   const openSearch = useCallback(() => setSearchOpen(true), []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
 
+  // Failed-open surface (D1 / R-UI-008): opening a case or follow-up can fail
+  // (backend reject or transport blip). Previously the two start paths swallowed
+  // the error in a silent `catch {}`, so a failed open looked identical to a
+  // dead click. We instead surface a short, non-crash, patient-data-free alert
+  // the doctor can see and dismiss (no stack, no SQL, no PII — R-UI-008,
+  // R-PRIV-001), and log one fixed line to the console for observability.
+  const [openError, setOpenError] = useState<string | null>(null);
+  const dismissOpenError = useCallback(() => setOpenError(null), []);
+
+  // Content zoom (Slice C3): a clamped, persisted scale the shared app-bar and
+  // the Ctrl+= / Ctrl+- / Ctrl+0 shortcuts drive. Applied to the content root
+  // as `--hc-font-scale`; rem-based sizing makes it scale text AND layout.
+  const zoom = useZoom();
+
   const goToLock = useCallback(() => navigate('/lock'), [navigate]);
   const onNavigate = useCallback(
     (route: NavRoute) => navigate(route),
@@ -224,6 +242,25 @@ function ShellFrame({
     [navigate],
   );
 
+  // Navigate to the JOURNAL case form in FOLLOW-UP mode (ADR 0018 #2 /
+  // S09-delta): a follow-up REUSES the journal CaseForm (box pre-opens with the
+  // prior visit's content, insert buttons read "Update vitals"/"Update
+  // prescription", "Add entry" appends a new dated entry). The `/followup`
+  // suffix on the deep-linkable case URL is the visit-kind marker CaseRoute
+  // reads to render CaseForm with visitType='follow_up'; the retired structured
+  // S09 screen is no longer on the nav path. The common Back/Alt+Left parent-
+  // chain regexes still match (`/patient/:id/case/`), and CaseForm autosaves.
+  const openCaseFollowup = useCallback(
+    (patientId: string, visitId: string): void => {
+      navigate(
+        `/patient/${encodeURIComponent(patientId)}/case/${encodeURIComponent(
+          visitId,
+        )}/followup`,
+      );
+    },
+    [navigate],
+  );
+
   // Start (open-or-create) a First visit for a patient and route into the
   // case form (S08 entry points: dashboard "New visit / Take case" and F5).
   // Only the generated binding is called; the resolved `visit_id` becomes the
@@ -237,57 +274,55 @@ function ShellFrame({
         );
         openCaseVisit(patientId, open.visitId);
       } catch {
-        /* a failed open leaves the user where they are; no dead end, no crash */
+        // A failed open must be OBSERVABLE, not a dead click (R-UI-008). Surface
+        // a short, non-crash alert and log one fixed line. No patient id, SQL,
+        // file path or stack is read into the message or the log (R-PRIV-001).
+        setOpenError(t('app.case.openFailed'));
+        console.error('[AppShell] case open failed');
       }
     },
     [openCaseVisit],
   );
 
-  // Navigate to the S09 follow-up visit for a patient with a prior visit. The
-  // previous visit (whose complaints pre-load, VIS-002) is carried in the hash
-  // query so the deep-linkable URL holds everything FollowupVisit needs.
-  const openFollowupVisit = useCallback(
-    (patientId: string, visitId: string, prevVisitId: string): void => {
-      navigate(
-        `/patient/${encodeURIComponent(patientId)}/visit/${encodeURIComponent(
-          visitId,
-        )}/followup?prev=${encodeURIComponent(prevVisitId)}`,
-      );
-    },
-    [navigate],
-  );
-
-  // Start (create) a Follow-up visit and route into S09 (dashboard "New visit"
-  // when a prior visit exists; F5 when the resolved type is Follow-up). Only
-  // the generated binding is called; the resolved `visit_id` becomes the route
-  // param so the URL is deep-linkable (S09 entry points, VIS-001/002).
+  // Start (open-or-create) a Follow-up visit and route into the JOURNAL case
+  // form in follow-up mode (ADR 0018 #2). The backend seeds the new follow-up
+  // visit's journal from the prior visit (box pre-opens with prior content; the
+  // prior complaints pre-load, VIS-002), so the UI only needs to open-or-create
+  // the follow-up and route into CaseForm with visitType='follow_up'. The
+  // dashboard's `onNewFollowup(patientId)` no longer needs to pass a prior
+  // visit id (prevVisitId is vestigial) — the backend resolves the prior visit
+  // itself — and the UI does not thread it through the URL. Only the generated
+  // binding is called; the resolved `visit_id` becomes the route param
+  // (deep-linkable, VIS-001/002).
   const startFollowupForPatient = useCallback(
-    async (patientId: string, prevVisitId: string): Promise<void> => {
+    async (patientId: string): Promise<void> => {
       try {
-        const created = await run(
-          commands.visitCreateFollowup({ patientId, prevVisitId }),
+        const open = await run(
+          commands.caseVisitOpenOrCreate({
+            patientId,
+            visitType: 'follow_up',
+          }),
         );
-        openFollowupVisit(patientId, created.visitId, prevVisitId);
+        openCaseFollowup(patientId, open.visitId);
       } catch {
-        /* a failed create leaves the user where they are; no dead end */
+        // A failed follow-up open must be OBSERVABLE (R-UI-008): surface a short
+        // non-crash alert and log one fixed line, with NO patient id / SQL /
+        // path / stack in either (R-PRIV-001).
+        setOpenError(t('app.case.openFailed'));
+        console.error('[AppShell] follow-up open failed');
       }
     },
-    [openFollowupVisit],
+    [openCaseFollowup],
   );
 
   // The patient currently in focus (if any), parsed from the active route so
   // F5 "new visit for the open patient" (S08 keyboard) knows whom to open. It
-  // is set by the /patients?id=<id> dashboard deep-link and by the case route.
+  // is set by the /patients?id=<id> dashboard deep-link and by the case route
+  // (first and follow-up both live under /patient/:id/case/, ADR 0018 #2).
   const openPatientId = useMemo((): string | null => {
     const caseMatch = /^\/patient\/([^/]+)\/case\//.exec(location.pathname);
     if (caseMatch && caseMatch[1] !== undefined) {
       return decodeURIComponent(caseMatch[1]);
-    }
-    const followupMatch = /^\/patient\/([^/]+)\/visit\//.exec(
-      location.pathname,
-    );
-    if (followupMatch && followupMatch[1] !== undefined) {
-      return decodeURIComponent(followupMatch[1]);
     }
     if (location.pathname === '/patients') {
       const params = new URLSearchParams(location.search);
@@ -309,10 +344,8 @@ function ShellFrame({
   const goBack = useCallback((): void => {
     const path = location.pathname;
     const caseMatch = /^\/patient\/([^/]+)\/case\//.exec(path);
-    const followupMatch = /^\/patient\/([^/]+)\/visit\//.exec(path);
-    const deeper = caseMatch ?? followupMatch;
-    if (deeper && deeper[1] !== undefined) {
-      navigate(`/patients?id=${encodeURIComponent(deeper[1])}`);
+    if (caseMatch && caseMatch[1] !== undefined) {
+      navigate(`/patients?id=${encodeURIComponent(caseMatch[1])}`);
       return;
     }
     if (path === '/patients') {
@@ -350,6 +383,30 @@ function ShellFrame({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [goBack]);
+
+  // Zoom keyboard shortcuts (Slice C3; 00-conventions §3): Ctrl+= / Ctrl++
+  // zoom in, Ctrl+- zoom out, Ctrl+0 reset. They scale the whole content root
+  // (text + layout). Ignored mid-IME-composition so they never fire while a
+  // doctor is composing text. `=`/`+` share a key, and NumpadAdd/Subtract are
+  // accepted too, so the shortcut works across keyboard layouts.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.isComposing) return;
+      const key = e.key;
+      if (key === '=' || key === '+' || key === 'Add') {
+        e.preventDefault();
+        zoom.zoomIn();
+      } else if (key === '-' || key === '_' || key === 'Subtract') {
+        e.preventDefault();
+        zoom.zoomOut();
+      } else if (key === '0') {
+        e.preventDefault();
+        zoom.reset();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [zoom]);
 
   // F5: new visit for the open patient (S08 keyboard). Feature-gated with the
   // case flag (R-DEL-002); never fires during IME composition (00-conventions).
@@ -411,17 +468,55 @@ function ShellFrame({
           ? '/backup'
           : undefined;
 
+  // The content root carries the zoom: the `--hc-font-scale` var (so rem-based
+  // layout math can read the scale) AND a scaled root font-size (so text and
+  // rem spacing grow together). Typed through CSSProperties — a CSS custom
+  // property is not in the lib DOM type, so the object is cast once here.
+  const contentStyle = {
+    '--hc-font-scale': String(zoom.scale),
+    fontSize: `calc(0.875rem * ${zoom.scale})`,
+  } as CSSProperties;
+
   return (
     <div
       data-testid="app-shell"
       className="flex h-screen flex-col bg-white text-[14px]"
     >
       <TopBar onLock={goToLock} onOpenSearch={openSearch} />
+      {/* Shared app-bar (Slice C2/C3): the ONE consistent place for the common
+          Back and the zoom controls, so every screen shares the same slot. */}
+      <AppBar
+        onBack={goBack}
+        onZoomIn={zoom.zoomIn}
+        onZoomOut={zoom.zoomOut}
+        onZoomReset={zoom.reset}
+      />
+      {/* Failed-open alert (R-UI-008): a non-crash, patient-data-free banner so
+          a failed case/follow-up open is observable, not a dead click. Role
+          `alert` + text (never colour alone); dismissible by the doctor. */}
+      {openError !== null ? (
+        <div
+          role="alert"
+          data-testid="app-open-error"
+          className="flex items-center justify-between gap-4 border-b border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800"
+        >
+          <span>{openError}</span>
+          <button
+            type="button"
+            data-testid="app-open-error-dismiss"
+            onClick={dismissOpenError}
+            className="rounded border border-red-300 px-2 py-0.5 text-xs hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600"
+          >
+            {t('common.dismiss')}
+          </button>
+        </div>
+      ) : null}
       <div className="flex min-h-0 flex-1">
         <SideNav activeRoute={activeRoute} onNavigate={onNavigate} />
         <main
           className="min-w-0 flex-1 overflow-auto"
           data-testid="content-area"
+          style={contentStyle}
         >
           <Routes>
             <Route path="/" element={<Navigate to="/today" replace />} />
@@ -453,6 +548,18 @@ function ShellFrame({
               />
             ) : null}
             {features.case ? (
+              <Route
+                path="/patient/:patientId/case/:visitId/followup"
+                element={
+                  <CaseRoute onBack={openPatient} visitType="follow_up" />
+                }
+              />
+            ) : null}
+            {features.case ? (
+              // Legacy structured S09 route (retired from the NAV PATH by ADR
+              // 0018 #2 — the dashboard follow-up now opens the journal CaseForm
+              // above). Kept as a dormant, deep-link-only surface so an existing
+              // bookmark/URL still resolves; nothing in the app navigates here.
               <Route
                 path="/patient/:patientId/visit/:visitId/followup"
                 element={<FollowupRoute onBack={openPatient} />}
@@ -494,7 +601,7 @@ function PatientsRoute({
   onNewFollowup,
 }: {
   readonly onTakeCase: (patientId: string) => void;
-  readonly onNewFollowup: (patientId: string, prevVisitId: string) => void;
+  readonly onNewFollowup: (patientId: string, prevVisitId?: string) => void;
 }): JSX.Element {
   const [params] = useSearchParams();
   const id = params.get('id') ?? undefined;
@@ -521,17 +628,24 @@ function PatientsRoute({
 }
 
 /**
- * `/patient/:patientId/case/:visitId` route (S08). Loads the patient once to
- * derive the two props the schema-driven case form needs beyond its ids — the
- * patient's sex (drives the menstrual/obstetric conditional section) and whole-
- * year age (drives the child-development section) (CASE-001). Both come from
- * the typed `patient_get_dashboard` payload; the UI never reads SQL. The case
- * form itself opens-or-restores the visit's answers/vitals (CASE-005).
+ * `/patient/:patientId/case/:visitId` route (S08) and its follow-up variant
+ * `/patient/:patientId/case/:visitId/followup` (S09, ADR 0018 #2). Loads the
+ * patient once to derive the two props the schema-driven case form needs beyond
+ * its ids — the patient's sex (drives the menstrual/obstetric conditional
+ * section) and whole-year age (drives the child-development section)
+ * (CASE-001). Both come from the typed `patient_get_dashboard` payload; the UI
+ * never reads SQL. `visitType` selects first vs follow-up journal mode: in
+ * follow-up mode the inserted-table buttons read "Update vitals"/"Update
+ * prescription" and the box opens with the backend-seeded prior content
+ * (VIS-002). The case form itself opens-or-restores the visit's journal
+ * (CASE-005).
  */
 function CaseRoute({
   onBack,
+  visitType = 'first',
 }: {
   readonly onBack: (patientId: string) => void;
+  readonly visitType?: 'first' | 'follow_up';
 }): JSX.Element {
   const params = useParams<{ patientId: string; visitId: string }>();
   const patientId = params.patientId ?? '';
@@ -575,6 +689,7 @@ function CaseRoute({
     <CaseForm
       patientId={patientId}
       visitId={visitId}
+      visitType={visitType}
       sex={sex}
       ageYears={ageYears}
       onBack={() => onBack(patientId)}
@@ -583,12 +698,14 @@ function CaseRoute({
 }
 
 /**
- * `/patient/:patientId/visit/:visitId/followup` route (S09). The follow-up
- * visit id comes from the path; the previous visit whose complaints pre-load
- * (VIS-002) is carried in the `?prev=` hash query so the URL is deep-linkable
- * and the completion guard still wraps it (it is a shell route). The component
- * itself fetches the pre-loaded complaints and autosaves (VIS-002/003). UI ->
- * typed commands only.
+ * Legacy `/patient/:patientId/visit/:visitId/followup` route — the retired
+ * structured S09 screen (ADR 0018 #2 replaces it with the journal CaseModel).
+ * This route is NO LONGER on the nav path: nothing in the app navigates here
+ * (the dashboard follow-up and F5 open the journal CaseForm in follow-up mode).
+ * It is retained only as a dormant, deep-link-only surface so an existing
+ * bookmark/URL still resolves instead of redirecting to Today. The previous
+ * visit whose complaints pre-load (VIS-002) is carried in the `?prev=` hash
+ * query. UI -> typed commands only.
  */
 function FollowupRoute({
   onBack,

@@ -1,116 +1,86 @@
-// S08 First (detailed) case form + schema-driven form engine (docs/ui/
-// S08-case-form.md; HC-MVP1-058..064). CASE-001..006, CASE-009, VIS-001.
+// S08 Case record — doctor-journal model (docs/ui/S08-case-form.md revised;
+// ADR 0018). The structured template-field form is REPLACED by a dated journal
+// of editable text + table blocks: one big editable box per complaint, a new
+// dated entry appended at every visit, button-inserted editable vitals /
+// modalities / prescription tables, and a small set of structured side
+// sections (physical generals, family Maternal/Paternal tabs, investigations
+// Suggested/Submitted tabs with the PAT-009 uploader under Submitted).
 //
 // Calls ONLY the generated typed bindings (UI -> typed commands only; never
 // SQL or raw filesystem paths). Every control / asserted value carries its
-// spec data-testid (R-UI-003); all visible text comes from en.json
-// (R-UI-007); dates/times go through shared/datetime (R-UI-006).
+// revised-S08 data-testid (R-UI-003); visible text comes from en.json
+// (R-UI-007); dates go through shared/datetime (R-UI-006).
 //
-// The engine renders a template's `schema_json` (sections -> fields) rather
-// than a hard-coded layout (CASE-004): section order, collapsible/hideable
-// flags, `showIf` conditionals (female / child age < 14) and `allowFreeText`
-// pick lists all come from the schema. The default template is fetched with
-// `case_template_get_default`; the open visit's answers/vitals come from
-// `case_visit_open_or_create` and are RESTORED on open so a killed-mid-typing
-// session loses nothing (CASE-005, acceptance flow 3).
+// The whole journal document serialises into the opaque `visit.data_json`
+// (ADR 0007); autosave (2 s + blur) and an explicit Save button both flush the
+// whole document through `case_visit_autosave`, so a killed-mid-typing session
+// loses nothing (CASE-005, the R3 kill-restore guarantee). A legacy R3
+// `data_json` is upcast in memory on open (ADR 0018 #8); disk is untouched
+// until the first autosave.
 //
-// Autosave (CASE-005): 2 s after the last change AND on blur, through
-// `case_visit_autosave`; the status bar shows Saving.../Saved hh:mm. There is
-// no Save button on this clinical form.
-//
-// Send-to-repertory (CASE-006) is FEATURE-FLAGGED OFF until R7: the control is
-// not rendered (no dead end, ADR-0002) and the R7 `rubric_search_prefill` stub
-// is never called this slice.
+// Send-to-repertory (CASE-006) and the real Rx engine (R4) are out of scope:
+// the prescription table is a labelled PLACEHOLDER (rx_placeholder:true) only.
+// The Case summary button, the narrative field and the Personal history
+// section are removed (ADR 0018 #5).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Minus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 import { commands } from '@/bindings';
 import type { AttachmentSummary } from '@/bindings';
+import {
+  MODALITIES_COLUMNS,
+  PRESCRIPTION_COLUMNS,
+  VITALS_COLUMNS,
+  formatEntryDate,
+  newEntry,
+  parseJournal,
+  sectionFieldValue,
+  serializeJournal,
+  setSectionField,
+  upcastLegacyCaseData,
+  type Block,
+  type Complaint,
+  type EditableSectionKey,
+  type Entry,
+  type JournalDoc,
+  type TableBlock,
+  type TableType,
+} from '@/case/caseJournal';
 import { isUserFacingError, run } from '@/shared/command';
-import { formatDateTime } from '@/shared/datetime';
-import { t, type StringKey } from '@/shared/strings';
+import { formatDate, formatDateTime } from '@/shared/datetime';
+import { t } from '@/shared/strings';
 
-/** Supported field kinds in a template schema. */
-type FieldType =
-  | 'text'
-  | 'long-text'
-  | 'single-choice'
-  | 'multi-choice'
-  | 'number'
-  | 'date'
-  | 'scale0-10';
+// The upcast is a UI-owned pure function; re-exported here so callers (and the
+// unit tests) import it alongside the component from this module.
+export { upcastLegacyCaseData };
 
-/** One field within a section (as described by the template schema). */
-interface SchemaField {
-  readonly key: string;
-  readonly label: string;
-  readonly type: FieldType;
-  readonly options?: readonly string[];
-  readonly allowFreeText?: boolean;
-  readonly computed?: string;
-}
-
-/** Conditional-visibility predicate on a section. */
-interface ShowIf {
-  readonly sex?: string;
-  readonly ageYearsLt?: number;
-}
-
-/** One section of the case template. */
-interface SchemaSection {
-  readonly key: string;
-  readonly title: string;
-  readonly collapsible?: boolean;
-  readonly hideable?: boolean;
-  readonly repeatable?: boolean;
-  readonly showIf?: ShowIf;
-  readonly fields: readonly SchemaField[];
-}
-
-/** The parsed template schema. */
-interface TemplateSchema {
-  readonly version: number;
-  readonly sections: readonly SchemaSection[];
-}
-
-/** How the form is opened. */
+/** How the journal case form is opened. */
 export interface CaseFormProps {
   /** Patient the case belongs to (route param). */
   readonly patientId: string;
   /** Visit the case belongs to (route param). */
   readonly visitId: string;
-  /** Patient sex — drives the menstrual/obstetric conditional section. */
+  /** Patient sex — reserved for the menstrual/obstetric conditional section. */
   readonly sex: 'male' | 'female';
-  /** Patient age in whole years — drives the child-development section. */
+  /** Patient age in whole years — reserved for the child-development section. */
   readonly ageYears: number;
   /**
-   * Return to the logical parent (the patient dashboard). When provided, a
-   * first-class Back control is rendered top-left (00-conventions §3). Back
-   * never discards data — the clinical form already autosaves (CASE-005). When
-   * absent, no Back control is rendered (no dead end, ADR-0002).
+   * How the visit opens: a brand-new `first` case, or a `follow_up` that opens
+   * the SAME journal document and reads "Update ..." on the insert buttons and
+   * appends a new dated entry (ADR 0018 #2/#3). Defaults to `first`.
+   */
+  readonly visitType?: 'first' | 'follow_up';
+  /**
+   * Return to the patient dashboard. When provided, a Back control is rendered
+   * top-left (00-conventions §3); Back never discards data (the form
+   * autosaves, CASE-005). When absent, no Back control is rendered.
    */
   readonly onBack?: () => void;
 }
 
-/** Answers for one repeatable chief-complaint block. */
-type ComplaintBlock = Record<string, string>;
-
-/** The full set of case-form answers kept in memory. */
-interface CaseData {
-  /** Repeatable chief-complaint blocks (section `chief_complaints`). */
-  chief_complaints: ComplaintBlock[];
-  /** Non-repeatable sections keyed by section key -> field key -> value. */
-  [sectionKey: string]: ComplaintBlock | ComplaintBlock[];
-}
-
-/** Vitals, camelCase to match the M3-A `recompute_bmi` contract. */
-interface Vitals {
-  [key: string]: number | undefined;
-}
-
-/** Autosave status shown in the status bar (CASE-005). */
+/** Autosave status shown beside the Save button (CASE-005). */
 type SaveStatus =
   | { kind: 'idle' }
   | { kind: 'saving' }
@@ -119,27 +89,16 @@ type SaveStatus =
 
 const AUTOSAVE_DEBOUNCE_MS = 2000;
 
-/** camelCase vitals keys the backend BMI recompute understands. */
+/** camelCase vitals keys the backend BMI recompute understands (schema §4a). */
 const VITALS_WEIGHT = 'weightKg';
 const VITALS_HEIGHT = 'heightCm';
 const VITALS_BMI = 'bmi';
 
-/** Map a schema field key in the examination section to its vitals key. */
-function vitalsKeyFor(fieldKey: string): string {
-  if (fieldKey === 'weight_kg') return VITALS_WEIGHT;
-  if (fieldKey === 'height_cm') return VITALS_HEIGHT;
-  if (fieldKey === 'bmi') return VITALS_BMI;
-  return fieldKey;
-}
-
 /**
- * Body-mass index from weight (kg) and height (cm) for the LIVE display,
- * shown to one decimal place, or `null` when either input is missing or
- * non-positive. `BMI = weight_kg / (height_m)^2` with `height_m = height_cm /
- * 100`; the fractional part is truncated to one decimal (68 kg / 172 cm =>
- * 22.9, matching the S08 wireframe). This is the client-side preview only; the
- * authoritative BMI is recomputed and persisted by the backend on autosave
- * (CASE-001/062).
+ * Body-mass index from weight (kg) and height (cm) for the LIVE popup display,
+ * truncated to one decimal place, or `null` when either input is missing or
+ * non-positive (68 kg / 172 cm => 22.9, matching the S08 wireframe). The
+ * authoritative BMI is recomputed by the backend on autosave (CASE-001).
  */
 export function liveBmi(
   weightKg: number | undefined,
@@ -157,159 +116,109 @@ export function liveBmi(
   return Math.trunc((weightKg / (heightM * heightM)) * 10) / 10;
 }
 
-/** Parse a template schema JSON string into a typed schema (empty on error). */
-function parseSchema(schemaJson: string): TemplateSchema {
-  try {
-    const raw = JSON.parse(schemaJson) as TemplateSchema;
-    if (raw && Array.isArray(raw.sections)) return raw;
-  } catch {
-    /* a malformed schema renders as an empty form rather than crashing */
-  }
-  return { version: 0, sections: [] };
-}
-
-/** Whether a section's `showIf` predicate holds for this patient. */
-function sectionVisibleForPatient(
-  section: SchemaSection,
-  sex: string,
-  ageYears: number,
-): boolean {
-  const cond = section.showIf;
-  if (cond === undefined) return true;
-  if (cond.sex !== undefined && cond.sex !== sex) return false;
-  if (cond.ageYearsLt !== undefined && !(ageYears < cond.ageYearsLt)) {
-    return false;
-  }
-  return true;
-}
-
-/** Read a non-repeatable section's answers from loaded data. */
-function sectionAnswers(data: CaseData, key: string): ComplaintBlock {
-  const value = data[key];
-  if (value !== undefined && !Array.isArray(value)) return value;
-  return {};
+/** A monotonically-increasing id generator for client-made blocks/complaints. */
+function makeIdGen(prefix: string, start: number): () => string {
+  let n = start;
+  return () => `${prefix}${++n}`;
 }
 
 /**
- * The structured first-consultation case sheet (S08). Renders the default
- * template's sections from its JSON schema, autosaves every field, shows live
- * BMI and opens a read-only case summary.
+ * The journal case sheet (S08, revised). Restores every complaint box from the
+ * opened visit's `data_json`, autosaves the whole document, and inserts
+ * editable text/table blocks under dated entries.
  */
 export function CaseForm({
   patientId,
   visitId,
-  sex,
-  ageYears,
+  visitType = 'first',
   onBack,
 }: CaseFormProps): JSX.Element {
-  const [schema, setSchema] = useState<TemplateSchema | null>(null);
-  const [templateName, setTemplateName] = useState('');
-  const [templates, setTemplates] = useState<
-    ReadonlyArray<{ id: string; name: string }>
-  >([]);
-  const [data, setData] = useState<CaseData>({ chief_complaints: [{}] });
-  const [vitals, setVitals] = useState<Vitals>({});
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [hidden, setHidden] = useState<Record<string, boolean>>({});
-  // Sections the doctor hid by TOGGLING the rail item (UX2), as opposed to the
-  // Hide-sections dialog. Both persist the same hidden state, but a rail-
-  // toggled section STAYS in the rail (muted, discoverable to click back on),
-  // while a dialog-hidden section is removed from the rail entirely. Tracking
-  // the source keeps both behaviours correct.
-  const [railToggledHidden, setRailToggledHidden] = useState<
-    Record<string, boolean>
-  >({});
-  const [complaintErrors, setComplaintErrors] = useState<
-    Record<number, boolean>
-  >({});
+  const isFollowup = visitType === 'follow_up';
+
+  const [doc, setDoc] = useState<JournalDoc | null>(null);
+  const [activeComplaint, setActiveComplaint] = useState(0);
+  const [nextFollowupOn, setNextFollowupOn] = useState<string | null>(null);
   const [status, setStatus] = useState<SaveStatus>({ kind: 'idle' });
-  const [hideDialogOpen, setHideDialogOpen] = useState(false);
-  const [summaryHtml, setSummaryHtml] = useState<string | null>(null);
   const [errored, setErrored] = useState(false);
+  const [vitalsOpen, setVitalsOpen] = useState(false);
+  // Becomes true the first time a save succeeds; gates the dues placeholder
+  // area (Slice C6) so dues are "auto-shown on save". Billing is R5 — this is
+  // a clearly-labelled, disabled placeholder with no money/math/network.
+  const [savedOnce, setSavedOnce] = useState(false);
+  // The side section open in the rail, if any (null = none expanded).
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  // The testid of the content element to focus after the next render (a newly
+  // inserted entry's text block), consumed once by a layout effect.
+  const [focusTarget, setFocusTarget] = useState<string | null>(null);
 
-  // The autosave debounce timer; the latest data/vitals are read from refs so a
-  // blur flush and the debounce always save the newest in-memory state.
+  // Client id generators, seeded past any ids already in the restored doc so a
+  // new block/complaint never collides with a restored one.
+  const blockIdRef = useRef<() => string>(makeIdGen('b', 0));
+  const complaintIdRef = useRef<() => string>(makeIdGen('cc', 0));
+
+  // The autosave debounce timer; the latest doc is read from a ref so a blur
+  // flush and the debounce both save the newest in-memory state.
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dataRef = useRef<CaseData>(data);
-  const vitalsRef = useRef<Vitals>(vitals);
-  dataRef.current = data;
-  vitalsRef.current = vitals;
+  const docRef = useRef<JournalDoc | null>(doc);
+  docRef.current = doc;
+  // The structured camelCase vitals copy mirrored into `visit.vitals_json`
+  // (schema §4a). Seeded from the opened visit and refreshed on each popup
+  // Record; the journal table is the editable copy, this is the structured one.
+  const vitalsRef = useRef<Record<string, number>>({});
 
-  // Load the template + open-or-create the visit, then RESTORE answers/vitals
-  // from the returned JSON so a killed-mid-typing session loses nothing
-  // (CASE-005). The two reads are independent; a template read failure still
-  // lets the restore run with an empty layout.
+  // ---- Load + restore ------------------------------------------------------
+
   useEffect(() => {
     let cancelled = false;
     void (async (): Promise<void> => {
       try {
         const open = await run(
-          commands.caseVisitOpenOrCreate({ patientId, visitType: 'first' }),
+          commands.caseVisitOpenOrCreate({ patientId, visitType }),
         );
         if (cancelled) return;
-        const restoredData = restoreData(open.dataJson);
-        const restoredVitals = restoreVitals(open.vitalsJson);
-        setData(restoredData);
-        setVitals(restoredVitals);
+        const parsed = parseJournal(open.dataJson, {
+          visitId: open.visitId,
+          visitAt: open.visitAt,
+        });
+        blockIdRef.current = makeIdGen('b', maxIdNum(parsed, 'b'));
+        complaintIdRef.current = makeIdGen('cc', maxComplaintNum(parsed));
+        vitalsRef.current = restoreVitals(open.vitalsJson);
+        setDoc(parsed);
+        setNextFollowupOn(open.nextFollowupOn);
       } catch {
         if (!cancelled) setErrored(true);
-      }
-
-      try {
-        const def = await run(commands.caseTemplateGetDefault());
-        if (cancelled) return;
-        setTemplateName(def.name);
-        const parsed = parseSchema(def.schemaJson);
-        setSchema(parsed);
-        // Chief complaints open by default; every other section starts
-        // collapsed (the doctor expands what they need).
-        const initialExpanded: Record<string, boolean> = {};
-        for (const s of parsed.sections) {
-          initialExpanded[s.key] = s.key === 'chief_complaints';
-        }
-        setExpanded(initialExpanded);
-      } catch {
-        if (!cancelled) setErrored(true);
-      }
-
-      try {
-        const list = await run(commands.caseTemplateList());
-        if (!cancelled) {
-          setTemplates(list.templates.map((x) => ({ id: x.id, name: x.name })));
-        }
-      } catch {
-        /* the picker is best-effort; the default template still renders */
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [patientId, visitId]);
+  }, [patientId, visitId, visitType]);
 
   // ---- Autosave (CASE-005) -------------------------------------------------
 
-  /** Serialise the current answers/vitals and persist them now. */
   const flushSave = useCallback(async (): Promise<void> => {
     if (timerRef.current !== null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    const current = docRef.current;
+    if (current === null) return;
     setStatus({ kind: 'saving' });
     try {
       const res = await run(
         commands.caseVisitAutosave({
           visitId,
-          dataJson: JSON.stringify(dataRef.current),
+          dataJson: serializeJournal(current),
           vitalsJson: JSON.stringify(vitalsRef.current),
         }),
       );
       setStatus({ kind: 'saved', at: res.savedAt });
+      setSavedOnce(true);
     } catch {
       setStatus({ kind: 'error' });
     }
   }, [visitId]);
 
-  /** Restart the 2 s debounce after a change and show the saving state. */
   const scheduleSave = useCallback((): void => {
     setStatus({ kind: 'saving' });
     if (timerRef.current !== null) clearTimeout(timerRef.current);
@@ -318,7 +227,6 @@ export function CaseForm({
     }, AUTOSAVE_DEBOUNCE_MS);
   }, [flushSave]);
 
-  // Clear a pending timer on unmount so no save fires after teardown.
   useEffect(
     () => () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
@@ -326,178 +234,223 @@ export function CaseForm({
     [],
   );
 
-  // ---- Field mutation ------------------------------------------------------
-
-  const setComplaintField = useCallback(
-    (index: number, fieldKey: string, value: string): void => {
-      setData((prev) => {
-        const blocks = prev.chief_complaints.slice();
-        blocks[index] = { ...blocks[index], [fieldKey]: value };
-        return { ...prev, chief_complaints: blocks };
-      });
-      scheduleSave();
-    },
-    [scheduleSave],
-  );
-
-  const setSectionField = useCallback(
-    (sectionKey: string, fieldKey: string, value: string): void => {
-      setData((prev) => {
-        const current = !Array.isArray(prev[sectionKey])
-          ? ((prev[sectionKey] as ComplaintBlock | undefined) ?? {})
-          : {};
-        return { ...prev, [sectionKey]: { ...current, [fieldKey]: value } };
-      });
-      scheduleSave();
-    },
-    [scheduleSave],
-  );
-
-  const setVital = useCallback(
-    (fieldKey: string, value: string): void => {
-      const num = value.trim() === '' ? undefined : Number(value);
-      setVitals((prev) => {
-        const next: Vitals = { ...prev };
-        if (num === undefined || Number.isNaN(num)) {
-          delete next[vitalsKeyFor(fieldKey)];
-        } else {
-          next[vitalsKeyFor(fieldKey)] = num;
-        }
-        const bmi = liveBmi(next[VITALS_WEIGHT], next[VITALS_HEIGHT]);
-        if (bmi === null) delete next[VITALS_BMI];
-        else next[VITALS_BMI] = bmi;
-        return next;
-      });
-      scheduleSave();
-    },
-    [scheduleSave],
-  );
-
-  const addComplaint = useCallback((): void => {
-    setData((prev) => ({
-      ...prev,
-      chief_complaints: [...prev.chief_complaints, {}],
-    }));
-  }, []);
-
-  const removeComplaint = useCallback(
-    (index: number): void => {
-      setData((prev) => {
-        if (prev.chief_complaints.length <= 1) return prev;
-        const blocks = prev.chief_complaints.slice();
-        blocks.splice(index, 1);
-        return { ...prev, chief_complaints: blocks };
-      });
-      scheduleSave();
-    },
-    [scheduleSave],
-  );
-
-  const validateComplaint = useCallback((index: number): void => {
-    const block = dataRef.current.chief_complaints[index];
-    const text = (block?.sensation ?? '').trim();
-    setComplaintErrors((prev) => ({ ...prev, [index]: text === '' }));
-  }, []);
-
-  // ---- Sections ------------------------------------------------------------
-
-  const toggleExpanded = useCallback((key: string, open: boolean): void => {
-    setExpanded((prev) => ({ ...prev, [key]: open }));
-  }, []);
-
-  const toggleHidden = useCallback(
-    async (key: string): Promise<void> => {
-      const nextHidden = !(hidden[key] ?? false);
-      setHidden((prev) => ({ ...prev, [key]: nextHidden }));
-      try {
-        // Per-doctor template visibility persists as their template (CASE-002).
-        await run(
-          commands.caseTemplateSetVisibility({
-            sectionKey: key,
-            hidden: nextHidden,
-          }),
-        );
-      } catch {
-        /* a persistence failure keeps the local choice; it is retried on reopen */
-      }
-    },
-    [hidden],
-  );
-
-  // Rail click TOGGLES the section (UX2), reusing the same toggleHidden +
-  // case_template_set_visibility persistence as the Hide-sections dialog
-  // (one-txn-one-audit) and coexisting with it:
-  //   - a HIDDEN section is re-shown (persisted hidden:false) and expanded so
-  //     its fields appear;
-  //   - a shown but COLLAPSED section is expanded (open its panel) — a doctor
-  //     navigating the rail opens a section before choosing to hide it;
-  //   - a shown and EXPANDED section is hidden (persisted hidden:true), which
-  //     is the "click again hides it" toggle-off the user asked for.
-  const toggleRailSection = useCallback(
-    (key: string): void => {
-      const isHidden = hidden[key] ?? false;
-      if (isHidden) {
-        // Re-show: clear the rail-toggled marker, expand, and persist shown.
-        setRailToggledHidden((prev) => {
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
-        toggleExpanded(key, true);
-        void toggleHidden(key);
-        return;
-      }
-      if (expanded[key] ?? false) {
-        // Toggle OFF from the rail: mark the source so it stays in the rail
-        // (muted) rather than disappearing like a dialog-hidden section.
-        setRailToggledHidden((prev) => ({ ...prev, [key]: true }));
-        void toggleHidden(key);
-        return;
-      }
-      toggleExpanded(key, true);
-    },
-    [hidden, expanded, toggleExpanded, toggleHidden],
-  );
-
-  // ---- Case summary (CASE-009) ---------------------------------------------
-
-  const openSummary = useCallback(async (): Promise<void> => {
-    try {
-      const res = await run(commands.caseSummaryRender({ visitId }));
-      setSummaryHtml(res.html);
-    } catch {
-      setErrored(true);
-    }
-  }, [visitId]);
-
-  // The sections shown in the left rail: schema order, minus only the
-  // patient-conditional ones (CASE-001). Per-doctor HIDDEN sections stay in the
-  // rail so the doctor can click them back on — a hidden rail item carries a
-  // hidden-state indicator (UX2). The centre pane renders only non-hidden
-  // sections (CASE-002).
-  const railSections = useMemo(() => {
-    if (schema === null) return [];
-    return schema.sections.filter((s) => {
-      if (!sectionVisibleForPatient(s, sex, ageYears)) return false;
-      const isHidden = hidden[s.key] ?? false;
-      // A section hidden via the Hide-sections DIALOG leaves the rail; a rail-
-      // TOGGLED section stays (muted) so it is discoverable to click back on.
-      if (isHidden && !(railToggledHidden[s.key] ?? false)) return false;
-      return true;
-    });
-  }, [schema, sex, ageYears, hidden, railToggledHidden]);
-
-  // The sections to render in the centre pane: schema order, minus patient-
-  // conditional and per-doctor hidden ones (CASE-002/001).
-  const visibleSections = useMemo(() => {
-    if (schema === null) return [];
-    return schema.sections.filter(
-      (s) =>
-        sectionVisibleForPatient(s, sex, ageYears) && !(hidden[s.key] ?? false),
+  // Focus the freshly-inserted text block once it is in the DOM.
+  useEffect(() => {
+    if (focusTarget === null) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-testid="${focusTarget}"]`,
     );
-  }, [schema, sex, ageYears, hidden]);
+    el?.focus();
+    setFocusTarget(null);
+  }, [focusTarget, doc]);
 
-  if (errored && schema === null) {
+  // ---- Document mutation ---------------------------------------------------
+  /**
+   * Replace the active complaint via an updater. `flushNow` distinguishes a
+   * discrete action (a button insert — flush the document immediately so an
+   * explicit action is never lost) from a keystroke edit (debounced, CASE-005
+   * 2 s). The in-memory `docRef` is updated synchronously so a `flushNow` save
+   * sees the just-applied change without waiting for the next render.
+   */
+  const updateActiveComplaint = useCallback(
+    (fn: (c: Complaint) => Complaint, flushNow = false): void => {
+      const prev = docRef.current;
+      if (prev !== null) {
+        const next: JournalDoc = {
+          ...prev,
+          complaints: prev.complaints.map((c, i) =>
+            i === activeComplaint ? fn(c) : c,
+          ),
+        };
+        docRef.current = next;
+        setDoc(next);
+      }
+      if (flushNow) void flushSave();
+      else scheduleSave();
+    },
+    [activeComplaint, scheduleSave, flushSave],
+  );
+
+  /** Append a block to the newest entry of the active complaint (flush now). */
+  const appendBlockToActive = useCallback(
+    (block: Block): void => {
+      updateActiveComplaint((c) => withBlockInLastEntry(c, block), true);
+    },
+    [updateActiveComplaint],
+  );
+
+  const onAddEntry = useCallback((): void => {
+    const newBlockId = blockIdRef.current();
+    const ctx = { visitId, visitAt: new Date().toISOString() };
+    const entry: Entry = {
+      ...newEntry(ctx),
+      blocks: [{ kind: 'text', id: newBlockId, text: '' }],
+    };
+    const cId = docRef.current?.complaints[activeComplaint]?.id ?? 'cc1';
+    updateActiveComplaint(
+      (c) => ({ ...c, entries: [...c.entries, entry] }),
+      true,
+    );
+    // Focus the new entry's text block so the doctor can type immediately.
+    setFocusTarget(`case-block-${cId}-${newBlockId}`);
+  }, [updateActiveComplaint, visitId, activeComplaint]);
+
+  const onAddTextBlock = useCallback((): void => {
+    const id = blockIdRef.current();
+    appendBlockToActive({ kind: 'text', id, text: '' });
+  }, [appendBlockToActive]);
+
+  const onInsertTable = useCallback(
+    (
+      tableType: TableType,
+      columns: readonly string[],
+      seedRow: readonly string[],
+      rxPlaceholder: boolean,
+    ): void => {
+      const id = blockIdRef.current();
+      const base: TableBlock = {
+        kind: 'table',
+        id,
+        table_type: tableType,
+        columns,
+        rows: seedRow.length > 0 ? [seedRow] : [columns.map(() => '')],
+      };
+      appendBlockToActive(
+        rxPlaceholder ? { ...base, rx_placeholder: true } : base,
+      );
+    },
+    [appendBlockToActive],
+  );
+
+  const onInsertModalities = useCallback((): void => {
+    onInsertTable('modalities', MODALITIES_COLUMNS, [], false);
+  }, [onInsertTable]);
+
+  const onInsertPrescription = useCallback((): void => {
+    onInsertTable('prescription', PRESCRIPTION_COLUMNS, [], true);
+  }, [onInsertTable]);
+
+  const onRecordVitals = useCallback(
+    (row: readonly string[], structured: Record<string, number>): void => {
+      vitalsRef.current = structured;
+      onInsertTable('vitals', VITALS_COLUMNS, row, false);
+      setVitalsOpen(false);
+    },
+    [onInsertTable],
+  );
+
+  // ---- Block/cell edits ----------------------------------------------------
+
+  const onTextBlockChange = useCallback(
+    (entryIdx: number, blockId: string, text: string): void => {
+      updateActiveComplaint((c) =>
+        mapEntryBlock(c, entryIdx, blockId, (b) =>
+          b.kind === 'text' ? { ...b, text } : b,
+        ),
+      );
+    },
+    [updateActiveComplaint],
+  );
+
+  const onCellChange = useCallback(
+    (
+      entryIdx: number,
+      blockId: string,
+      row: number,
+      col: number,
+      value: string,
+    ): void => {
+      updateActiveComplaint((c) =>
+        mapEntryBlock(c, entryIdx, blockId, (b) =>
+          b.kind === 'table' ? setCell(b, row, col, value) : b,
+        ),
+      );
+    },
+    [updateActiveComplaint],
+  );
+
+  const onHeaderChange = useCallback(
+    (entryIdx: number, blockId: string, col: number, value: string): void => {
+      updateActiveComplaint((c) =>
+        mapEntryBlock(c, entryIdx, blockId, (b) =>
+          b.kind === 'table' ? setHeader(b, col, value) : b,
+        ),
+      );
+    },
+    [updateActiveComplaint],
+  );
+
+  const onAddRow = useCallback(
+    (entryIdx: number, blockId: string): void => {
+      updateActiveComplaint((c) =>
+        mapEntryBlock(c, entryIdx, blockId, (b) =>
+          b.kind === 'table'
+            ? { ...b, rows: [...b.rows, b.columns.map(() => '')] }
+            : b,
+        ),
+      );
+    },
+    [updateActiveComplaint],
+  );
+
+  const onRemoveBlock = useCallback(
+    (entryIdx: number, blockId: string): void => {
+      updateActiveComplaint((c) => ({
+        ...c,
+        entries: c.entries.map((e, i) =>
+          i === entryIdx
+            ? { ...e, blocks: e.blocks.filter((b) => b.id !== blockId) }
+            : e,
+        ),
+      }));
+    },
+    [updateActiveComplaint],
+  );
+
+  // ---- Complaint list ------------------------------------------------------
+
+  const onAddComplaint = useCallback((): void => {
+    setDoc((prev) => {
+      if (prev === null) return prev;
+      const id = complaintIdRef.current();
+      const ctx = { visitId, visitAt: new Date().toISOString() };
+      const complaint: Complaint = {
+        id,
+        title: '',
+        entries: [newEntry(ctx)],
+      };
+      return { ...prev, complaints: [...prev.complaints, complaint] };
+    });
+    setActiveComplaint((i) => i + 1);
+    scheduleSave();
+  }, [visitId, scheduleSave]);
+
+  const onTitleChange = useCallback(
+    (title: string): void => {
+      updateActiveComplaint((c) => ({ ...c, title }));
+    },
+    [updateActiveComplaint],
+  );
+
+  // ---- Side sections -------------------------------------------------------
+
+  const onSectionField = useCallback(
+    (sectionKey: EditableSectionKey, fieldKey: string, value: string): void => {
+      setDoc((prev) => {
+        if (prev === null) return prev;
+        return {
+          ...prev,
+          sections: setSectionField(prev.sections, sectionKey, fieldKey, value),
+        };
+      });
+      scheduleSave();
+    },
+    [scheduleSave],
+  );
+
+  // ---- Render --------------------------------------------------------------
+
+  if (errored && doc === null) {
     return (
       <section
         data-testid="case-form-error"
@@ -509,7 +462,7 @@ export function CaseForm({
     );
   }
 
-  if (schema === null) {
+  if (doc === null) {
     return (
       <section
         data-testid="case-form-loading"
@@ -521,185 +474,220 @@ export function CaseForm({
     );
   }
 
+  const complaint = doc.complaints[activeComplaint] ?? doc.complaints[0];
+  const complaintId = complaint?.id ?? 'cc1';
+
   return (
     <section
       data-testid="case-form"
-      aria-label={templateName}
       className="flex h-full min-h-0 flex-col text-[0.875rem] text-slate-900"
     >
       <HeaderBar
-        templateName={templateName}
-        templates={templates}
         status={status}
+        nextFollowupOn={nextFollowupOn}
         onForceSave={() => void flushSave()}
         {...(onBack !== undefined ? { onBack } : {})}
       />
 
       <div className="flex min-h-0 flex-1">
-        {/* Left: section rail (CASE-002) */}
+        {/* Left: complaint list + structured side-section rail. */}
         <nav
-          aria-label={t('case.form.sections.title')}
-          className="flex w-56 flex-none flex-col gap-1 overflow-auto border-r border-slate-200 p-2"
+          aria-label={t('case.form.complaints.title')}
+          className="flex w-60 flex-none flex-col gap-2 overflow-auto border-r border-slate-200 p-2"
         >
-          <h2 className="px-1 text-xs font-semibold uppercase text-slate-500">
-            {t('case.form.sections.title')}
-          </h2>
-          {railSections.map((s) => {
-            const isHidden = hidden[s.key] ?? false;
-            const isExpanded = !isHidden && (expanded[s.key] ?? false);
-            return (
-              <button
-                key={s.key}
-                type="button"
-                data-testid={`case-form-section-${s.key}`}
-                // A rail click TOGGLES the section on/off (UX2). The state is
-                // surfaced for accessibility and test discovery: aria-pressed
-                // is true while shown, aria-expanded reflects the open panel,
-                // and data-hidden marks a hidden section so it stays clickable
-                // to restore.
-                aria-pressed={!isHidden}
-                aria-expanded={isExpanded}
-                data-hidden={isHidden ? 'true' : undefined}
-                title={
-                  isHidden ? t('case.form.sections.hiddenHint') : undefined
-                }
-                onClick={() => toggleRailSection(s.key)}
-                className={[
-                  'rounded px-2 py-1 text-left hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600',
-                  isHidden
-                    ? 'italic text-slate-400'
-                    : isExpanded
-                      ? 'bg-blue-50 font-medium'
-                      : '',
-                ].join(' ')}
-              >
-                {s.title}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            data-testid="case-form-hide-sections"
-            onClick={() => setHideDialogOpen(true)}
-            className="mt-2 rounded border border-slate-300 px-2 py-1 text-left hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-          >
-            {t('case.form.hideSections')}
-          </button>
+          <ComplaintRail
+            complaints={doc.complaints}
+            active={activeComplaint}
+            onSelect={setActiveComplaint}
+            onAdd={onAddComplaint}
+          />
+          <SideSectionRail
+            doc={doc}
+            visitId={visitId}
+            openSection={openSection}
+            onToggleSection={(key) =>
+              setOpenSection((cur) => (cur === key ? null : key))
+            }
+            onSectionField={onSectionField}
+            onBlurFlush={() => void flushSave()}
+          />
         </nav>
 
-        {/* Centre: active section fields */}
-        <div className="min-w-0 flex-1 overflow-auto p-4">
-          {visibleSections.map((section) =>
-            expanded[section.key] ? (
-              <SectionPanel
-                key={section.key}
-                section={section}
-                visitId={visitId}
-                data={data}
-                vitals={vitals}
-                complaintErrors={complaintErrors}
-                onCollapse={() => toggleExpanded(section.key, false)}
-                onComplaintField={setComplaintField}
-                onComplaintBlur={(index) => {
-                  validateComplaint(index);
-                  void flushSave();
-                }}
-                onSectionField={setSectionField}
-                onSectionBlur={() => void flushSave()}
-                onVital={setVital}
-                onAddComplaint={addComplaint}
-                onRemoveComplaint={removeComplaint}
-              />
-            ) : null,
-          )}
-
-          <div className="mt-4 border-t border-slate-200 pt-3">
-            <button
-              type="button"
-              data-testid="case-form-case-summary"
-              onClick={() => void openSummary()}
-              className="rounded border border-slate-300 px-3 py-1.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-            >
-              {t('case.form.caseSummary')}
-            </button>
-          </div>
+        {/* Centre: the active complaint's dated journal box. Adaptive, full-
+            width content region (Slice C4) — no narrow centered column, so a
+            wide window / fullscreen fills the resolution (ADR 0018 §UX shell,
+            S08 "Full-width content area, adaptive to the window"). */}
+        <div
+          data-testid="case-form-content"
+          data-adaptive="true"
+          className="min-w-0 flex-1 overflow-auto p-4"
+        >
+          {complaint !== undefined ? (
+            <JournalBox
+              complaint={complaint}
+              complaintId={complaintId}
+              isFollowup={isFollowup}
+              onTitleChange={onTitleChange}
+              onTitleBlur={() => void flushSave()}
+              onAddEntry={onAddEntry}
+              onAddText={onAddTextBlock}
+              onRecordVitals={() => setVitalsOpen(true)}
+              onModalities={onInsertModalities}
+              onAddPrescription={onInsertPrescription}
+              onTextChange={onTextBlockChange}
+              onCellChange={onCellChange}
+              onHeaderChange={onHeaderChange}
+              onAddRow={onAddRow}
+              onRemoveBlock={onRemoveBlock}
+              onBlurFlush={() => void flushSave()}
+            />
+          ) : null}
         </div>
       </div>
 
-      {hideDialogOpen ? (
-        <HideSectionsDialog
-          sections={schema.sections.filter((s) => s.hideable !== false)}
-          hidden={hidden}
-          onToggle={(key) => void toggleHidden(key)}
-          onClose={() => setHideDialogOpen(false)}
-        />
+      {savedOnce ? (
+        <section
+          data-testid="case-form-dues-placeholder"
+          aria-label={t('case.form.dues.title')}
+          className="flex flex-none items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600"
+        >
+          <span>
+            <strong className="mr-1 text-slate-700">
+              {t('case.form.dues.title')}
+            </strong>
+            {t('case.form.dues.placeholder')}
+          </span>
+          <button
+            type="button"
+            data-testid="case-form-dues-clear"
+            disabled
+            aria-disabled="true"
+            title={t('case.form.dues.disabledHint')}
+            className="cursor-not-allowed rounded border border-slate-300 bg-slate-100 px-3 py-1 text-slate-400"
+          >
+            {t('case.form.dues.clear')}
+          </button>
+        </section>
       ) : null}
 
-      {summaryHtml !== null ? (
-        <SummaryView html={summaryHtml} onClose={() => setSummaryHtml(null)} />
+      {vitalsOpen ? (
+        <VitalsPopup
+          onCancel={() => setVitalsOpen(false)}
+          onRecord={onRecordVitals}
+        />
       ) : null}
     </section>
   );
 }
 
-/** Restore the in-memory answers from the open-or-create `data_json`. */
-function restoreData(dataJson: string): CaseData {
-  const base: CaseData = { chief_complaints: [{}] };
-  try {
-    const raw = JSON.parse(dataJson) as Record<string, unknown>;
-    if (raw && typeof raw === 'object') {
-      const out: CaseData = { ...base, ...(raw as object) } as CaseData;
-      if (
-        !Array.isArray(out.chief_complaints) ||
-        out.chief_complaints.length === 0
-      ) {
-        out.chief_complaints = [{}];
+/** The biggest numeric suffix of a block id (`b<n>`) across the doc, or 0. */
+function maxIdNum(doc: JournalDoc, prefix: string): number {
+  let max = 0;
+  for (const c of doc.complaints) {
+    for (const e of c.entries) {
+      for (const b of e.blocks) {
+        const m = new RegExp(`^${prefix}(\\d+)$`).exec(b.id);
+        if (m && m[1] !== undefined) max = Math.max(max, Number(m[1]));
       }
-      return out;
     }
-  } catch {
-    /* a fresh or malformed visit starts with one empty complaint block */
   }
-  return base;
+  return max;
 }
 
-/** Restore vitals from the open-or-create `vitals_json`. */
-function restoreVitals(vitalsJson: string): Vitals {
-  try {
-    const raw = JSON.parse(vitalsJson) as Record<string, unknown>;
-    if (raw && typeof raw === 'object') {
-      const out: Vitals = {};
-      for (const [k, v] of Object.entries(raw)) {
-        if (typeof v === 'number') out[k] = v;
-      }
-      return out;
-    }
-  } catch {
-    /* empty vitals on a fresh or malformed visit */
+/** The biggest numeric suffix of a complaint id (`cc<n>`), or 0. */
+function maxComplaintNum(doc: JournalDoc): number {
+  let max = 0;
+  for (const c of doc.complaints) {
+    const m = /^cc(\d+)$/.exec(c.id);
+    if (m && m[1] !== undefined) max = Math.max(max, Number(m[1]));
   }
-  return {};
+  return max;
 }
 
-/** Top header: patient/visit line, template picker and autosave status. */
+/** Append a block to a complaint's newest entry (creating one if none). */
+function withBlockInLastEntry(c: Complaint, block: Block): Complaint {
+  if (c.entries.length === 0) {
+    return {
+      ...c,
+      entries: [{ entry_date: isoToday(), visit_id: '', blocks: [block] }],
+    };
+  }
+  const lastIdx = c.entries.length - 1;
+  return {
+    ...c,
+    entries: c.entries.map((e, i) =>
+      i === lastIdx ? { ...e, blocks: [...e.blocks, block] } : e,
+    ),
+  };
+}
+
+/** Map one block (by id) inside a given entry index. */
+function mapEntryBlock(
+  c: Complaint,
+  entryIdx: number,
+  blockId: string,
+  fn: (b: Block) => Block,
+): Complaint {
+  return {
+    ...c,
+    entries: c.entries.map((e, i) =>
+      i === entryIdx
+        ? { ...e, blocks: e.blocks.map((b) => (b.id === blockId ? fn(b) : b)) }
+        : e,
+    ),
+  };
+}
+
+/** Set a body cell value, padding ragged rows to the column count. */
+function setCell(
+  b: TableBlock,
+  row: number,
+  col: number,
+  value: string,
+): TableBlock {
+  const rows = b.rows.map((r, i) => {
+    if (i !== row) return r;
+    const next = b.columns.map((_, c) => r[c] ?? '');
+    next[col] = value;
+    return next;
+  });
+  return { ...b, rows };
+}
+
+/** Set a header (column) value. */
+function setHeader(b: TableBlock, col: number, value: string): TableBlock {
+  const columns = b.columns.map((h, i) => (i === col ? value : h));
+  return { ...b, columns };
+}
+
+/** A local-timezone ISO calendar date for today. */
+function isoToday(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Top header: patient/visit line placeholder, next F/U, Save + status. */
 function HeaderBar({
-  templateName,
-  templates,
   status,
+  nextFollowupOn,
   onForceSave,
   onBack,
 }: {
-  readonly templateName: string;
-  readonly templates: ReadonlyArray<{ id: string; name: string }>;
   readonly status: SaveStatus;
+  readonly nextFollowupOn: string | null;
   readonly onForceSave: () => void;
   readonly onBack?: () => void;
 }): JSX.Element {
+  const nextText =
+    nextFollowupOn !== null && formatDate(nextFollowupOn) !== null
+      ? `${t('case.form.nextFollowup.prefix')} ${formatDate(nextFollowupOn)}`
+      : t('case.form.nextFollowup.none');
   return (
     <header className="flex flex-none items-center justify-between gap-3 border-b border-slate-200 px-4 py-2">
       <div className="flex items-center gap-3">
-        {/* Back to the patient dashboard (00-conventions §3). Rendered only
-            when a destination is wired, so there is no dead-end control
-            (ADR-0002). Back never discards data — the form autosaves. */}
         {onBack !== undefined ? (
           <button
             type="button"
@@ -711,45 +699,30 @@ function HeaderBar({
             {t('case.form.back')}
           </button>
         ) : null}
-        <span className="font-semibold">{templateName}</span>
-        <label className="flex items-center gap-1 text-xs text-slate-600">
-          {t('case.form.template')}
-          <select
-            data-testid="case-form-template"
-            value={templateName}
-            onChange={() => {
-              /* template switching beyond the default is R9 (CASE-004) */
-            }}
-            className="rounded border border-slate-300 px-1 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-          >
-            {templates.length === 0 ? (
-              <option value={templateName}>{templateName}</option>
-            ) : (
-              templates.map((tpl) => (
-                <option key={tpl.id} value={tpl.name}>
-                  {tpl.name}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
+        <span
+          data-testid="case-form-next-followup"
+          className="text-sm text-slate-700"
+        >
+          {nextText}
+        </span>
       </div>
       <div className="flex items-center gap-2">
         <SaveIndicator status={status} />
         <button
           type="button"
-          data-testid="case-form-force-save"
+          data-testid="case-form-save"
+          aria-label={t('case.form.saveShortcut')}
           onClick={onForceSave}
-          className="sr-only"
+          className="rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-700"
         >
-          {t('case.form.save.saving')}
+          {t('case.form.save')}
         </button>
       </div>
     </header>
   );
 }
 
-/** Status-bar autosave indicator (Saving.../Saved hh:mm) (CASE-005). */
+/** Status indicator beside Save (Saving…/Saved hh:mm) (CASE-005). */
 function SaveIndicator({
   status,
 }: {
@@ -782,422 +755,875 @@ function SaveIndicator({
   );
 }
 
-/** One expanded section's fields in the centre pane. */
-function SectionPanel({
-  section,
-  visitId,
-  data,
-  vitals,
-  complaintErrors,
-  onCollapse,
-  onComplaintField,
-  onComplaintBlur,
-  onSectionField,
-  onSectionBlur,
-  onVital,
-  onAddComplaint,
-  onRemoveComplaint,
+/** The complaint selector list + add control. */
+function ComplaintRail({
+  complaints,
+  active,
+  onSelect,
+  onAdd,
 }: {
-  readonly section: SchemaSection;
-  readonly visitId: string;
-  readonly data: CaseData;
-  readonly vitals: Vitals;
-  readonly complaintErrors: Record<number, boolean>;
-  readonly onCollapse: () => void;
-  readonly onComplaintField: (
-    index: number,
-    fieldKey: string,
-    value: string,
-  ) => void;
-  readonly onComplaintBlur: (index: number) => void;
-  readonly onSectionField: (
-    sectionKey: string,
-    fieldKey: string,
-    value: string,
-  ) => void;
-  readonly onSectionBlur: () => void;
-  readonly onVital: (fieldKey: string, value: string) => void;
-  readonly onAddComplaint: () => void;
-  readonly onRemoveComplaint: (index: number) => void;
+  readonly complaints: readonly Complaint[];
+  readonly active: number;
+  readonly onSelect: (index: number) => void;
+  readonly onAdd: () => void;
 }): JSX.Element {
   return (
-    <div className="mb-4 rounded border border-slate-200">
-      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-2">
-        <h2 className="font-semibold">{section.title}</h2>
-        <div className="flex items-center gap-2">
-          {section.repeatable ? (
-            <button
-              type="button"
-              data-testid="case-form-add-complaint"
-              onClick={onAddComplaint}
-              className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-xs font-semibold uppercase text-slate-500">
+          {t('case.form.complaints.title')}
+        </h2>
+        <button
+          type="button"
+          data-testid="case-form-add-complaint"
+          aria-label={t('case.form.addComplaint')}
+          onClick={onAdd}
+          className="rounded border border-slate-300 px-1.5 py-0.5 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
+      {complaints.map((c, i) => {
+        const label =
+          c.title.trim() === ''
+            ? `${t('case.form.complaintTitle')} ${i + 1}`
+            : c.title;
+        return (
+          <button
+            key={c.id}
+            type="button"
+            data-testid={`case-form-complaint-${i + 1}`}
+            aria-pressed={i === active}
+            onClick={() => onSelect(i)}
+            className={[
+              'rounded px-2 py-1 text-left hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600',
+              i === active ? 'bg-blue-50 font-medium' : '',
+            ].join(' ')}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The active complaint's big editable dated-journal box. */
+function JournalBox({
+  complaint,
+  complaintId,
+  isFollowup,
+  onTitleChange,
+  onTitleBlur,
+  onAddEntry,
+  onAddText,
+  onRecordVitals,
+  onModalities,
+  onAddPrescription,
+  onTextChange,
+  onCellChange,
+  onHeaderChange,
+  onAddRow,
+  onRemoveBlock,
+  onBlurFlush,
+}: {
+  readonly complaint: Complaint;
+  readonly complaintId: string;
+  readonly isFollowup: boolean;
+  readonly onTitleChange: (title: string) => void;
+  readonly onTitleBlur: () => void;
+  readonly onAddEntry: () => void;
+  readonly onAddText: () => void;
+  readonly onRecordVitals: () => void;
+  readonly onModalities: () => void;
+  readonly onAddPrescription: () => void;
+  readonly onTextChange: (
+    entryIdx: number,
+    blockId: string,
+    text: string,
+  ) => void;
+  readonly onCellChange: (
+    entryIdx: number,
+    blockId: string,
+    row: number,
+    col: number,
+    value: string,
+  ) => void;
+  readonly onHeaderChange: (
+    entryIdx: number,
+    blockId: string,
+    col: number,
+    value: string,
+  ) => void;
+  readonly onAddRow: (entryIdx: number, blockId: string) => void;
+  readonly onRemoveBlock: (entryIdx: number, blockId: string) => void;
+  readonly onBlurFlush: () => void;
+}): JSX.Element {
+  const hasPrescription = complaint.entries.some((e) =>
+    e.blocks.some((b) => b.kind === 'table' && b.table_type === 'prescription'),
+  );
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <label className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="sr-only">{t('case.form.complaint.titleLabel')}</span>
+          <input
+            data-testid="case-form-complaint-title"
+            value={complaint.title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            onBlur={onTitleBlur}
+            placeholder={t('case.form.complaint.titlePlaceholder')}
+            aria-label={t('case.form.complaint.titleLabel')}
+            className="input w-full text-base font-semibold"
+          />
+        </label>
+        <button
+          type="button"
+          data-testid="case-form-add-entry"
+          onClick={onAddEntry}
+          className="flex-none rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          {t('case.form.addEntry')}
+        </button>
+      </div>
+
+      <div
+        data-testid="case-form-journal-box"
+        role="group"
+        aria-label={t('case.form.complaints.title')}
+        className="flex flex-col gap-4 rounded border border-slate-200 p-3"
+      >
+        {complaint.entries.length === 0 ? (
+          <p className="text-sm text-slate-500">{t('case.form.emptyHint')}</p>
+        ) : (
+          complaint.entries.map((entry, entryIdx) => (
+            <EntryView
+              key={`${entry.entry_date}-${entryIdx}`}
+              entry={entry}
+              entryIdx={entryIdx}
+              complaintId={complaintId}
+              onTextChange={onTextChange}
+              onCellChange={onCellChange}
+              onHeaderChange={onHeaderChange}
+              onAddRow={onAddRow}
+              onRemoveBlock={onRemoveBlock}
+              onBlurFlush={onBlurFlush}
+            />
+          ))
+        )}
+      </div>
+
+      {hasPrescription ? (
+        <p
+          data-testid="case-form-rx-placeholder-hint"
+          role="note"
+          className="rounded bg-amber-50 px-3 py-1.5 text-xs text-amber-800"
+        >
+          {t('case.form.rxPlaceholderHint')}
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-3">
+        <button
+          type="button"
+          data-testid="case-form-record-vitals"
+          onClick={onRecordVitals}
+          className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          {isFollowup
+            ? t('case.form.updateVitals')
+            : t('case.form.recordVitals')}
+        </button>
+        <button
+          type="button"
+          data-testid="case-form-modalities"
+          onClick={onModalities}
+          className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          {isFollowup
+            ? t('case.form.updateModalities')
+            : t('case.form.modalities')}
+        </button>
+        <button
+          type="button"
+          data-testid="case-form-add-prescription"
+          onClick={onAddPrescription}
+          className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          {isFollowup
+            ? t('case.form.updatePrescription')
+            : t('case.form.addPrescription')}
+        </button>
+        <button
+          type="button"
+          data-testid="case-form-add-text"
+          onClick={onAddText}
+          className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          {t('case.form.addText')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** One dated entry: its date header and ordered editable blocks. */
+function EntryView({
+  entry,
+  entryIdx,
+  complaintId,
+  onTextChange,
+  onCellChange,
+  onHeaderChange,
+  onAddRow,
+  onRemoveBlock,
+  onBlurFlush,
+}: {
+  readonly entry: Entry;
+  readonly entryIdx: number;
+  readonly complaintId: string;
+  readonly onTextChange: (
+    entryIdx: number,
+    blockId: string,
+    text: string,
+  ) => void;
+  readonly onCellChange: (
+    entryIdx: number,
+    blockId: string,
+    row: number,
+    col: number,
+    value: string,
+  ) => void;
+  readonly onHeaderChange: (
+    entryIdx: number,
+    blockId: string,
+    col: number,
+    value: string,
+  ) => void;
+  readonly onAddRow: (entryIdx: number, blockId: string) => void;
+  readonly onRemoveBlock: (entryIdx: number, blockId: string) => void;
+  readonly onBlurFlush: () => void;
+}): JSX.Element {
+  const headerText = `${t('case.form.entry.label')} ${formatEntryDate(
+    entry.entry_date,
+  )}`;
+  return (
+    <div className="flex flex-col gap-2">
+      <h3
+        data-testid={`case-form-entry-${complaintId}-${entryIdx}`}
+        className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+      >
+        {headerText}
+      </h3>
+      {entry.blocks.map((block) =>
+        block.kind === 'text' ? (
+          <label key={block.id} className="flex flex-col gap-1">
+            <span className="sr-only">{t('case.form.textBlock.label')}</span>
+            <textarea
+              data-testid={`case-block-${complaintId}-${block.id}`}
+              value={block.text}
+              rows={3}
+              onChange={(e) => onTextChange(entryIdx, block.id, e.target.value)}
+              onBlur={onBlurFlush}
+              aria-label={t('case.form.textBlock.label')}
+              className="input"
+            />
+          </label>
+        ) : (
+          <TableBlockView
+            key={block.id}
+            block={block}
+            entryIdx={entryIdx}
+            complaintId={complaintId}
+            onCellChange={onCellChange}
+            onHeaderChange={onHeaderChange}
+            onAddRow={onAddRow}
+            onRemoveBlock={onRemoveBlock}
+            onBlurFlush={onBlurFlush}
+          />
+        ),
+      )}
+    </div>
+  );
+}
+
+/** One editable table block: every header cell and body cell is an input. */
+function TableBlockView({
+  block,
+  entryIdx,
+  complaintId,
+  onCellChange,
+  onHeaderChange,
+  onAddRow,
+  onRemoveBlock,
+  onBlurFlush,
+}: {
+  readonly block: TableBlock;
+  readonly entryIdx: number;
+  readonly complaintId: string;
+  readonly onCellChange: (
+    entryIdx: number,
+    blockId: string,
+    row: number,
+    col: number,
+    value: string,
+  ) => void;
+  readonly onHeaderChange: (
+    entryIdx: number,
+    blockId: string,
+    col: number,
+    value: string,
+  ) => void;
+  readonly onAddRow: (entryIdx: number, blockId: string) => void;
+  readonly onRemoveBlock: (entryIdx: number, blockId: string) => void;
+  readonly onBlurFlush: () => void;
+}): JSX.Element {
+  return (
+    <div
+      data-testid={`case-block-${complaintId}-${block.id}`}
+      className="overflow-x-auto rounded border border-slate-200"
+    >
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr>
+            {block.columns.map((col, c) => (
+              <th key={c} className="border-b border-slate-200 p-1">
+                <input
+                  data-testid={`case-cell-${complaintId}-${block.id}-h-${c}`}
+                  value={col}
+                  onChange={(e) =>
+                    onHeaderChange(entryIdx, block.id, c, e.target.value)
+                  }
+                  onBlur={onBlurFlush}
+                  aria-label={t('case.form.table.cell')}
+                  className="input w-full font-semibold"
+                />
+              </th>
+            ))}
+            <th className="w-8 border-b border-slate-200 p-1" />
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((row, r) => (
+            <tr key={r}>
+              {block.columns.map((_, c) => (
+                <td key={c} className="p-1">
+                  <input
+                    data-testid={`case-cell-${complaintId}-${block.id}-${r}-${c}`}
+                    value={row[c] ?? ''}
+                    onChange={(e) =>
+                      onCellChange(entryIdx, block.id, r, c, e.target.value)
+                    }
+                    onBlur={onBlurFlush}
+                    aria-label={t('case.form.table.cell')}
+                    className="input w-full"
+                  />
+                </td>
+              ))}
+              <td className="p-1" />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="flex gap-2 border-t border-slate-100 p-1">
+        <button
+          type="button"
+          data-testid={`case-table-add-row-${block.id}`}
+          onClick={() => onAddRow(entryIdx, block.id)}
+          className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          {t('case.form.table.addRow')}
+        </button>
+        <button
+          type="button"
+          data-testid={`case-block-remove-${block.id}`}
+          onClick={() => onRemoveBlock(entryIdx, block.id)}
+          className="rounded border border-slate-300 px-2 py-0.5 text-xs text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          {t('case.form.table.removeBlock')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The Record-vitals popup: BP sys + dia as TWO fields, live BMI (ADR 0018 #3). */
+function VitalsPopup({
+  onCancel,
+  onRecord,
+}: {
+  readonly onCancel: () => void;
+  readonly onRecord: (
+    row: readonly string[],
+    structured: Record<string, number>,
+  ) => void;
+}): JSX.Element {
+  const [sys, setSys] = useState('');
+  const [dia, setDia] = useState('');
+  const [pulse, setPulse] = useState('');
+  const [weight, setWeight] = useState('');
+  const [height, setHeight] = useState('');
+  const [temp, setTemp] = useState('');
+  const [spo2, setSpo2] = useState('');
+
+  const bmi = liveBmi(numOrUndef(weight), numOrUndef(height));
+  const bmiText = bmi === null ? '' : String(bmi);
+
+  const record = useCallback((): void => {
+    const structured: Record<string, number> = {};
+    const put = (key: string, value: string): void => {
+      const n = numOrUndef(value);
+      if (n !== undefined) structured[key] = n;
+    };
+    put('bpSys', sys);
+    put('bpDia', dia);
+    put('pulse', pulse);
+    put(VITALS_WEIGHT, weight);
+    put(VITALS_HEIGHT, height);
+    put('temp', temp);
+    put('spo2', spo2);
+    if (bmi !== null) structured[VITALS_BMI] = bmi;
+    onRecord(
+      [sys, dia, pulse, weight, height, bmiText, temp, spo2],
+      structured,
+    );
+  }, [onRecord, sys, dia, pulse, weight, height, bmi, bmiText, temp, spo2]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('case.form.vitals.title')}
+      data-testid="case-form-vitals-popup"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onCancel();
+      }}
+    >
+      <div className="w-[32rem] rounded border border-slate-300 bg-white p-4 shadow-lg">
+        <h2 className="mb-3 text-sm font-semibold">
+          {t('case.form.vitals.title')}
+        </h2>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          <NumberField
+            testId="case-vitals-bp-sys"
+            label={t('case.form.vitals.bpSys')}
+            value={sys}
+            onChange={setSys}
+          />
+          <NumberField
+            testId="case-vitals-bp-dia"
+            label={t('case.form.vitals.bpDia')}
+            value={dia}
+            onChange={setDia}
+          />
+          <NumberField
+            testId="case-vitals-pulse"
+            label={t('case.form.vitals.pulse')}
+            value={pulse}
+            onChange={setPulse}
+          />
+          <NumberField
+            testId="case-vitals-weight"
+            label={t('case.form.vitals.weight')}
+            value={weight}
+            onChange={setWeight}
+          />
+          <NumberField
+            testId="case-vitals-height"
+            label={t('case.form.vitals.height')}
+            value={height}
+            onChange={setHeight}
+          />
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">
+              {t('case.form.vitals.bmi')}
+            </span>
+            <output
+              data-testid="case-vitals-bmi"
+              aria-label={t('case.form.vitals.bmi')}
+              className="input bg-slate-50"
             >
-              {t('case.form.addComplaint')}
-            </button>
-          ) : null}
+              {bmiText}
+            </output>
+          </div>
+          <NumberField
+            testId="case-vitals-temp"
+            label={t('case.form.vitals.temp')}
+            value={temp}
+            onChange={setTemp}
+          />
+          <NumberField
+            testId="case-vitals-spo2"
+            label={t('case.form.vitals.spo2')}
+            value={spo2}
+            onChange={setSpo2}
+          />
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
-            data-testid={`case-form-collapse-${section.key}`}
-            aria-label={t('case.form.collapse')}
-            onClick={onCollapse}
-            className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+            data-testid="case-form-record-vitals-cancel"
+            onClick={onCancel}
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
           >
-            <Minus className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('case.form.vitals.cancel')}
+          </button>
+          <button
+            type="button"
+            data-testid="case-form-record-vitals-confirm"
+            onClick={record}
+            className="rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-700"
+          >
+            {t('case.form.vitals.record')}
           </button>
         </div>
       </div>
-
-      <div className="p-3">
-        {section.repeatable ? (
-          <ComplaintRepeater
-            blocks={data.chief_complaints}
-            errors={complaintErrors}
-            onField={onComplaintField}
-            onBlur={onComplaintBlur}
-            onRemove={onRemoveComplaint}
-          />
-        ) : section.key === 'examination' ? (
-          <VitalsFields section={section} vitals={vitals} onVital={onVital} />
-        ) : section.key === 'investigations' ? (
-          <>
-            <GenericFields
-              section={section}
-              answers={sectionAnswers(data, section.key)}
-              onField={onSectionField}
-              onBlur={onSectionBlur}
-            />
-            <InvestigationsPanel visitId={visitId} />
-          </>
-        ) : (
-          <GenericFields
-            section={section}
-            answers={sectionAnswers(data, section.key)}
-            onField={onSectionField}
-            onBlur={onSectionBlur}
-          />
-        )}
-      </div>
     </div>
   );
 }
 
-/** Repeatable chief-complaint blocks (CASE-001). */
-function ComplaintRepeater({
-  blocks,
-  errors,
-  onField,
-  onBlur,
-  onRemove,
+/** A labelled numeric input used inside the vitals popup. */
+function NumberField({
+  testId,
+  label,
+  value,
+  onChange,
 }: {
-  readonly blocks: ComplaintBlock[];
-  readonly errors: Record<number, boolean>;
-  readonly onField: (index: number, fieldKey: string, value: string) => void;
-  readonly onBlur: (index: number) => void;
-  readonly onRemove: (index: number) => void;
+  readonly testId: string;
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
 }): JSX.Element {
   return (
-    <div className="flex flex-col gap-3">
-      {blocks.map((block, index) => {
-        const n = index + 1;
-        const blockTitle = `${t('case.form.complaintTitle')} ${n}`;
-        return (
-          <fieldset key={index} className="rounded border border-slate-200 p-3">
-            <legend className="flex items-center gap-2 px-1 text-xs font-semibold text-slate-600">
-              {blockTitle}
-              {blocks.length > 1 ? (
-                <button
-                  type="button"
-                  data-testid={`case-form-remove-complaint-${n}`}
-                  onClick={() => onRemove(index)}
-                  className="rounded border border-slate-300 px-1.5 py-0.5 text-[0.7rem] text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  {t('case.form.removeComplaint')}
-                </button>
-              ) : null}
-            </legend>
-
-            {/* Primary required field: the chief-complaint description, which
-                in the chronic_detailed template is the `sensation` field
-                (S08 folds "Complaint text"/"Sensation" onto this one line;
-                CASE-001). The label wraps the input so its testid scopes the
-                value for restore assertions (`case-form-complaint-<n>`), and
-                the textarea itself carries the spec `case-form-sensation-<n>`
-                id so the distinct S08 sensation target resolves (R-UI-003). */}
-            <label
-              data-testid={`case-form-complaint-${n}`}
-              className="flex flex-col gap-1"
-            >
-              <span className="text-xs font-medium text-slate-600">
-                {t('case.form.complaint.label')}
-                {t('setup.requiredMark')}
-              </span>
-              <textarea
-                data-testid={`case-form-sensation-${n}`}
-                value={block.sensation ?? ''}
-                rows={2}
-                onChange={(e) => onField(index, 'sensation', e.target.value)}
-                onBlur={() => onBlur(index)}
-                className="input"
-                aria-label={t('case.form.complaint.label')}
-              />
-            </label>
-            {errors[index] ? (
-              <span
-                role="alert"
-                data-testid={`case-form-complaint-${n}-error`}
-                className="mt-1 block text-xs text-red-700"
-              >
-                {t('case.form.complaint.required')}
-              </span>
-            ) : null}
-
-            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
-              {COMPLAINT_FIELD_KEYS.map((key) => {
-                const label = t(COMPLAINT_FIELD_LABEL_KEYS[key]);
-                const testIdKey = COMPLAINT_FIELD_TESTID_SUFFIX[key] ?? key;
-                return (
-                  <label key={key} className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-slate-600">
-                      {label}
-                    </span>
-                    <input
-                      data-testid={`case-form-${testIdKey}-${n}`}
-                      value={block[key] ?? ''}
-                      onChange={(e) => onField(index, key, e.target.value)}
-                      onBlur={() => onBlur(index)}
-                      className="input"
-                      aria-label={label}
-                    />
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-        );
-      })}
-    </div>
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-slate-600">{label}</span>
+      <input
+        data-testid={testId}
+        type="number"
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={label}
+        className="input"
+      />
+    </label>
   );
 }
 
-/**
- * The non-primary chief-complaint field keys (CASE-001), in render order, and
- * their en.json label keys. Labels come from the strings file (R-UI-007); the
- * map value type is `StringKey` so each key is checked at compile time.
- */
-const COMPLAINT_FIELD_KEYS = [
-  'location',
-  'agg',
-  'amel',
-  'concomitants',
-  'duration',
-  'onset',
-] as const;
-
-const COMPLAINT_FIELD_LABEL_KEYS: Readonly<
-  Record<(typeof COMPLAINT_FIELD_KEYS)[number], StringKey>
-> = {
-  location: 'case.form.complaint.location',
-  agg: 'case.form.complaint.agg',
-  amel: 'case.form.complaint.amel',
-  concomitants: 'case.form.complaint.concomitants',
-  duration: 'case.form.complaint.duration',
-  onset: 'case.form.complaint.onset',
-};
-
-/**
- * The S08 testid suffix for each complaint field. The autosave DATA key stays
- * as the schema key (e.g. `concomitants`) so the persisted JSON contract is
- * unchanged, but the spec names the control `case-form-concomitant-<n>`
- * (singular). Keys not listed here fall back to their own field key, so only
- * the divergent ids need an entry (R-UI-003).
- */
-const COMPLAINT_FIELD_TESTID_SUFFIX: Readonly<
-  Partial<Record<(typeof COMPLAINT_FIELD_KEYS)[number], string>>
-> = {
-  concomitants: 'concomitant',
-};
-
-/** Examination/vitals fields with live BMI (CASE-001/062). */
-function VitalsFields({
-  section,
-  vitals,
-  onVital,
-}: {
-  readonly section: SchemaSection;
-  readonly vitals: Vitals;
-  readonly onVital: (fieldKey: string, value: string) => void;
-}): JSX.Element {
-  const bmi = liveBmi(vitals[VITALS_WEIGHT], vitals[VITALS_HEIGHT]);
-  return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-2 md:grid-cols-4">
-      {section.fields.map((field) => {
-        if (field.key === 'bmi') {
-          // BMI is computed, not editable (CASE-001). Rendered as read-only
-          // text (carrying a `readonly` attribute) rather than an input so the
-          // doctor cannot override it.
-          return (
-            <div key={field.key} className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-600">
-                {t('case.form.bmi.label')}
-              </span>
-              <output
-                data-testid="case-form-bmi"
-                ref={(el) => el?.setAttribute('readonly', '')}
-                aria-label={t('case.form.bmi.label')}
-                aria-readonly="true"
-                className="input bg-slate-50"
-              >
-                {bmi === null ? '' : String(bmi)}
-              </output>
-            </div>
-          );
-        }
-        const vKey = vitalsKeyFor(field.key);
-        const current = vitals[vKey];
-        return (
-          <label key={field.key} className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">
-              {field.label}
-            </span>
-            <input
-              data-testid={`case-form-vital-${field.key}`}
-              type={field.type === 'number' ? 'number' : 'text'}
-              inputMode="numeric"
-              value={current === undefined ? '' : String(current)}
-              onChange={(e) => onVital(field.key, e.target.value)}
-              className="input"
-              aria-label={field.label}
-            />
-          </label>
-        );
-      })}
-    </div>
-  );
+/** Parse a numeric string, or undefined when empty/invalid. */
+function numOrUndef(value: string): number | undefined {
+  if (value.trim() === '') return undefined;
+  const n = Number(value);
+  return Number.isNaN(n) ? undefined : n;
 }
 
-/** A section's fields rendered generically from the schema (CASE-004/003). */
-function GenericFields({
-  section,
-  answers,
-  onField,
-  onBlur,
+/** Restore the structured camelCase vitals copy from the opened `vitals_json`. */
+function restoreVitals(vitalsJson: string): Record<string, number> {
+  try {
+    const raw = JSON.parse(vitalsJson) as Record<string, unknown>;
+    if (raw !== null && typeof raw === 'object') {
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(raw)) {
+        if (typeof v === 'number') out[k] = v;
+      }
+      return out;
+    }
+  } catch {
+    /* a fresh or malformed visit starts with empty structured vitals */
+  }
+  return {};
+}
+
+/** The structured side-section rail (family, investigations, generals, dx). */
+function SideSectionRail({
+  doc,
+  visitId,
+  openSection,
+  onToggleSection,
+  onSectionField,
+  onBlurFlush,
 }: {
-  readonly section: SchemaSection;
-  readonly answers: ComplaintBlock;
-  readonly onField: (
-    sectionKey: string,
+  readonly doc: JournalDoc;
+  readonly visitId: string;
+  readonly openSection: string | null;
+  readonly onToggleSection: (key: string) => void;
+  readonly onSectionField: (
+    sectionKey: EditableSectionKey,
     fieldKey: string,
     value: string,
   ) => void;
-  readonly onBlur: () => void;
+  readonly onBlurFlush: () => void;
 }): JSX.Element {
-  // Physical-generals pick lists use the `generals` testid prefix. The
-  // single-field diagnosis/analysis sections carry their own spec testids
-  // (`case-form-diagnosis`, `case-form-analysis`, R-UI-003) rather than the
-  // generic `case-form-field-<key>`. Every other section uses `field`.
-  const SECTION_FIELD_TESTID: Readonly<Record<string, string>> = {
-    provisional_diagnosis: 'case-form-diagnosis',
-    analysis: 'case-form-analysis',
-  };
-  const prefix = section.key === 'physical_generals' ? 'generals' : 'field';
-  const sectionTestId = SECTION_FIELD_TESTID[section.key];
+  const SECTIONS: ReadonlyArray<{ key: EditableSectionKey; title: string }> = [
+    { key: 'physical_generals', title: t('case.form.generals.title') },
+    { key: 'family_history', title: t('case.form.family.title') },
+    { key: 'investigations', title: t('case.form.investigations.title') },
+    {
+      key: 'provisional_diagnosis',
+      title: t('case.form.diagnosis.label'),
+    },
+  ];
   return (
-    <div className="grid grid-cols-1 gap-y-2 md:grid-cols-2 md:gap-x-4">
-      {section.fields.map((field) => {
-        const testId = sectionTestId ?? `case-form-${prefix}-${field.key}`;
-        const value = answers[field.key] ?? '';
-        const common = {
-          'data-testid': testId,
-          value,
-          onBlur,
-          className: 'input',
-          'aria-label': field.label,
-        } as const;
+    <div className="mt-2 flex flex-col gap-1 border-t border-slate-200 pt-2">
+      <h2 className="px-1 text-xs font-semibold uppercase text-slate-500">
+        {t('case.form.sections.title')}
+      </h2>
+      {SECTIONS.map((s) => {
+        const isOpen = openSection === s.key;
         return (
-          <label key={field.key} className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">
-              {field.label}
-            </span>
-            {renderField(field, common, (v) =>
-              onField(section.key, field.key, v),
-            )}
-          </label>
+          <div key={s.key} className="flex flex-col">
+            <button
+              type="button"
+              data-testid={`case-form-section-${s.key}`}
+              aria-expanded={isOpen}
+              onClick={() => onToggleSection(s.key)}
+              className={[
+                'rounded px-2 py-1 text-left hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600',
+                isOpen ? 'bg-blue-50 font-medium' : '',
+              ].join(' ')}
+            >
+              {s.title}
+            </button>
+            {isOpen ? (
+              <div className="p-2">
+                <SideSectionBody
+                  sectionKey={s.key}
+                  doc={doc}
+                  visitId={visitId}
+                  onSectionField={onSectionField}
+                  onBlurFlush={onBlurFlush}
+                />
+              </div>
+            ) : null}
+          </div>
         );
       })}
     </div>
   );
 }
 
-/** Props shared by every generic field control. */
-interface FieldControlProps {
-  readonly 'data-testid': string;
-  readonly value: string;
-  readonly onBlur: () => void;
-  readonly className: string;
-  readonly 'aria-label': string;
+/** Render the body of one expanded side section. */
+function SideSectionBody({
+  sectionKey,
+  doc,
+  visitId,
+  onSectionField,
+  onBlurFlush,
+}: {
+  readonly sectionKey: EditableSectionKey;
+  readonly doc: JournalDoc;
+  readonly visitId: string;
+  readonly onSectionField: (
+    sectionKey: EditableSectionKey,
+    fieldKey: string,
+    value: string,
+  ) => void;
+  readonly onBlurFlush: () => void;
+}): JSX.Element {
+  if (sectionKey === 'family_history') {
+    return (
+      <FamilyHistoryTabs
+        maternal={sectionFieldValue(doc.sections, 'family_history', 'maternal')}
+        paternal={sectionFieldValue(doc.sections, 'family_history', 'paternal')}
+        onChange={(field, value) =>
+          onSectionField('family_history', field, value)
+        }
+        onBlurFlush={onBlurFlush}
+      />
+    );
+  }
+  if (sectionKey === 'investigations') {
+    return (
+      <InvestigationsTabs
+        suggested={sectionFieldValue(
+          doc.sections,
+          'investigations',
+          'suggested',
+        )}
+        visitId={visitId}
+        onChange={(field, value) =>
+          onSectionField('investigations', field, value)
+        }
+        onBlurFlush={onBlurFlush}
+      />
+    );
+  }
+  if (sectionKey === 'provisional_diagnosis') {
+    return (
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-slate-600">
+          {t('case.form.diagnosis.label')}
+        </span>
+        <textarea
+          data-testid="case-form-diagnosis"
+          rows={3}
+          value={sectionFieldValue(doc.sections, 'provisional_diagnosis', 'dx')}
+          onChange={(e) =>
+            onSectionField('provisional_diagnosis', 'dx', e.target.value)
+          }
+          onBlur={onBlurFlush}
+          aria-label={t('case.form.diagnosis.label')}
+          className="input"
+        />
+      </label>
+    );
+  }
+  // physical_generals and any other simple key -> a Notes field.
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-slate-600">
+        {t('case.form.generals.title')}
+      </span>
+      <textarea
+        data-testid="case-form-generals-notes"
+        rows={3}
+        value={sectionFieldValue(doc.sections, 'physical_generals', 'notes')}
+        onChange={(e) =>
+          onSectionField('physical_generals', 'notes', e.target.value)
+        }
+        onBlur={onBlurFlush}
+        aria-label={t('case.form.generals.title')}
+        className="input"
+      />
+    </label>
+  );
 }
 
-/** Render one field by its schema type (pick lists always accept free text). */
-function renderField(
-  field: SchemaField,
-  common: FieldControlProps,
-  onChange: (value: string) => void,
-): JSX.Element {
-  if (field.type === 'long-text') {
-    return (
-      <textarea
-        {...common}
-        rows={3}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  }
-  if (field.type === 'single-choice' || field.type === 'multi-choice') {
-    // A pick list offers common values via a datalist but always accepts free
-    // text (CASE-003): it is a plain text input, so a value outside the list is
-    // kept verbatim.
-    const listId = `${common['data-testid']}-options`;
-    return (
-      <>
-        <input
-          {...common}
-          list={field.allowFreeText === false ? undefined : listId}
-          onChange={(e) => onChange(e.target.value)}
+/** Family history: Maternal / Paternal tabs holding independent data. */
+function FamilyHistoryTabs({
+  maternal,
+  paternal,
+  onChange,
+  onBlurFlush,
+}: {
+  readonly maternal: string;
+  readonly paternal: string;
+  readonly onChange: (field: 'maternal' | 'paternal', value: string) => void;
+  readonly onBlurFlush: () => void;
+}): JSX.Element {
+  const [tab, setTab] = useState<'maternal' | 'paternal'>('maternal');
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        role="tablist"
+        aria-label={t('case.form.family.title')}
+        className="flex gap-1"
+      >
+        <button
+          type="button"
+          role="tab"
+          data-testid="case-form-family-maternal-tab"
+          aria-selected={tab === 'maternal'}
+          onClick={() => setTab('maternal')}
+          className={tabClass(tab === 'maternal')}
+        >
+          {t('case.form.family.maternal')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          data-testid="case-form-family-paternal-tab"
+          aria-selected={tab === 'paternal'}
+          onClick={() => setTab('paternal')}
+          className={tabClass(tab === 'paternal')}
+        >
+          {t('case.form.family.paternal')}
+        </button>
+      </div>
+      {tab === 'maternal' ? (
+        <textarea
+          data-testid="case-form-family-maternal"
+          rows={4}
+          value={maternal}
+          onChange={(e) => onChange('maternal', e.target.value)}
+          onBlur={onBlurFlush}
+          aria-label={t('case.form.family.maternal')}
+          className="input"
         />
-        <datalist id={listId}>
-          {(field.options ?? []).map((opt) => (
-            <option key={opt} value={opt} />
-          ))}
-        </datalist>
-      </>
-    );
-  }
-  if (field.type === 'number' || field.type === 'scale0-10') {
-    return (
-      <input
-        {...common}
-        type="number"
-        inputMode="numeric"
-        {...(field.type === 'scale0-10' ? { min: 0, max: 10 } : {})}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  }
-  if (field.type === 'date') {
-    return (
-      <input
-        {...common}
-        type="date"
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  }
-  return <input {...common} onChange={(e) => onChange(e.target.value)} />;
+      ) : (
+        <textarea
+          data-testid="case-form-family-paternal"
+          rows={4}
+          value={paternal}
+          onChange={(e) => onChange('paternal', e.target.value)}
+          onBlur={onBlurFlush}
+          aria-label={t('case.form.family.paternal')}
+          className="input"
+        />
+      )}
+    </div>
+  );
+}
+
+/** Investigations: Suggested text tab + Submitted (PAT-009 uploader) tab. */
+function InvestigationsTabs({
+  suggested,
+  visitId,
+  onChange,
+  onBlurFlush,
+}: {
+  readonly suggested: string;
+  readonly visitId: string;
+  readonly onChange: (field: 'suggested', value: string) => void;
+  readonly onBlurFlush: () => void;
+}): JSX.Element {
+  const [tab, setTab] = useState<'suggested' | 'submitted'>('suggested');
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        role="tablist"
+        aria-label={t('case.form.investigations.title')}
+        className="flex gap-1"
+      >
+        <button
+          type="button"
+          role="tab"
+          data-testid="case-form-invest-suggested-tab"
+          aria-selected={tab === 'suggested'}
+          onClick={() => setTab('suggested')}
+          className={tabClass(tab === 'suggested')}
+        >
+          {t('case.form.invest.suggested')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          data-testid="case-form-invest-submitted-tab"
+          aria-selected={tab === 'submitted'}
+          onClick={() => setTab('submitted')}
+          className={tabClass(tab === 'submitted')}
+        >
+          {t('case.form.invest.submitted')}
+        </button>
+      </div>
+      {tab === 'suggested' ? (
+        <textarea
+          data-testid="case-form-invest-suggested"
+          rows={4}
+          value={suggested}
+          onChange={(e) => onChange('suggested', e.target.value)}
+          onBlur={onBlurFlush}
+          aria-label={t('case.form.invest.suggested')}
+          className="input"
+        />
+      ) : (
+        <InvestigationsPanel visitId={visitId} />
+      )}
+    </div>
+  );
+}
+
+/** Shared tab button styling. */
+function tabClass(active: boolean): string {
+  return [
+    'rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600',
+    active ? 'bg-blue-600 text-white' : 'border border-slate-300',
+  ].join(' ');
 }
 
 /**
  * Whether a mime is an image (drives the type badge + thumbnail preview).
- * Everything else the backend accepts is a PDF.
  */
 function isImageMime(mime: string): boolean {
   return mime.startsWith('image/');
@@ -1210,17 +1636,12 @@ function attachmentErrorMessage(err: unknown): string {
 }
 
 /**
- * Investigations lab-report attachments (PAT-009). Lets the doctor attach the
- * PDFs / ultrasound / CT / lab images a patient brings, list them with a type
- * badge + caption, open one for in-app preview and remove one behind a
- * confirm.
- *
- * Calls ONLY the generated typed bindings (UI → typed commands only): the OS
- * file picker returns a path via `visit_pick_report_file` which is handed to
- * `visit_attach_report` — the UI never constructs a filesystem path
- * (architecture rule). The encrypted store + validation live in the backend;
- * this component owns only presentation and the typed calls. No patient data,
- * path or stack trace is surfaced (R-PRIV-001, R-UI-008).
+ * Investigations lab-report attachments (PAT-009), hosted under the Submitted
+ * tab. Lets the doctor attach PDFs / images, list them, open one for in-app
+ * preview and remove one behind a confirm. Calls ONLY the generated typed
+ * bindings; the UI never constructs a filesystem path (the OS picker returns a
+ * path via `visit_pick_report_file`). No patient data, path or stack trace is
+ * surfaced (R-PRIV-001, R-UI-008).
  */
 function InvestigationsPanel({
   visitId,
@@ -1245,7 +1666,6 @@ function InvestigationsPanel({
     setLoaded(true);
   }, [visitId]);
 
-  // Load this visit's attachments on mount (and when the visit changes).
   useEffect(() => {
     let cancelled = false;
     void (async (): Promise<void> => {
@@ -1271,9 +1691,8 @@ function InvestigationsPanel({
     setError(null);
     setBusy(true);
     try {
-      // Ask the OS picker for a path — the UI never builds one itself.
       const picked = await run(commands.visitPickReportFile());
-      if (picked.sourcePath === null) return; // cancelled
+      if (picked.sourcePath === null) return;
       await run(
         commands.visitAttachReport({
           visitId,
@@ -1294,8 +1713,6 @@ function InvestigationsPanel({
     setError(null);
     try {
       const res = await run(commands.visitOpenAttachment({ attachmentId }));
-      // In-app preview from a data: URL (CSP allows img-src data:). No
-      // plaintext temp file is written to disk (ADR-0017).
       const url = `data:${res.mime};base64,${res.dataBase64}`;
       setPreview({
         url,
@@ -1321,7 +1738,7 @@ function InvestigationsPanel({
   }, [confirmId, reload]);
 
   return (
-    <div className="mt-3 flex flex-col gap-3">
+    <div className="mt-1 flex flex-col gap-3">
       <div>
         <h3 className="text-xs font-semibold uppercase text-slate-500">
           {t('case.form.investigations.title')}
@@ -1331,7 +1748,6 @@ function InvestigationsPanel({
         </p>
       </div>
 
-      {/* Upload control: optional caption + the upload action. */}
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-slate-600">
@@ -1508,10 +1924,6 @@ function InvestigationsPanel({
                   className="mx-auto max-h-[70vh] max-w-full"
                 />
               ) : (
-                // CSP sets object-src 'none', so a PDF cannot be embedded; the
-                // doctor saves/opens it through the OS via a download anchor of
-                // the decrypted data URL (no plaintext temp file is written by
-                // the app, ADR-0017).
                 <a
                   data-testid="case-form-investigations-preview-download"
                   href={preview.url}
@@ -1525,122 +1937,6 @@ function InvestigationsPanel({
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-/** The per-doctor hide/show sections dialog (CASE-002). */
-function HideSectionsDialog({
-  sections,
-  hidden,
-  onToggle,
-  onClose,
-}: {
-  readonly sections: readonly SchemaSection[];
-  readonly hidden: Record<string, boolean>;
-  readonly onToggle: (key: string) => void;
-  readonly onClose: () => void;
-}): JSX.Element {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('case.form.hideSections.title')}
-      data-testid="case-form-hide-dialog"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
-      }}
-    >
-      <div className="w-[28rem] rounded border border-slate-300 bg-white p-4 shadow-lg">
-        <h2 className="mb-1 text-sm font-semibold">
-          {t('case.form.hideSections.title')}
-        </h2>
-        <p className="mb-3 text-xs text-slate-600">
-          {t('case.form.hideSections.hint')}
-        </p>
-        <ul className="max-h-80 overflow-auto">
-          {sections.map((s) => {
-            const isHidden = hidden[s.key] ?? false;
-            return (
-              <li
-                key={s.key}
-                className="flex items-center justify-between py-1"
-              >
-                <span>{s.title}</span>
-                <button
-                  type="button"
-                  data-testid={`case-form-hide-toggle-${s.key}`}
-                  role="switch"
-                  aria-checked={!isHidden}
-                  onClick={() => onToggle(s.key)}
-                  className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  {isHidden
-                    ? t('case.form.hideSections.hiddenLabel')
-                    : t('case.form.hideSections.shownLabel')}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="mt-3 flex justify-end">
-          <button
-            type="button"
-            data-testid="case-form-hide-close"
-            onClick={onClose}
-            className="rounded bg-blue-600 px-3 py-1.5 font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-700"
-          >
-            {t('case.form.hideSections.close')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Read-only, printable case summary view (CASE-009). */
-function SummaryView({
-  html,
-  onClose,
-}: {
-  readonly html: string;
-  readonly onClose: () => void;
-}): JSX.Element {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('case.form.summary.title')}
-      data-testid="case-form-summary-dialog"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
-      }}
-    >
-      <div className="flex max-h-[80vh] w-[48rem] flex-col rounded border border-slate-300 bg-white shadow-lg">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
-          <h2 className="text-sm font-semibold">
-            {t('case.form.summary.title')}
-          </h2>
-          <button
-            type="button"
-            data-testid="case-form-summary-close"
-            onClick={onClose}
-            className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-          >
-            {t('case.form.summary.close')}
-          </button>
-        </div>
-        {/* Read-only rendered HTML (CASE-009). The summary is produced by the
-            trusted backend `case_summary_render` command; no editable control
-            is rendered inside it. */}
-        <div
-          data-testid="case-form-summary-view"
-          className="overflow-auto p-4"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </div>
     </div>
   );
 }

@@ -115,10 +115,11 @@ describe('R3 UX3 Investigations PHASE A: upload a PDF report via the seam, list 
     // eslint-disable-next-line no-console
     console.log(`[inv] Take case -> /patient/${patientId}/case/${visitId}`);
 
-    await casePage.expandSection(
-      'investigations',
-      'case-form-investigations-upload',
-    );
+    // The uploader (caption + Upload + list) lives under the Investigations
+    // section's SUBMITTED tab, so expand the rail section then switch to the
+    // Submitted tab before touching the empty-state / uploader (T1 fix).
+    await casePage.expandSection('investigations');
+    await investigationsPage.openSubmittedTab();
     await investigationsPage.waitForEmpty();
     expect(await investigationsPage.itemCount()).toBe(0);
     // eslint-disable-next-line no-console
@@ -163,10 +164,8 @@ describe('R3 UX3 Investigations PHASE B: relaunch SAME dir, PDF persisted, uploa
 
     // Reopen the EXACT same visit and prove the PHASE A PDF persisted.
     await casePage.openVisit(patientId, visitId);
-    await casePage.expandSection(
-      'investigations',
-      'case-form-investigations-list',
-    );
+    await casePage.expandSection('investigations');
+    await investigationsPage.openSubmittedTab();
     await browser.waitUntil(
       async () => (await investigationsPage.itemCount()) === 1,
       { timeout: 20000, timeoutMsg: 'PHASE A PDF not persisted across relaunch' },

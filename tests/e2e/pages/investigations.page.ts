@@ -18,6 +18,30 @@ function byTestId(id: string): ChainablePromiseElement {
 }
 
 export class InvestigationsPage {
+  // ---- Suggested / Submitted tabs ----------------------------------------
+  // The Investigations section has two tabs: "Suggested" (free text) and
+  // "Submitted" — the PAT-009 uploader (caption + Upload + the list) lives
+  // under the SUBMITTED tab, so a caller must switch to it after expanding the
+  // section and before touching the upload controls.
+  get suggestedTab(): ChainablePromiseElement {
+    return byTestId("case-form-invest-suggested-tab");
+  }
+
+  get submittedTab(): ChainablePromiseElement {
+    return byTestId("case-form-invest-submitted-tab");
+  }
+
+  /**
+   * Switch to the Submitted tab and wait until the uploader's caption input is
+   * in the DOM. The caller must already have expanded the investigations rail
+   * section (CasePage.expandSection('investigations')).
+   */
+  async openSubmittedTab(timeout = 15000): Promise<void> {
+    await this.submittedTab.waitForClickable({ timeout });
+    await this.submittedTab.click();
+    await this.caption.waitForDisplayed({ timeout });
+  }
+
   // ---- upload control ----------------------------------------------------
   get caption(): ChainablePromiseElement {
     return byTestId("case-form-investigations-caption");

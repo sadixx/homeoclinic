@@ -69,6 +69,14 @@ export class TodayPage {
     });
   }
 
+  /** Wait until at least one registered-today row is present. */
+  async waitForRegistered(timeout = 20000): Promise<void> {
+    await browser.waitUntil(async () => (await this.registeredRows.length) > 0, {
+      timeout,
+      timeoutMsg: 'no today-registered-row appeared within timeout',
+    });
+  }
+
   /** The visible text of every due-today row. */
   async dueTexts(): Promise<string[]> {
     const out: string[] = [];
@@ -95,6 +103,20 @@ export class TodayPage {
   /** True when some overdue row's text contains `name`. */
   async overdueContains(name: string): Promise<boolean> {
     return (await this.overdueTexts()).some((t) => t.includes(name));
+  }
+
+  /** The visible text of every registered-today row. */
+  async registeredTexts(): Promise<string[]> {
+    const out: string[] = [];
+    for await (const r of this.registeredRows) {
+      out.push((await r.getText()).trim());
+    }
+    return out;
+  }
+
+  /** True when some registered-today row's text contains `name`. */
+  async registeredContains(name: string): Promise<boolean> {
+    return (await this.registeredTexts()).some((t) => t.includes(name));
   }
 }
 

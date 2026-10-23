@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-22T10:02:19.172Z",
+  "generatedAt": "2026-10-23T08:51:24.609Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -52,22 +52,6 @@
       ]
     },
     {
-      "path": "tests/e2e/specs/case/case-form.e2e.ts",
-      "reqs": [
-        "CASE-001",
-        "CASE-003",
-        "CASE-005",
-        "CASE-006",
-        "CASE-009",
-        "VIS-001"
-      ],
-      "tier": "stable",
-      "area": "case",
-      "targets": [
-        "linux"
-      ]
-    },
-    {
       "path": "tests/e2e/specs/case/case-investigations.e2e.ts",
       "reqs": [
         "PAT-009"
@@ -79,12 +63,15 @@
       ]
     },
     {
-      "path": "tests/e2e/specs/case/case-nav-toggle.e2e.ts",
+      "path": "tests/e2e/specs/case/case-journal.e2e.ts",
       "reqs": [
-        "CASE-002",
+        "CASE-001",
+        "CASE-003",
+        "CASE-005",
+        "VIS-001",
         "NFR-030",
-        "SUX-001",
-        "VIS-001"
+        "SET-005",
+        "PAT-009"
       ],
       "tier": "stable",
       "area": "case",

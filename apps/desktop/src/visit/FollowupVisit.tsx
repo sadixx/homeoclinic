@@ -401,8 +401,14 @@ export function FollowupVisit({
         <SaveIndicator status={status} savedHhmm={prevLabel} />
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        {/* Pre-loaded complaints (VIS-002). */}
+      <div
+        data-testid="followup-content"
+        data-adaptive="true"
+        className="min-h-0 flex-1 overflow-auto p-4"
+      >
+        {/* Pre-loaded complaints (VIS-002). Adaptive, full-width region (Slice
+            C4): no narrow centered column, so fullscreen fills the resolution
+            (ADR 0018 §UX shell; S08 S09 delta shares the full-width shell). */}
         <h2 className="mb-2 text-sm font-semibold">
           {t('followup.complaints.title')}
         </h2>
