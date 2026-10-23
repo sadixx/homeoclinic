@@ -921,7 +921,11 @@ fn extract_journal_complaints(v: &Value) -> Vec<PrevComplaint> {
 /// doctor-journal forward (ADR 0018 #2 / S09-delta): every prior complaint box
 /// is kept with its title and its prior dated entries, and a NEW empty dated
 /// entry (today, this follow-up's id) is appended to each so the box pre-opens
-/// with prior content and "Add entry" semantics are preserved.
+/// with prior content and "Add entry" semantics are preserved. The prior
+/// top-level `sections` object (family history, physical generals,
+/// investigations, mental generals, ...) is ALSO carried forward verbatim so a
+/// follow-up never drops the side-section data (B7); it is absent when the
+/// prior had no parseable `sections`.
 ///
 /// The prior document is opaque; this only understands the journal shape. When
 /// the prior visit is a legacy R3 structured document (no `schema ==
@@ -930,11 +934,44 @@ fn extract_journal_complaints(v: &Value) -> Vec<PrevComplaint> {
 /// old case still pre-opens. When there is no prior visit, no prior complaints,
 /// or the prior document is unparseable, the follow-up starts with a single
 /// empty complaint box holding one empty dated entry.
+///
+/// M3-RWv2 reconciliation (v3 `case-rich`, ADR 0019 #10 / serialization-v3
+/// §9b): when the prior document is a v3 `case-rich` document the WHOLE prior
+/// ProseMirror document is copied forward instead of the v2 journal shape —
+/// each prior `complaint` object (id, title, `doc`, `next_section_no`) is kept
+/// verbatim and a NEW dated-entry heading node plus an empty paragraph is
+/// APPENDED to each `doc.content`, carrying the top-level `next_section_no` and
+/// (transitionally) `sections` forward. This fixes the reported follow-up
+/// data-loss: prior prose AND prior numbered sections (INCLUDING family
+/// history) persist because they are part of the copied `doc`. The backend
+/// stays opaque — it only appends to the `doc.content` array and copies objects
+/// wholesale; it inspects/reads/logs no clinical node (R-PRIV-001). The v2 /
+/// legacy branch is retained for in-flight migration (a v2 prior still seeds a
+/// v2 follow-up, which the UI upcasts to v3 on open).
 fn seed_followup_data_json(prev: Option<&VisitRow>, visit_id: &str, today: &str) -> String {
+    // v3 `case-rich` prior -> copy the whole document(s) forward (§9b).
+    if let Some(rich) = prev
+        .and_then(|v| v.data_json.as_deref())
+        .and_then(|raw| seed_followup_case_rich(raw, visit_id, today))
+    {
+        return rich;
+    }
+
     let complaints = prev
         .and_then(|v| v.data_json.as_deref())
         .map(prior_journal_complaints)
         .unwrap_or_default();
+
+    // B7: carry the prior visit's ENTIRE top-level `sections` object forward
+    // verbatim (family history, physical generals, investigations, mental
+    // generals, ...). Previously the seed rebuilt the document with only
+    // `complaints` and dropped `sections`, so every follow-up silently lost the
+    // side-section data. Absent when the prior had no (parseable) `sections`;
+    // the UI's read-time upcast then fills a typed empty object — we never
+    // fabricate one here.
+    let prior_sections = prev
+        .and_then(|v| v.data_json.as_deref())
+        .and_then(prior_journal_sections);
 
     let entries_with_new = |title_id: (String, String), prior_entries: Vec<Value>| -> Value {
         let (id, title) = title_id;
@@ -959,12 +996,123 @@ fn seed_followup_data_json(prev: Option<&VisitRow>, visit_id: &str, today: &str)
             .collect()
     };
 
-    json!({
+    let mut doc = json!({
         "schema": "case-journal",
         "version": 2,
         "complaints": seeded,
-    })
-    .to_string()
+    });
+    if let Some(sections) = prior_sections {
+        // Carry the prior `sections` object forward verbatim. `doc` is built
+        // from a `json!` object literal above, so it is always an object.
+        if let Some(obj) = doc.as_object_mut() {
+            obj.insert("sections".to_string(), sections);
+        }
+    }
+    doc.to_string()
+}
+
+/// Seed a follow-up from a v3 `case-rich` prior document by copying the WHOLE
+/// prior ProseMirror document(s) forward and APPENDING a new dated entry to
+/// each complaint's `doc.content` (ADR 0019 #10 / serialization-v3 §9b).
+///
+/// Returns `Some(serialised_v3)` only when `data_json` parses and is a
+/// `schema == "case-rich"` document with a `complaints` array; `None` for any
+/// other shape (v2 journal, legacy R3, unparseable) so the caller falls back to
+/// the retained v2/legacy seed path.
+///
+/// Opaque-safe: each prior `complaint` object (id, title, `doc`,
+/// `next_section_no`) is copied VERBATIM; the only mutation is pushing a fresh
+/// dated-entry heading node and an empty paragraph onto the opaque
+/// `doc.content` array. No existing clinical node is read, inspected or logged
+/// (R-PRIV-001); the top-level `next_section_no` and (transitionally)
+/// `sections` are carried forward unchanged. The result is one opaque
+/// `data_json` string the caller writes in ONE `UPDATE visit` with ONE audit
+/// row (R-DATA-001 preserved — this only chooses the seed).
+fn seed_followup_case_rich(data_json: &str, visit_id: &str, today: &str) -> Option<String> {
+    let v = serde_json::from_str::<Value>(data_json).ok()?;
+    if v.get("schema").and_then(Value::as_str) != Some("case-rich") {
+        return None;
+    }
+    let complaints = v.get("complaints").and_then(Value::as_array)?;
+
+    // The new dated-entry heading node + an empty paragraph appended to each
+    // complaint's `doc.content`. Built from a literal (no clinical node read).
+    let new_entry_heading = json!({
+        "type": "heading",
+        "attrs": {
+            "level": 2,
+            "hcKind": "entry",
+            "hcDate": today,
+            "hcVisitId": visit_id,
+        },
+        "content": [ { "type": "text", "text": display_date(today) } ],
+    });
+    let empty_paragraph = json!({ "type": "paragraph" });
+
+    let seeded: Vec<Value> = complaints
+        .iter()
+        .map(|complaint| {
+            // Copy the complaint object verbatim, then append to its doc.content.
+            let mut c = complaint.clone();
+            if let Some(content) = c
+                .get_mut("doc")
+                .and_then(|d| d.get_mut("content"))
+                .and_then(Value::as_array_mut)
+            {
+                content.push(new_entry_heading.clone());
+                content.push(empty_paragraph.clone());
+            }
+            c
+        })
+        .collect();
+
+    let mut out = json!({
+        "schema": "case-rich",
+        "version": 3,
+        "complaints": seeded,
+    });
+    let obj = out.as_object_mut()?;
+    // Carry the top-level running counter forward so numbering never resets.
+    if let Some(next_no) = v.get("next_section_no") {
+        obj.insert("next_section_no".to_string(), next_no.clone());
+    }
+    // Carry `sections` forward verbatim if present (transitional; §6).
+    if let Some(sections) = v.get("sections") {
+        obj.insert("sections".to_string(), sections.clone());
+    }
+    Some(out.to_string())
+}
+
+/// Format a `YYYY-MM-DD` calendar date as `DD-MM-YYYY` for an entry heading's
+/// display text (R-UI-006). Falls back to the input when it is not a 10-char
+/// ISO date; no patient data is involved (a date only).
+fn display_date(date: &str) -> String {
+    if date.len() >= 10 && date.as_bytes()[4] == b'-' && date.as_bytes()[7] == b'-' {
+        let (y, rest) = date.split_at(4);
+        let (m, d) = (&rest[1..3], &rest[4..6]);
+        format!("{d}-{m}-{y}")
+    } else {
+        date.to_string()
+    }
+}
+
+/// Read the prior visit's top-level `sections` object verbatim from a v2
+/// case-journal `data_json`, for carrying forward into a seeded follow-up (B7).
+/// Returns `Some(sections)` only when the prior document is a v2 case-journal
+/// whose top-level `sections` is a JSON object; `None` for a legacy/structured
+/// prior, an unparseable document, or an absent/non-object `sections` (the UI
+/// upcast then fills a typed empty object — we never fabricate one here). The
+/// document is opaque; no field is inspected, so no patient data is read or
+/// logged — the object is copied wholesale.
+fn prior_journal_sections(data_json: &str) -> Option<Value> {
+    let v = serde_json::from_str::<Value>(data_json).ok()?;
+    if v.get("schema").and_then(Value::as_str) != Some("case-journal") {
+        return None;
+    }
+    match v.get("sections") {
+        Some(sections @ Value::Object(_)) => Some(sections.clone()),
+        _ => None,
+    }
 }
 
 /// Read the prior visit's journal complaints as `(id, title, prior_entries)`

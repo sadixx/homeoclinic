@@ -48,7 +48,7 @@ import { fileURLToPath } from 'node:url';
 import { browser, expect } from '@wdio/globals';
 
 import { bootPage } from '../../pages/boot.page.js';
-import { casePage } from '../../pages/case.page.js';
+import { caseRichPage } from '../../pages/case-rich.page.js';
 import { investigationsPage } from '../../pages/investigations.page.js';
 import { lockPage } from '../../pages/lock.page.js';
 import { patientsPage } from '../../pages/patients.page.js';
@@ -106,8 +106,8 @@ describe('R3 UX3 Investigations PHASE A: upload a PDF report via the seam, list 
 
     // ---- Take case -> S08 form, open the Investigations section -----------
     await patientsPage.dashTakeCase();
-    await casePage.waitForForm();
-    const ids = await casePage.routeIds();
+    await caseRichPage.waitForForm();
+    const ids = await caseRichPage.routeIds();
     patientId = ids.patientId;
     visitId = ids.visitId;
     expect(patientId.length).toBeGreaterThan(0);
@@ -118,8 +118,6 @@ describe('R3 UX3 Investigations PHASE A: upload a PDF report via the seam, list 
     // The uploader (caption + Upload + list) lives under the Investigations
     // section's SUBMITTED tab, so expand the rail section then switch to the
     // Submitted tab before touching the empty-state / uploader (T1 fix).
-    await casePage.expandSection('investigations');
-    await investigationsPage.openSubmittedTab();
     await investigationsPage.waitForEmpty();
     expect(await investigationsPage.itemCount()).toBe(0);
     // eslint-disable-next-line no-console
@@ -163,9 +161,7 @@ describe('R3 UX3 Investigations PHASE B: relaunch SAME dir, PDF persisted, uploa
     console.log('[inv] relaunched on SAME data dir -> booted to #/lock -> unlocked with PIN');
 
     // Reopen the EXACT same visit and prove the PHASE A PDF persisted.
-    await casePage.openVisit(patientId, visitId);
-    await casePage.expandSection('investigations');
-    await investigationsPage.openSubmittedTab();
+    await caseRichPage.openVisit(patientId, visitId);
     await browser.waitUntil(
       async () => (await investigationsPage.itemCount()) === 1,
       { timeout: 20000, timeoutMsg: 'PHASE A PDF not persisted across relaunch' },

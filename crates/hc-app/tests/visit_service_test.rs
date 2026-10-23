@@ -474,3 +474,270 @@ fn case_template_set_visibility_persists_hidden_section() {
         "showing a section removes it from the hidden map (CASE-002)"
     );
 }
+
+// ---------------------------------------------------------------------------
+// B7 (DATA LOSS): a follow-up MUST carry the prior visit's entire top-level
+// `sections` object forward verbatim (family history, physical generals,
+// investigations, mental generals, ...). The seed previously rebuilt the
+// follow-up `data_json` with ONLY the top-level `complaints` key and dropped
+// `sections`, so on every follow-up the family history and all side-section
+// data vanished. These tests exercise the behaviour through the public
+// `open_or_create` API (the seed runs inside it for a `follow_up`).
+// ---------------------------------------------------------------------------
+
+/// B7: a v2 case-journal prior visit with populated side sections (family
+/// history, physical generals, investigations, mental generals) must have its
+/// ENTIRE `sections` object carried forward verbatim into the seeded follow-up
+/// `data_json`, while each complaint still gains a new empty dated entry.
+#[test]
+fn followup_carries_prior_sections_forward_verbatim() {
+    let (_dir, pool) = temp_db();
+    let patient_id = seed_patient(&pool, "HC-000001", "Test Patient 001");
+
+    // Prior first case, saved "yesterday", with a populated v2 case-journal.
+    let prior_clock = FakeClock {
+        now: "2026-10-20T09:00:00Z".to_string(),
+    };
+    let svc_prior = VisitService::new(&prior_clock);
+    let prev = svc_prior
+        .open_or_create(
+            &pool,
+            OpenOrCreateRequest {
+                patient_id: patient_id.clone(),
+                visit_type: "first".to_string(),
+            },
+        )
+        .unwrap();
+
+    // A v2 case-journal: one titled complaint with one dated entry, PLUS a
+    // populated top-level `sections` object (the data B7 drops).
+    let prior_data = r#"{
+        "schema": "case-journal",
+        "version": 2,
+        "complaints": [
+            {
+                "id": "cc1",
+                "title": "Throbbing headache",
+                "entries": [
+                    {"entry_date": "2026-10-20", "visit_id": "v-prev", "blocks": [{"kind":"text","text":"worse 3pm"}]}
+                ]
+            }
+        ],
+        "sections": {
+            "family_history": {"maternal": "TB in mother", "paternal": "Diabetes in father"},
+            "physical_generals": {"constitution": "lean", "diet": "vegetarian", "sun_aggravation": "yes", "notes": "sweats on head"},
+            "investigations": {"suggested": "CBC", "submitted": "ESR raised"},
+            "mental_generals": {"disposition": "anxious", "fears": "darkness"}
+        }
+    }"#;
+    svc_prior
+        .case_autosave(
+            &pool,
+            CaseAutosaveRequest {
+                visit_id: prev.visit_id.clone(),
+                data_json: prior_data.to_string(),
+                vitals_json: "{}".to_string(),
+            },
+        )
+        .unwrap();
+
+    // The follow-up, "today".
+    let fu_clock = FakeClock {
+        now: "2026-10-21T09:00:00Z".to_string(),
+    };
+    let svc_fu = VisitService::new(&fu_clock);
+    let followup = svc_fu
+        .open_or_create(
+            &pool,
+            OpenOrCreateRequest {
+                patient_id,
+                visit_type: "follow_up".to_string(),
+            },
+        )
+        .expect("open follow-up");
+
+    let seeded: serde_json::Value = serde_json::from_str(&followup.data_json)
+        .expect("seeded follow-up data_json is valid JSON");
+
+    // The entire `sections` object survives, field by field (B7 regression).
+    let sections = seeded.get("sections").unwrap_or_else(|| {
+        panic!(
+            "follow-up dropped the top-level `sections` object (B7): {}",
+            followup.data_json
+        )
+    });
+    assert_eq!(
+        sections
+            .pointer("/family_history/maternal")
+            .and_then(|v| v.as_str()),
+        Some("TB in mother"),
+        "family_history.maternal must survive the follow-up seed (B7)"
+    );
+    assert_eq!(
+        sections
+            .pointer("/family_history/paternal")
+            .and_then(|v| v.as_str()),
+        Some("Diabetes in father"),
+        "family_history.paternal must survive the follow-up seed (B7)"
+    );
+    assert_eq!(
+        sections
+            .pointer("/physical_generals/constitution")
+            .and_then(|v| v.as_str()),
+        Some("lean"),
+        "physical_generals.constitution must survive (B7)"
+    );
+    assert_eq!(
+        sections
+            .pointer("/physical_generals/diet")
+            .and_then(|v| v.as_str()),
+        Some("vegetarian"),
+        "physical_generals.diet must survive (B7)"
+    );
+    assert_eq!(
+        sections
+            .pointer("/physical_generals/sun_aggravation")
+            .and_then(|v| v.as_str()),
+        Some("yes"),
+        "physical_generals.sun_aggravation must survive (B7)"
+    );
+    assert_eq!(
+        sections
+            .pointer("/physical_generals/notes")
+            .and_then(|v| v.as_str()),
+        Some("sweats on head"),
+        "physical_generals.notes must survive (B7)"
+    );
+    assert_eq!(
+        sections
+            .pointer("/investigations/suggested")
+            .and_then(|v| v.as_str()),
+        Some("CBC"),
+        "investigations.suggested must survive (B7)"
+    );
+    assert_eq!(
+        sections
+            .pointer("/investigations/submitted")
+            .and_then(|v| v.as_str()),
+        Some("ESR raised"),
+        "investigations.submitted must survive (B7)"
+    );
+    assert_eq!(
+        sections
+            .pointer("/mental_generals/disposition")
+            .and_then(|v| v.as_str()),
+        Some("anxious"),
+        "mental_generals.disposition must survive (B7)"
+    );
+    assert_eq!(
+        sections
+            .pointer("/mental_generals/fears")
+            .and_then(|v| v.as_str()),
+        Some("darkness"),
+        "mental_generals.fears must survive (B7)"
+    );
+
+    // And the complaint still carries forward with a NEW empty dated entry
+    // appended (today) so the box pre-opens with "Add entry" semantics.
+    let complaints = seeded
+        .get("complaints")
+        .and_then(|v| v.as_array())
+        .expect("seeded follow-up keeps the complaints array");
+    assert_eq!(
+        complaints.len(),
+        1,
+        "the single prior complaint carries forward"
+    );
+    let entries = complaints[0]
+        .get("entries")
+        .and_then(|v| v.as_array())
+        .expect("complaint keeps its entries");
+    assert_eq!(
+        entries.len(),
+        2,
+        "prior entry kept + one new empty dated entry appended"
+    );
+    let new_entry = entries.last().unwrap();
+    assert_eq!(
+        new_entry.get("entry_date").and_then(|v| v.as_str()),
+        Some("2026-10-21"),
+        "the new entry is dated today (the follow-up date)"
+    );
+    assert_eq!(
+        new_entry
+            .get("blocks")
+            .and_then(|v| v.as_array())
+            .map(|a| a.len()),
+        Some(0),
+        "the new dated entry starts empty"
+    );
+}
+
+/// B7: a legacy / absent-`sections` prior visit still yields a valid follow-up
+/// document (no panic, valid JSON, a complaints array present). This guards the
+/// fix against assuming `sections` is always present.
+#[test]
+fn followup_with_absent_sections_prior_still_yields_valid_doc() {
+    let (_dir, pool) = temp_db();
+    let patient_id = seed_patient(&pool, "HC-000001", "Test Patient 001");
+
+    let prior_clock = FakeClock {
+        now: "2026-10-20T09:00:00Z".to_string(),
+    };
+    let svc_prior = VisitService::new(&prior_clock);
+    let prev = svc_prior
+        .open_or_create(
+            &pool,
+            OpenOrCreateRequest {
+                patient_id: patient_id.clone(),
+                visit_type: "first".to_string(),
+            },
+        )
+        .unwrap();
+    // Legacy R3 structured prior: no top-level `sections`, no `schema`.
+    svc_prior
+        .case_autosave(
+            &pool,
+            CaseAutosaveRequest {
+                visit_id: prev.visit_id.clone(),
+                data_json:
+                    r#"{"chief_complaints":[{"key":"cc1","sensation":"Cough","location":"Chest"}]}"#
+                        .to_string(),
+                vitals_json: "{}".to_string(),
+            },
+        )
+        .unwrap();
+
+    let fu_clock = FakeClock {
+        now: "2026-10-21T09:00:00Z".to_string(),
+    };
+    let svc_fu = VisitService::new(&fu_clock);
+    let followup = svc_fu
+        .open_or_create(
+            &pool,
+            OpenOrCreateRequest {
+                patient_id,
+                visit_type: "follow_up".to_string(),
+            },
+        )
+        .expect("open follow-up on legacy prior");
+
+    let seeded: serde_json::Value = serde_json::from_str(&followup.data_json)
+        .expect("legacy-prior follow-up data_json is still valid JSON (no panic)");
+    assert!(
+        seeded
+            .get("complaints")
+            .and_then(|v| v.as_array())
+            .is_some(),
+        "a legacy-prior follow-up still produces a valid journal with complaints"
+    );
+    // When the prior had no `sections`, the seed must not fabricate patient
+    // data; if a `sections` key is present it must be an object (never a
+    // non-object), and absence is acceptable.
+    if let Some(s) = seeded.get("sections") {
+        assert!(
+            s.is_object(),
+            "if `sections` is present it is an object, never fabricated scalar data"
+        );
+    }
+}

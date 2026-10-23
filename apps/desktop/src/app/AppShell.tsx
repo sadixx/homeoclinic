@@ -65,6 +65,13 @@ import { FollowupVisit } from '@/visit/FollowupVisit';
  */
 const DEFAULT_AUTOLOCK_MINUTES = 15;
 
+/**
+ * The `:root` (html) font-size baseline in px (SET-005 / 00-conventions §1,
+ * src/index.css). The zoom scale multiplies this to drive the document-root
+ * font-size so all rem-based text and layout scale together (C8 fix).
+ */
+const ZOOM_ROOT_BASELINE_PX = 14;
+
 /** The launch route chosen by the boot-gate. */
 type BootRoute = '/setup' | '/lock' | '/today';
 
@@ -203,9 +210,27 @@ function ShellFrame({
   const dismissOpenError = useCallback(() => setOpenError(null), []);
 
   // Content zoom (Slice C3): a clamped, persisted scale the shared app-bar and
-  // the Ctrl+= / Ctrl+- / Ctrl+0 shortcuts drive. Applied to the content root
-  // as `--hc-font-scale`; rem-based sizing makes it scale text AND layout.
+  // the Ctrl+= / Ctrl+- / Ctrl+0 shortcuts drive. The scale is driven onto the
+  // DOCUMENT ROOT (`:root` html) font-size below; because every unit of text
+  // and spacing in the app is a rem/px Tailwind utility anchored to the root
+  // font-size (14px baseline, src/index.css), scaling the root scales text AND
+  // layout together. Applying it to a mid-tree div was the C8 no-op bug.
   const zoom = useZoom();
+
+  // C8 fix: apply the zoom scale to the document-root font-size so all
+  // rem-based text and layout scale. The 14px baseline comes from `:root` in
+  // src/index.css; `14 * scale` px keeps rem anchored to the scaled root. On
+  // reset the scale returns to 1.0 (14px); on unmount the inline override is
+  // cleared so the CSS baseline resumes. No network call, no patient data.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.fontSize = `${ZOOM_ROOT_BASELINE_PX * zoom.scale}px`;
+    return () => {
+      // Clear the inline override on unmount so the CSS `:root` baseline (14px)
+      // resumes rather than a stale scaled value lingering on the element.
+      root.style.fontSize = '';
+    };
+  }, [zoom.scale]);
 
   const goToLock = useCallback(() => navigate('/lock'), [navigate]);
   const onNavigate = useCallback(
@@ -468,13 +493,14 @@ function ShellFrame({
           ? '/backup'
           : undefined;
 
-  // The content root carries the zoom: the `--hc-font-scale` var (so rem-based
-  // layout math can read the scale) AND a scaled root font-size (so text and
-  // rem spacing grow together). Typed through CSSProperties — a CSS custom
-  // property is not in the lib DOM type, so the object is cast once here.
+  // The content root carries the zoom VARIABLE only (`--hc-font-scale`), so any
+  // layout math that reads the scale still works. The actual text/layout
+  // scaling is driven onto the DOCUMENT ROOT font-size by the zoom effect above
+  // (C8 fix) — setting font-size on this mid-tree div was a no-op for every
+  // rem-based utility, which was the bug. Typed through CSSProperties: a CSS
+  // custom property is not in the lib DOM type, so the object is cast once here.
   const contentStyle = {
     '--hc-font-scale': String(zoom.scale),
-    fontSize: `calc(0.875rem * ${zoom.scale})`,
   } as CSSProperties;
 
   return (

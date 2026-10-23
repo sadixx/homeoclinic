@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-23T08:51:24.609Z",
+  "generatedAt": "2026-10-23T16:31:19.926Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -63,7 +63,7 @@
       ]
     },
     {
-      "path": "tests/e2e/specs/case/case-journal.e2e.ts",
+      "path": "tests/e2e/specs/case/case-rich-editor.e2e.ts",
       "reqs": [
         "CASE-001",
         "CASE-003",
@@ -181,7 +181,7 @@
       ]
     },
     {
-      "path": "tests/e2e/specs/visit/followup-visit.e2e.ts",
+      "path": "tests/e2e/specs/visit/followup-richtext.e2e.ts",
       "reqs": [
         "VIS-001",
         "VIS-002",
