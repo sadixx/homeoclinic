@@ -272,70 +272,64 @@ From the dashboard you can **Edit** the patient, **Export** their record
 
 From a patient's dashboard, click **Take case** (or **New visit** for a
 patient with no prior visit; shortcut **F5**). This opens the case form
-(screen S08) — the on-screen replacement for the paper case sheet. It is built
-around a **free-writing journal**, so it works the way you write on paper.
+(screen S08) — the on-screen replacement for the paper case sheet. It is one
+**rich text editor per complaint** that works like a word processor: you type
+freely, and structured data drops **into the same document as editable
+tables**, so the entire case lives in one place.
 
-### The complaint box — write freely, insert tables
+### The editor — one document for everything
 
-- Each complaint has **one big editable box**. You type the case into it as
-  free text, exactly as you would write on a sheet.
+- Each complaint is **one rich editable document**. Type the case into it as
+  free text, format as you like, exactly as you would write on a sheet — and
+  everything you record (vitals, family history, prescription, …) is inserted
+  **into this same document** as a table.
 - **Add entry** stamps a **date header** and starts a fresh block beneath it.
-  The box is a **running dated log**: every time you open the case (and on
+  The document is a **running dated log**: every time you open the case (and on
   every follow-up) you add a new dated entry under the previous ones, so the
-  whole history of the complaint stays in one place.
-- **Everything is editable** — all the text, and every cell of every table you
-  insert, can be changed at any time.
+  whole history of the complaint stays together in one scroll.
+- **Everything is editable in place** — all the text, and every cell of every
+  table, can be clicked into and changed at any time (tab between cells like a
+  spreadsheet).
 
-### Inserting tables (vitals, modalities, prescription)
+### Record buttons — insert a section as a table
 
-Buttons at the top of the box drop structured **tables** into your writing:
+A row of **Record** buttons sits above the editor. Each opens a small pop-up;
+when you press **Record**, it inserts that section **into the current dated
+entry** as an editable table, preceded by a **numbered heading** and a
+**full-width separator line** so each section reads as a clear block:
 
-- **Record vitals** opens a small pop-up. Enter **blood pressure as two
-  fields — systolic and diastolic** — plus pulse, weight and height; **BMI is
-  computed live**. Press **Record** and a **vitals table** is inserted into the
-  box. You can edit any cell afterwards.
-- **Record modalities** (aggravations / ameliorations) inserts an editable
-  **modalities table** the same way.
-- **Add prescription** inserts an editable **medicine table** with columns
-  **Medicine, Potency, Dosage, Instructions** — add a new table each time you
-  prescribe. In this release the prescription table is a **preview**: it is
-  saved with the case, but formatted printing arrives with the prescription
+- **Record vitals** — enter **blood pressure as two fields, systolic and
+  diastolic**, plus pulse, weight and height; **BMI is computed live**. Inserts
+  a vitals table.
+- **Record modalities** — aggravations / ameliorations, as a table.
+- **Record family history** — a pop-up with **Maternal** and **Paternal**
+  tabs; on Record it inserts a tidy **two-column table (Maternal | Paternal)**.
+- **Record physical generals** — appetite, thirst, cravings, thermal state,
+  and **Constitution**, **Diet**, **Sun aggravation (Yes/No)** and **Notes**.
+- **Record investigations** — what you have **Suggested** and what the patient
+  has **Submitted**.
+- **Add prescription** — a medicine table with columns **Medicine, Potency,
+  Dosage, Instructions**. In this release the prescription is a **preview**: it
+  is saved with the case, but formatted printing arrives with the prescription
   release (R4).
 
-On a **follow-up** the same buttons read **Update vitals**, **Update
-modalities** and **Update prescription**, and they add a fresh table under a
-new dated entry rather than replacing the earlier one.
-
-### The side sections
-
-Alongside the box are the structured history sections from the template:
-
-- **Physical generals** — appetite, thirst, cravings, aversions, stool, urine,
-  sweat, sleep, dreams, thermal state, and now **Constitution**, **Diet**, a
-  **Sun aggravation (Yes/No)** choice, and a free-text **Notes** field.
-- **Mental generals** and **Past history** — long-text boxes.
-- **Family history** — two tabs, **Maternal** and **Paternal**, kept
-  separately.
-- **Investigations** — two tabs: **Suggested** (what you have advised) and
-  **Submitted** (reports the patient has brought back; this is where you
-  **upload lab / scan reports** — see below).
-- **Menstrual / obstetric** (female patients) and **Child development**
-  (patients under 14) appear only when relevant.
-- Sections are **collapsible**, and clicking a section in the left rail
-  **toggles it** on or off so you only see what you use.
+Each inserted section is **numbered in order**, so the case always reads in a
+fixed chronological sequence. On a **follow-up** the buttons read **Update
+vitals / Update prescription / …** and insert a fresh table under the new
+dated entry rather than overwriting the earlier one.
 
 ### Uploading lab and scan reports
 
-In **Investigations → Submitted**, click **Upload report** to attach a
-**PDF or image** (ultrasound, CT, blood report, etc.). Each report shows a
-**PDF / Image** badge and an optional caption; you can **open** it or **remove**
-it (with confirmation). Reports are stored **encrypted** on your computer and
-never leave it.
+Use the **Investigations** upload control to attach a **PDF or image**
+(ultrasound, CT, blood report, etc.). Each report shows a **PDF / Image** badge
+and an optional caption; you can **open** it or **remove** it (with
+confirmation). Reports are stored **encrypted** on your computer and never
+leave it.
 
 ### Saving — autosave plus a Save button
 
-- The case **autosaves every 2 seconds and whenever you leave a field**; the
-  status shows "Saving..." then **"Saved hh:mm"**.
+- The case **autosaves every 2 seconds and whenever you pause**; the status
+  shows "Saving..." then **"Saved hh:mm"**.
 - There is also an explicit **Save** button. Pressing it forces an immediate
   save and confirms **"Saved"** — for peace of mind that the case is written.
 - If the app closes — or the computer crashes — **mid-typing**, reopening the
@@ -354,15 +348,16 @@ plain "New visit" is greyed out, because the first case is already recorded —
 so you can't start a second first case by mistake). Click **Follow-up** to
 record a return consultation.
 
-A follow-up **opens the very same journal box** as the case, already filled
-with the previous entries:
+A follow-up **reopens the very same document** as the case, already filled
+with the previous entries and everything you recorded:
 
-- The complaint box **pre-loads** with the earlier dated entries and the prior
-  complaint titles, so you have the full history in front of you.
+- The editor **pre-loads** with the earlier dated entries, the prior complaint
+  text, and the tables you recorded before — **including the family history**
+  and every other recorded section, so nothing is lost between visits.
 - Click **Add entry** to stamp **today's date** and write what has changed.
-- The table buttons now read **Update vitals / Update modalities / Update
-  prescription**; each inserts a fresh table under the new dated entry, so you
-  can see the earlier readings and the new ones together.
+- The Record buttons now read **Update vitals / Update family history /
+  Update prescription / …**; each inserts a fresh table under the new dated
+  entry, so you can see the earlier readings and the new ones together.
 - **Next follow-up**: set the next appointment with the quick buttons
   **7d / 15d / 1m / 2m** or a **custom date**. The scheduled date is shown on
   the visit and puts the patient onto the Today screen for that date (section
