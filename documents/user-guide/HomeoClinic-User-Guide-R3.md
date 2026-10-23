@@ -249,13 +249,19 @@ Open **Patients** to see the full list with a filter panel (screen S05).
 Clicking a patient (from search or the list) opens their dashboard (screen
 S07):
 
-- **Demographics banner** — name, code, age/sex, mobile, city, referred by,
-  photo — plus any **allergies / alerts**.
+- **Demographics banner** — name, code, **age**/sex, mobile, city, referred by,
+  photo — plus any **allergies / alerts**. The **age updates itself** over
+  time from the date of birth, so it is always current.
 - **Family** — linked family members with quick-switch.
-- **New visit / Take case** — starts a case or follow-up for this patient
-  (see sections 8 and 9). New in R3.
-- **Visit timeline** builds up as you record visits (R3). Prescriptions and
-  dues appear here from later releases.
+- **Take case / Follow-up** — starts the first case, or (once a first case is
+  saved) a **Follow-up**. After the first case is recorded, the plain
+  "New visit" is greyed out so you don't accidentally start a second first
+  case — use **Follow-up** instead (see sections 8 and 9). New in R3.
+- **Visit timeline** builds up as you record visits (R3).
+
+A **dues** area and a **Clear dues** button appear as **disabled
+placeholders** — automatic fee totals and marking dues paid arrive with the
+billing release (R5).
 
 From the dashboard you can **Edit** the patient, **Export** their record
 (PDF or JSON), or move them to the **recycle bin**.
@@ -265,43 +271,76 @@ From the dashboard you can **Edit** the patient, **Export** their record
 ## 8. Taking a case (R3, new)
 
 From a patient's dashboard, click **Take case** (or **New visit** for a
-patient with no prior visit; shortcut **F5**). This opens the detailed
-first-case form (screen S08) — the on-screen replacement for the paper case
-sheet.
+patient with no prior visit; shortcut **F5**). This opens the case form
+(screen S08) — the on-screen replacement for the paper case sheet. It is built
+around a **free-writing journal**, so it works the way you write on paper.
 
-### How the case form works
+### The complaint box — write freely, insert tables
 
-- The form is **template-driven**. It opens with the default **Chronic
-  detailed** template and shows its sections in order: chief complaints,
-  history of present illness, past/family/personal history, physical and
-  mental generals, examination/vitals, investigations, provisional diagnosis,
-  and the doctor's analysis. (Templates **Acute quick** and **Child** are also
-  available.)
-- **Sections are collapsible, and you can hide the ones you never use** — the
-  choice is remembered as your own template.
-- **Conditional sections** appear only when relevant: the menstrual/obstetric
-  section shows for female patients, and the child-development section for
-  patients under 14.
-- **Chief complaints** are a repeating block — add as many as needed, each with
-  location, sensation, aggravation, amelioration, concomitants, duration and
-  onset.
-- **Pick lists with free text**: fields like thermal state and thirst offer
-  common values but always accept whatever you type.
-- **Vitals** compute **BMI live** from weight and height.
+- Each complaint has **one big editable box**. You type the case into it as
+  free text, exactly as you would write on a sheet.
+- **Add entry** stamps a **date header** and starts a fresh block beneath it.
+  The box is a **running dated log**: every time you open the case (and on
+  every follow-up) you add a new dated entry under the previous ones, so the
+  whole history of the complaint stays in one place.
+- **Everything is editable** — all the text, and every cell of every table you
+  insert, can be changed at any time.
 
-### Autosave — nothing is lost
+### Inserting tables (vitals, modalities, prescription)
 
-- There is **no Save button**. The form **autosaves every 2 seconds and
-  whenever you leave a field**; the status bar shows "Saving..." then
-  **"Saved hh:mm"**.
-- If the app is closed — or the computer crashes — **mid-typing**, reopening
-  the patient's case restores the last autosaved content with **nothing lost**.
+Buttons at the top of the box drop structured **tables** into your writing:
 
-### Case summary
+- **Record vitals** opens a small pop-up. Enter **blood pressure as two
+  fields — systolic and diastolic** — plus pulse, weight and height; **BMI is
+  computed live**. Press **Record** and a **vitals table** is inserted into the
+  box. You can edit any cell afterwards.
+- **Record modalities** (aggravations / ameliorations) inserts an editable
+  **modalities table** the same way.
+- **Add prescription** inserts an editable **medicine table** with columns
+  **Medicine, Potency, Dosage, Instructions** — add a new table each time you
+  prescribe. In this release the prescription table is a **preview**: it is
+  saved with the case, but formatted printing arrives with the prescription
+  release (R4).
 
-- Click **Case summary** (**Ctrl+P**) to open a read-only summary of the case.
-  Printing it to paper/PDF arrives with the prescription print path in a later
-  release.
+On a **follow-up** the same buttons read **Update vitals**, **Update
+modalities** and **Update prescription**, and they add a fresh table under a
+new dated entry rather than replacing the earlier one.
+
+### The side sections
+
+Alongside the box are the structured history sections from the template:
+
+- **Physical generals** — appetite, thirst, cravings, aversions, stool, urine,
+  sweat, sleep, dreams, thermal state, and now **Constitution**, **Diet**, a
+  **Sun aggravation (Yes/No)** choice, and a free-text **Notes** field.
+- **Mental generals** and **Past history** — long-text boxes.
+- **Family history** — two tabs, **Maternal** and **Paternal**, kept
+  separately.
+- **Investigations** — two tabs: **Suggested** (what you have advised) and
+  **Submitted** (reports the patient has brought back; this is where you
+  **upload lab / scan reports** — see below).
+- **Menstrual / obstetric** (female patients) and **Child development**
+  (patients under 14) appear only when relevant.
+- Sections are **collapsible**, and clicking a section in the left rail
+  **toggles it** on or off so you only see what you use.
+
+### Uploading lab and scan reports
+
+In **Investigations → Submitted**, click **Upload report** to attach a
+**PDF or image** (ultrasound, CT, blood report, etc.). Each report shows a
+**PDF / Image** badge and an optional caption; you can **open** it or **remove**
+it (with confirmation). Reports are stored **encrypted** on your computer and
+never leave it.
+
+### Saving — autosave plus a Save button
+
+- The case **autosaves every 2 seconds and whenever you leave a field**; the
+  status shows "Saving..." then **"Saved hh:mm"**.
+- There is also an explicit **Save** button. Pressing it forces an immediate
+  save and confirms **"Saved"** — for peace of mind that the case is written.
+- If the app closes — or the computer crashes — **mid-typing**, reopening the
+  case restores the last saved content (text **and** the inserted tables) with
+  **nothing lost**.
 
 > The **"Send to repertory"** action is not shown yet; it switches on when the
 > repertory ships in a later release.
@@ -310,26 +349,35 @@ sheet.
 
 ## 9. Follow-up visits (R3, new)
 
-For a patient who already has a case, click **New visit** on the dashboard
-(shortcut **F5**) to record a routine return consultation (screen S09). It
-needs far less typing than the first case.
+Once a patient has a saved first case, the dashboard offers **Follow-up** (the
+plain "New visit" is greyed out, because the first case is already recorded —
+so you can't start a second first case by mistake). Click **Follow-up** to
+record a return consultation.
 
-- **Visit type**: First / Follow-up / Acute / Tele.
-- **Complaints pre-load** from the previous visit. For each, set a **status**
-  — Better / Same / Worse / New / Resolved — and an **improvement %** slider
-  (0–100), with an optional note. You can also **add a new complaint**.
-- **Remedy response**: pick one of six Hering's-law-aware options
-  (Amelioration; Aggravation then amelioration; No change; Aggravation; New
-  symptoms; Old symptoms returned).
-- **Observations and vitals** as needed.
-- **Next follow-up**: quick buttons **7d / 15d / 1m / 2m** or a **custom
-  date**. Setting it schedules the patient onto the Today screen for that date
-  (see section 10).
-- Like the case form, the follow-up **autosaves** (2 s + on blur; "Saved"
-  shown in the status bar).
+A follow-up **opens the very same journal box** as the case, already filled
+with the previous entries:
 
-> The **progress chart** and the **Prescribe** action are not active yet; they
-> switch on in later releases.
+- The complaint box **pre-loads** with the earlier dated entries and the prior
+  complaint titles, so you have the full history in front of you.
+- Click **Add entry** to stamp **today's date** and write what has changed.
+- The table buttons now read **Update vitals / Update modalities / Update
+  prescription**; each inserts a fresh table under the new dated entry, so you
+  can see the earlier readings and the new ones together.
+- **Next follow-up**: set the next appointment with the quick buttons
+  **7d / 15d / 1m / 2m** or a **custom date**. The scheduled date is shown on
+  the visit and puts the patient onto the Today screen for that date (section
+  10).
+- Like the case, the follow-up **autosaves** and has an explicit **Save**
+  button.
+
+When you finish and save, the patient's **Today / home screen updates** to
+reflect the follow-up you entered — if you scheduled a next appointment the
+patient appears under **Due today / Overdue** on the right date, and the visit
+shows under **Registered today**.
+
+> The **progress chart** and formatted **Prescribe / print** actions are not
+> active yet; they switch on in later releases (the prescription table you add
+> in the box is saved as a preview in the meantime).
 
 ---
 
@@ -427,11 +475,22 @@ and **all cases and visits** come back.
 | F3 | Today |
 | F4 | New patient |
 | F5 | New visit for the open patient (case or follow-up) |
-| Ctrl+P | Case summary (on the case form) |
+| Alt+← | Back (up one level: case/follow-up → dashboard → list → Today) |
+| Ctrl+= / Ctrl+- | Zoom text and layout in / out |
+| Ctrl+0 | Reset zoom |
 | Ctrl+L | Lock the app now |
 | Up / Down | Move through search results / lists |
 | Enter | Open the selected patient / confirm the current step / unlock |
 | Esc | Close a dialog or the search overlay (never discards data) |
+
+> **Back** is always in the **same place** (top of the screen) on every
+> screen, and **Alt+←** does the same from the keyboard. Going back never
+> discards your work — the case is already autosaved.
+
+> **Zoom** scales both the text and the layout, so you can make the whole app
+> larger on a big consulting-room screen or smaller to fit more in. When the
+> window is **maximised / full-screen, the layout now fills the whole screen**
+> rather than sitting in a narrow centred column.
 
 ---
 
@@ -455,12 +514,13 @@ and **all cases and visits** come back.
 ## Appendix — what is NOT in this release
 
 The following arrive in later milestones and are intentionally absent or
-disabled in R3: prescriptions and printing (including printing the case
-summary), billing and reports, the repertory / Materia Medica and
-"Send to repertory", per-complaint progress charts, buying/importing a real
-licence, custom case-template editing, voice dictation and the body diagram,
-and the appointment book. When those ship, this guide will be extended to
-cover them.
+shown as **disabled placeholders** in R3: formatted prescriptions and printing
+(the prescription table you add to the case is saved as a preview only),
+billing — including the **dues** total and **Clear dues** — and reports, the
+repertory / Materia Medica and "Send to repertory", per-complaint progress
+charts, buying/importing a real licence, custom case-template editing, voice
+dictation and the body diagram, and the appointment book. When those ship,
+this guide will be extended to cover them.
 
 *HomeoClinic User Guide — R3 edition (M0 + M1 + M2 + M3). Generated from
 `documents/user-guide/HomeoClinic-User-Guide-R3.md`.*
