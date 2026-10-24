@@ -34,22 +34,35 @@ import { commands } from '@/bindings';
 import type { AttachmentSummary } from '@/bindings';
 import {
   buildFamilySeed,
+  buildInvestigationLinkRow,
   buildPrescriptionSeed,
   buildVitalsSeed,
   parseCaseDoc,
+  removeComplaint,
+  removeEntry,
+  sanitizeDisplayLabel,
   serializeRich,
+  type ProseMirrorNode,
   type RichTableType,
   type TableSeed,
   type V3Doc,
 } from '@/case/caseRich';
 import {
+  appendInvestigationLink,
+  appendOrCreateModalities,
   caseEditorExtensions,
+  caseStructure,
   currentComplaintName,
+  editorSpine,
   initialContent,
   insertComplaint,
   insertDatedEntry,
   insertSectionNodes,
+  selectionIsOnComplaintHeading,
+  setEditorSpine,
+  unlinkInvestigationRow,
   v3DocFromEditor,
+  type ComplaintStructure,
 } from '@/case/caseRichEditor';
 import { isUserFacingError, run } from '@/shared/command';
 import { formatDate, formatDateTime, todayIsoDate } from '@/shared/datetime';
@@ -152,6 +165,31 @@ export function CaseForm({
   // True once an Rx placeholder table has been inserted; shows the R4 hint.
   const [rxInserted, setRxInserted] = useState(false);
 
+  // C6 (M3-RWv4 §6): the live complaint/entry structure, derived from the
+  // editor doc, so a focusable remove (x) control renders per complaint + per
+  // entry WITHOUT being an editable doc node. Refreshed on load + editor update.
+  const [structure, setStructure] = useState<{
+    complaints: ComplaintStructure[];
+    entries: { complaintId: string; entryIndex: number }[];
+  }>({ complaints: [], entries: [] });
+  // The pending remove confirmation (complaint or entry), or null.
+  const [removeTarget, setRemoveTarget] = useState<
+    | null
+    | { kind: 'complaint'; complaintId: string }
+    | { kind: 'entry'; complaintId: string; entryIndex: number }
+  >(null);
+  // D5: the pending UNLINK confirmation (an attachment id), or null.
+  const [unlinkTarget, setUnlinkTarget] = useState<string | null>(null);
+  // D5: the investigation link rows in the live doc (attachmentId + label), so
+  // a focusable UNLINK control renders per link row.
+  const [linkRows, setLinkRows] = useState<
+    { attachmentId: string; label: string }[]
+  >([]);
+  // DEFECT 1 (M3-RWv4 build-12): is the caret on a complaint heading? When true
+  // the bullet/ordered toolbar buttons are disabled (and the toggles no-op) so a
+  // complaint heading can NEVER be wrapped into a list item and lost.
+  const [listGuarded, setListGuarded] = useState(false);
+
   // The per-complaint section counter (R3: one complaint, "cc1"). Held in a ref
   // so an insert reads the latest value synchronously between renders.
   const nextSectionNoRef = useRef(1);
@@ -217,6 +255,16 @@ export function CaseForm({
     }, AUTOSAVE_DEBOUNCE_MS);
   }, [flushSave]);
 
+  // C6: recompute the complaint/entry structure from the live editor doc so the
+  // remove-control overlay stays in sync after any edit (add/remove/typing).
+  const refreshStructure = useCallback((): void => {
+    const ed = editorRef.current;
+    if (ed === null) return;
+    setStructure(caseStructure(ed));
+    setLinkRows(collectLinkRows(editorSpine(ed)));
+    setListGuarded(selectionIsOnComplaintHeading(ed));
+  }, []);
+
   // ---- Editor --------------------------------------------------------------
 
   const editor = useEditor(
@@ -236,8 +284,18 @@ export function CaseForm({
           class: 'ProseMirror hc-case-editor focus:outline-none',
         },
       },
+      onCreate: () => {
+        refreshStructure();
+      },
       onUpdate: () => {
         scheduleSave();
+        refreshStructure();
+      },
+      // DEFECT 1 (M3-RWv4 build-12): a plain caret move (no doc change) does not
+      // fire onUpdate, so track the complaint-heading guard here too — the list
+      // toolbar must disable the instant the caret lands on a complaint heading.
+      onSelectionUpdate: ({ editor: ed }) => {
+        setListGuarded(selectionIsOnComplaintHeading(ed));
       },
       onBlur: () => {
         void flushSave();
@@ -246,6 +304,15 @@ export function CaseForm({
     [doc !== null],
   );
   editorRef.current = editor;
+
+  // Populate the remove-control structure once the editor mounts (onCreate may
+  // fire before editorRef is assigned on the first render).
+  useEffect(() => {
+    if (editor !== null) {
+      setStructure(caseStructure(editor));
+      setLinkRows(collectLinkRows(editorSpine(editor)));
+    }
+  }, [editor]);
 
   // ---- Load + restore ------------------------------------------------------
 
@@ -303,19 +370,6 @@ export function CaseForm({
     },
     [flushSave],
   );
-
-  const onAddEntry = useCallback((): void => {
-    const ed = editorRef.current;
-    if (ed === null) return;
-    insertDatedEntry(
-      ed,
-      todayIsoDate(),
-      visitId,
-      currentComplaintName(ed),
-      'first',
-    );
-    void flushSave();
-  }, [visitId, flushSave]);
 
   const onAddFollowupEntry = useCallback((): void => {
     const ed = editorRef.current;
@@ -377,6 +431,136 @@ export function CaseForm({
     [insertSection],
   );
 
+  // B4 (M3-RWv4 §4): modalities is ONE appendable table per entry. The first
+  // "Record modalities" creates the table; a later press in the SAME entry
+  // appends rows to it (appendOrCreateModalities). Vitals/family/etc keep the
+  // one-table-per-press behaviour (onRecordGenericSeed). No fresh section
+  // number is consumed on append.
+  const onRecordModalities = useCallback(
+    (seed: TableSeed): void => {
+      const ed = editorRef.current;
+      if (ed === null) return;
+      appendOrCreateModalities(ed, seed);
+      setPopup(null);
+      void flushSave();
+    },
+    [flushSave],
+  );
+
+  // A3 (M3-RWv4 §3): Word-style list toggles over the current selection.
+  // DEFECT 1 (M3-RWv4 build-12, DATA LOSS): the toggle wraps the node under the
+  // caret into a list item. If the caret is on the complaint heading, TipTap
+  // would wrap the HEADING into a listItem and splitSpineToComplaints then loses
+  // the whole complaint section. The toggles therefore NO-OP when the selection
+  // is on a complaint heading (the toolbar buttons are also disabled); lists
+  // still work inside entry body text.
+  const onToggleBullet = useCallback((): void => {
+    const ed = editorRef.current;
+    if (ed === null) return;
+    if (selectionIsOnComplaintHeading(ed)) return;
+    ed.chain().focus().toggleBulletList().run();
+    void flushSave();
+  }, [flushSave]);
+
+  const onToggleOrdered = useCallback((): void => {
+    const ed = editorRef.current;
+    if (ed === null) return;
+    if (selectionIsOnComplaintHeading(ed)) return;
+    ed.chain().focus().toggleOrderedList().run();
+    void flushSave();
+  }, [flushSave]);
+
+  // C6 (M3-RWv4 §6): confirmed removal of a complaint section or an entry. The
+  // removal is a PURE spine transform (removeComplaint/removeEntry) applied to
+  // the live editor doc, then the whole document is re-set and autosaved. The
+  // editor never drops below one complaint (the pure helper's fallback).
+  const onConfirmRemove = useCallback((): void => {
+    const ed = editorRef.current;
+    const target = removeTarget;
+    if (ed === null || target === null) return;
+    const spine = editorSpine(ed);
+    const next =
+      target.kind === 'complaint'
+        ? removeComplaint(spine, target.complaintId)
+        : removeEntry(spine, target.complaintId, target.entryIndex);
+    setEditorSpine(ed, next);
+    setRemoveTarget(null);
+    setStructure(caseStructure(ed));
+    setLinkRows(collectLinkRows(editorSpine(ed)));
+    void flushSave();
+  }, [removeTarget, flushSave]);
+
+  // D5 (M3-RWv4 §5.6): confirmed UNLINK — drop the investigation link row
+  // (data_json edit) WITHOUT deleting the attachment file.
+  const onConfirmUnlink = useCallback((): void => {
+    const ed = editorRef.current;
+    const attachmentId = unlinkTarget;
+    if (ed === null || attachmentId === null) return;
+    const next = unlinkInvestigationRow(ed, attachmentId);
+    setEditorSpine(ed, next);
+    setUnlinkTarget(null);
+    setStructure(caseStructure(ed));
+    setLinkRows(collectLinkRows(editorSpine(ed)));
+    void flushSave();
+  }, [unlinkTarget, flushSave]);
+
+  // D5 (M3-RWv4 §5.2a/§5.5): a Submitted UPLOAD — pick a file, attach it with a
+  // composed display-ONLY label `<investigation>-<date>` (patient name is set
+  // backend-side so the UI does not shuttle PII; the label is sanitised and
+  // NEVER logged — R-PRIV-001/007), then write a link row into the
+  // investigations table (data_json edit) and autosave.
+  const onSubmitUpload = useCallback(
+    async (investigationName: string): Promise<void> => {
+      const ed = editorRef.current;
+      if (ed === null) return;
+      try {
+        const picked = await run(commands.visitPickReportFile());
+        if (picked.sourcePath === null) return;
+        const displayLabel = sanitizeDisplayLabel(
+          investigationName,
+          '',
+          formatDate(todayIsoDate()) ?? todayIsoDate(),
+        );
+        const attached = await run(
+          commands.visitAttachReport({
+            visitId,
+            sourcePath: picked.sourcePath,
+            caption: null,
+            displayLabel,
+          }),
+        );
+        linkAttachmentRow(ed, attached.attachmentId, displayLabel);
+        // DEFECT 2 (M3-RWv4 build-12): linkAttachmentRow re-sets the document via
+        // setEditorSpine (setContent), which does NOT emit onUpdate — so without
+        // this explicit refresh the new link row is in the doc but the
+        // `case-form-investigation-links` panel (driven by `linkRows` state)
+        // never renders and the E2E 30s-waits for it time out. Refresh the
+        // derived structure + link rows now (same pattern as unlink/remove).
+        refreshStructure();
+        setPopup(null);
+        void flushSave();
+      } catch {
+        setPopup(null);
+      }
+    },
+    [visitId, flushSave, refreshStructure],
+  );
+
+  // D5 (M3-RWv4 §5.2b): link an ALREADY-uploaded patient attachment.
+  const onSubmitPick = useCallback(
+    (attachmentId: string, label: string): void => {
+      const ed = editorRef.current;
+      if (ed === null) return;
+      linkAttachmentRow(ed, attachmentId, label);
+      // DEFECT 2 (see onSubmitUpload): refresh the derived link-row state so the
+      // newly-linked row renders without waiting for an unrelated editor update.
+      refreshStructure();
+      setPopup(null);
+      void flushSave();
+    },
+    [flushSave, refreshStructure],
+  );
+
   // ---- Render --------------------------------------------------------------
 
   if (errored && doc === null) {
@@ -422,7 +606,7 @@ export function CaseForm({
         <div
           data-testid="case-form-content"
           data-adaptive="true"
-          className="flex min-w-0 flex-1 flex-col overflow-auto p-4"
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-4"
         >
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <label className="flex min-w-0 flex-1 items-center gap-2">
@@ -441,18 +625,11 @@ export function CaseForm({
                 className="input w-full text-base font-semibold"
               />
             </label>
-            {/* The three complaint/entry actions (M3-RWv3 §5), replacing the
-                single legacy "Add entry". Each is a labelled, keyboard-focusable
-                button with its own data-testid. */}
+            {/* The two complaint/entry actions (M3-RWv4 §2): "Add follow-up
+                entry" and "Add new complaint". The legacy "Add new entry" was
+                removed (RWv4 A2) — every complaint's initial entry is created by
+                "Add new complaint"; later visits are follow-up entries. */}
             <div className="flex flex-none flex-wrap gap-2">
-              <button
-                type="button"
-                data-testid="case-form-add-entry"
-                onClick={onAddEntry}
-                className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                {t('case.form.addNewEntry')}
-              </button>
               <button
                 type="button"
                 data-testid="case-form-add-followup-entry"
@@ -472,16 +649,67 @@ export function CaseForm({
             </div>
           </div>
 
-          {/* The single WYSIWYG notepad. Zoom is driven app-level: the shared
-              app-bar zoom controls + Ctrl+= / Ctrl+- / Ctrl+0 scale the
-              DOCUMENT ROOT font-size (useZoom -> AppShell, C8), which scales
-              every rem-based unit — chrome AND this editor — uniformly. The
-              editor no longer carries its own fontSize scale (that editor-only
-              override scaled just this box, competing with the app-level zoom).
-              Full-width adaptive (no capped column). */}
+          {/* A3 (M3-RWv4 §3): Word-style list formatting toolbar, fixed above
+              the bounded editor. Bullet + ordered toggles reflect the active
+              list via aria-pressed. Keyboard-focusable + labelled. */}
+          <FormatToolbar
+            onBullet={onToggleBullet}
+            onOrdered={onToggleOrdered}
+            bulletActive={editor?.isActive('bulletList') ?? false}
+            orderedActive={editor?.isActive('orderedList') ?? false}
+            guarded={listGuarded}
+          />
+
+          {/* C6 (M3-RWv4 §6): a focusable remove (x) control per complaint and
+              per entry, rendered as a React overlay keyed to the live editor
+              structure (NOT an editable doc node). Each opens a confirm dialog. */}
+          <RemoveControls
+            structure={structure}
+            onRemoveComplaint={(complaintId) =>
+              setRemoveTarget({ kind: 'complaint', complaintId })
+            }
+            onRemoveEntry={(complaintId, entryIndex) =>
+              setRemoveTarget({ kind: 'entry', complaintId, entryIndex })
+            }
+          />
+
+          {/* D5 (M3-RWv4 §5.6): an UNLINK control per linked report row — a
+              data_json edit only (the file stays), separate from Delete file. */}
+          {linkRows.length > 0 ? (
+            <ul
+              data-testid="case-form-investigation-links"
+              className="mb-2 flex flex-col gap-1"
+            >
+              {linkRows.map((lr, index) => {
+                const n = index + 1;
+                return (
+                  <li
+                    key={`${lr.attachmentId}-${n}`}
+                    className="flex items-center justify-between gap-2 rounded border border-slate-200 px-2 py-1 text-xs"
+                  >
+                    <span className="min-w-0 truncate">{lr.label}</span>
+                    <button
+                      type="button"
+                      data-testid={`case-form-investigation-unlink-${n}`}
+                      onClick={() => setUnlinkTarget(lr.attachmentId)}
+                      className="flex-none rounded border border-slate-300 px-2 py-0.5 text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    >
+                      {t('case.form.investigations.unlink')}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          {/* The single WYSIWYG notepad. A7 (M3-RWv4 §7): the editor is a
+              BOUNDED, internally-scrolling region — `flex-1 min-h-0
+              overflow-y-auto` inside the `flex h-full min-h-0 flex-col` content
+              column — so a long document scrolls WITHIN this box instead of
+              growing the column and overwriting the record toolbar / panel
+              below. Zoom is app-level (document-root font-size). */}
           <div
             data-testid={`case-form-editor-${complaintId}`}
-            className="min-h-[16rem] w-full flex-1 rounded border border-slate-200 p-3"
+            className="w-full flex-1 min-h-0 overflow-y-auto rounded border border-slate-200 p-3"
           >
             <EditorContent editor={editor} />
           </div>
@@ -612,7 +840,7 @@ export function CaseForm({
         <ModalitiesPopup
           onCancel={() => setPopup(null)}
           onRecord={(seed) => {
-            onRecordGenericSeed('modalities', seed);
+            onRecordModalities(seed);
           }}
         />
       ) : null}
@@ -628,9 +856,16 @@ export function CaseForm({
 
       {popup === 'investigations' ? (
         <InvestigationsRecordPopup
+          patientId={patientId}
           onCancel={() => setPopup(null)}
           onRecord={(seed) => {
             onRecordGenericSeed('investigations', seed);
+          }}
+          onSubmitUpload={(name) => {
+            void onSubmitUpload(name);
+          }}
+          onSubmitPick={(attachmentId, label) => {
+            onSubmitPick(attachmentId, label);
           }}
         />
       ) : null}
@@ -642,6 +877,46 @@ export function CaseForm({
             setRxInserted(true);
             onRecordPrescription(seed);
           }}
+        />
+      ) : null}
+
+      {/* C6 (M3-RWv4 §6): the shared remove confirm dialog (complaint or entry).
+          Escape cancels; the confirm drops the nodes + renumbers. */}
+      {removeTarget !== null ? (
+        <ConfirmDialog
+          testId="case-form-remove-dialog"
+          title={
+            removeTarget.kind === 'complaint'
+              ? t('case.form.remove.complaint.title')
+              : t('case.form.remove.entry.title')
+          }
+          body={
+            removeTarget.kind === 'complaint'
+              ? t('case.form.remove.complaint.body')
+              : t('case.form.remove.entry.body')
+          }
+          confirmLabel={t('case.form.remove.confirm')}
+          cancelLabel={t('case.form.remove.cancel')}
+          cancelTestId="case-form-remove-cancel"
+          confirmTestId="case-form-remove-confirm"
+          onCancel={() => setRemoveTarget(null)}
+          onConfirm={onConfirmRemove}
+        />
+      ) : null}
+
+      {/* D5 (M3-RWv4 §5.6): the UNLINK confirm dialog — removes the link row
+          only; the attachment file is NOT deleted. */}
+      {unlinkTarget !== null ? (
+        <ConfirmDialog
+          testId="case-form-investigation-unlink-dialog"
+          title={t('case.form.investigations.unlink.title')}
+          body={t('case.form.investigations.unlink.body')}
+          confirmLabel={t('case.form.investigations.unlink.confirm')}
+          cancelLabel={t('case.form.investigations.unlink.cancel')}
+          cancelTestId="case-form-investigation-unlink-cancel"
+          confirmTestId="case-form-investigation-unlink-confirm"
+          onCancel={() => setUnlinkTarget(null)}
+          onConfirm={onConfirmUnlink}
         />
       ) : null}
     </section>
@@ -668,6 +943,240 @@ function RecordButton({
       {label}
     </button>
   );
+}
+
+/**
+ * A3 (M3-RWv4 §3): the Word-style list formatting toolbar. Bullet + ordered
+ * toggles reflect the active list (aria-pressed). `role="toolbar"`, labelled,
+ * keyboard-focusable. Presentation/editing only — no network, no CSP impact.
+ *
+ * DEFECT 1 (M3-RWv4 build-12, DATA LOSS): when `guarded` (the caret is on a
+ * complaint heading) both buttons are DISABLED (`disabled` + `aria-disabled`)
+ * so a complaint heading can never be wrapped into a list item and lost. The
+ * buttons re-enable the moment the caret moves into entry body text.
+ */
+function FormatToolbar({
+  onBullet,
+  onOrdered,
+  bulletActive,
+  orderedActive,
+  guarded,
+}: {
+  readonly onBullet: () => void;
+  readonly onOrdered: () => void;
+  readonly bulletActive: boolean;
+  readonly orderedActive: boolean;
+  readonly guarded: boolean;
+}): JSX.Element {
+  return (
+    <div
+      role="toolbar"
+      aria-label={t('case.form.format.toolbar')}
+      data-testid="case-form-format-toolbar"
+      className="mb-2 flex flex-none gap-1 border-b border-slate-200 pb-2"
+    >
+      <button
+        type="button"
+        data-testid="case-form-format-bullet"
+        aria-pressed={bulletActive}
+        aria-disabled={guarded}
+        disabled={guarded}
+        aria-label={t('case.form.format.bullet')}
+        title={
+          guarded
+            ? t('case.form.format.listGuardTitle')
+            : t('case.form.format.bullet')
+        }
+        onClick={guarded ? undefined : onBullet}
+        className={[
+          'rounded border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600',
+          guarded
+            ? 'cursor-not-allowed border-slate-200 text-slate-400'
+            : bulletActive
+              ? 'border-blue-600 bg-blue-50 text-blue-700'
+              : 'border-slate-300 hover:bg-slate-100',
+        ].join(' ')}
+      >
+        {t('case.form.format.bullet')}
+      </button>
+      <button
+        type="button"
+        data-testid="case-form-format-ordered"
+        aria-pressed={orderedActive}
+        aria-disabled={guarded}
+        disabled={guarded}
+        aria-label={t('case.form.format.ordered')}
+        title={
+          guarded
+            ? t('case.form.format.listGuardTitle')
+            : t('case.form.format.ordered')
+        }
+        onClick={guarded ? undefined : onOrdered}
+        className={[
+          'rounded border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600',
+          guarded
+            ? 'cursor-not-allowed border-slate-200 text-slate-400'
+            : orderedActive
+              ? 'border-blue-600 bg-blue-50 text-blue-700'
+              : 'border-slate-300 hover:bg-slate-100',
+        ].join(' ')}
+      >
+        {t('case.form.format.ordered')}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * C6 (M3-RWv4 §6): the remove (x) controls overlay — a focusable control per
+ * complaint and per entry, derived from the live editor structure. Each opens
+ * the shared confirm dialog; the actual removal is a pure spine transform. The
+ * controls are a React overlay (NOT editable doc nodes) so they can never be
+ * typed into or serialised.
+ */
+function RemoveControls({
+  structure,
+  onRemoveComplaint,
+  onRemoveEntry,
+}: {
+  readonly structure: {
+    complaints: ComplaintStructure[];
+    entries: { complaintId: string; entryIndex: number }[];
+  };
+  readonly onRemoveComplaint: (complaintId: string) => void;
+  readonly onRemoveEntry: (complaintId: string, entryIndex: number) => void;
+}): JSX.Element {
+  return (
+    <div
+      data-testid="case-form-remove-controls"
+      className="mb-2 flex flex-none flex-wrap gap-2 text-xs"
+    >
+      {structure.complaints.map((c) => (
+        <button
+          key={c.complaintId}
+          type="button"
+          data-testid={`case-form-complaint-remove-${c.complaintId}`}
+          aria-label={`${t('case.form.complaint.remove')}: ${c.name}`}
+          title={t('case.form.complaint.remove')}
+          onClick={() => onRemoveComplaint(c.complaintId)}
+          className="rounded border border-slate-300 px-2 py-0.5 text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          {t('case.form.remove.icon')}{' '}
+          {c.name === '' ? t('case.form.complaint.remove') : c.name}
+        </button>
+      ))}
+      {structure.entries.map((e, index) => {
+        const n = index + 1;
+        return (
+          <button
+            key={`${e.complaintId}-${e.entryIndex}-${n}`}
+            type="button"
+            data-testid={`case-form-entry-remove-${n}`}
+            aria-label={t('case.form.entry.remove')}
+            title={t('case.form.entry.remove')}
+            onClick={() => onRemoveEntry(e.complaintId, e.entryIndex)}
+            className="rounded border border-slate-300 px-2 py-0.5 text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            {t('case.form.remove.icon')} {n}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * A shared accessible confirm dialog (role=dialog, aria-modal, Escape cancels,
+ * focus-trapped via the shared {@link Dialog} shell). Used by C6 removal and D5
+ * unlink.
+ */
+function ConfirmDialog({
+  testId,
+  title,
+  body,
+  confirmLabel,
+  cancelLabel,
+  cancelTestId,
+  confirmTestId,
+  onCancel,
+  onConfirm,
+}: {
+  readonly testId: string;
+  readonly title: string;
+  readonly body: string;
+  readonly confirmLabel: string;
+  readonly cancelLabel: string;
+  readonly cancelTestId: string;
+  readonly confirmTestId: string;
+  readonly onCancel: () => void;
+  readonly onConfirm: () => void;
+}): JSX.Element {
+  return (
+    <Dialog
+      testId={testId}
+      title={title}
+      onCancel={onCancel}
+      width="26rem"
+      footer={
+        <>
+          <button
+            type="button"
+            data-testid={cancelTestId}
+            onClick={onCancel}
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            data-testid={confirmTestId}
+            onClick={onConfirm}
+            className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-red-700"
+          >
+            {confirmLabel}
+          </button>
+        </>
+      }
+    >
+      <p className="text-xs text-slate-600">{body}</p>
+    </Dialog>
+  );
+}
+
+/**
+ * Collect the investigation LINK rows from the live doc (M3-RWv4 §5.6): each
+ * `tableRow` carrying `attrs.hcInvestigationLink.attachmentId`, paired with the
+ * first cell's text as a display label for the UNLINK control.
+ */
+function collectLinkRows(
+  root: ProseMirrorNode,
+): { attachmentId: string; label: string }[] {
+  const out: { attachmentId: string; label: string }[] = [];
+  const walk = (n: ProseMirrorNode): void => {
+    const link = n.attrs?.['hcInvestigationLink'] as
+      | { attachmentId?: string }
+      | null
+      | undefined;
+    if (
+      n.type === 'tableRow' &&
+      link != null &&
+      typeof link.attachmentId === 'string'
+    ) {
+      const label = cellText(n);
+      out.push({ attachmentId: link.attachmentId, label });
+    }
+    for (const c of n.content ?? []) walk(c);
+  };
+  walk(root);
+  return out;
+}
+
+/** The concatenated text of a node (first-cell display label for a link row). */
+function cellText(node: ProseMirrorNode): string {
+  let s =
+    node.type === 'text' && typeof node.text === 'string' ? node.text : '';
+  for (const c of node.content ?? []) s += cellText(c);
+  return s;
 }
 
 /** Top header: next F/U display, Save + status. */
@@ -903,6 +1412,45 @@ function numOrUndef(value: string): number | undefined {
   if (value.trim() === '') return undefined;
   const n = Number(value);
   return Number.isNaN(n) ? undefined : n;
+}
+
+/**
+ * D5 (M3-RWv4 §5.3): append an investigation LINK row referencing `attachmentId`
+ * (cells = the display label + "Submitted" status) to the current entry's
+ * investigations table, creating that table if the entry has none yet, then
+ * re-set the editor document. A `data_json` edit only — the attachment is
+ * untouched.
+ */
+function linkAttachmentRow(
+  editor: Editor,
+  attachmentId: string,
+  label: string,
+): void {
+  const submitted = t('case.form.investigations.status.submitted');
+  const linkRow = buildInvestigationLinkRow({
+    attachmentId,
+    cells: [label, submitted],
+  });
+  const createTable = (): ProseMirrorNode[] => {
+    const header: ProseMirrorNode = {
+      type: 'tableRow',
+      content: [
+        t('case.form.investigations.name'),
+        t('case.form.investigations.status'),
+      ].map((h) => ({
+        type: 'tableHeader',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: h }] }],
+      })),
+    };
+    const table: ProseMirrorNode = {
+      type: 'table',
+      attrs: { hcTableType: 'investigations' },
+      content: [header, linkRow],
+    };
+    return [{ type: 'horizontalRule' }, table];
+  };
+  const next = appendInvestigationLink(editor, linkRow, createTable);
+  setEditorSpine(editor, next);
 }
 
 /** Record vitals: BP sys + dia as TWO fields, live BMI (ADR 0019 #7). */
@@ -1263,15 +1811,26 @@ function GeneralsPopup({
 
 /** Record investigations (in-document notes; the uploader is separate). */
 function InvestigationsRecordPopup({
+  patientId,
   onCancel,
   onRecord,
+  onSubmitUpload,
+  onSubmitPick,
 }: {
+  readonly patientId: string;
   readonly onCancel: () => void;
   readonly onRecord: (seed: TableSeed) => void;
+  readonly onSubmitUpload: (investigationName: string) => void;
+  readonly onSubmitPick: (attachmentId: string, label: string) => void;
 }): JSX.Element {
   const [name, setName] = useState('');
-  const [statusValue, setStatusValue] = useState('');
+  // D5: status is a typed DROPDOWN with exactly two options.
+  const [statusValue, setStatusValue] = useState<'suggested' | 'submitted'>(
+    'suggested',
+  );
   const [notes, setNotes] = useState('');
+  // The Submitted popup is open while status === 'submitted'.
+  const [submitOpen, setSubmitOpen] = useState(false);
 
   const record = useCallback((): void => {
     onRecord({
@@ -1281,9 +1840,19 @@ function InvestigationsRecordPopup({
         t('case.form.investigations.status'),
         t('case.form.investigations.notes'),
       ],
-      rows: [[name, statusValue, notes]],
+      rows: [[name, t('case.form.investigations.status.suggested'), notes]],
     });
-  }, [onRecord, name, statusValue, notes]);
+  }, [onRecord, name, notes]);
+
+  const onStatusChange = useCallback((value: string): void => {
+    if (value === 'submitted') {
+      setStatusValue('submitted');
+      setSubmitOpen(true);
+    } else {
+      setStatusValue('suggested');
+      setSubmitOpen(false);
+    }
+  }, []);
 
   return (
     <Dialog
@@ -1306,18 +1875,176 @@ function InvestigationsRecordPopup({
           value={name}
           onChange={setName}
         />
-        <TextField
-          testId="case-investigations-status"
-          label={t('case.form.investigations.status')}
-          value={statusValue}
-          onChange={setStatusValue}
-        />
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-600">
+            {t('case.form.investigations.status')}
+          </span>
+          <select
+            data-testid="case-investigations-status-select"
+            value={statusValue}
+            onChange={(e) => onStatusChange(e.target.value)}
+            aria-label={t('case.form.investigations.status')}
+            className="input"
+          >
+            <option
+              data-testid="case-investigations-status-opt-suggested"
+              value="suggested"
+            >
+              {t('case.form.investigations.status.suggested')}
+            </option>
+            <option
+              data-testid="case-investigations-status-opt-submitted"
+              value="submitted"
+            >
+              {t('case.form.investigations.status.submitted')}
+            </option>
+          </select>
+        </label>
         <TextField
           testId="case-investigations-notes"
           label={t('case.form.investigations.notes')}
           value={notes}
           onChange={setNotes}
         />
+      </div>
+
+      {submitOpen ? (
+        <SubmitReportPopup
+          patientId={patientId}
+          onCancel={() => {
+            setSubmitOpen(false);
+            setStatusValue('suggested');
+          }}
+          onUpload={() => onSubmitUpload(name)}
+          onPick={(attachmentId, label) => onSubmitPick(attachmentId, label)}
+        />
+      ) : null}
+    </Dialog>
+  );
+}
+
+/**
+ * D5 (M3-RWv4 §5.2): the Submitted popup — UPLOAD a new report OR PICK an
+ * already-uploaded one from the shared patient attachment store
+ * (`patient_list_attachments`). A warning note reminds the doctor to upload the
+ * correct file against the name. Accessible (shared Dialog shell).
+ */
+function SubmitReportPopup({
+  patientId,
+  onCancel,
+  onUpload,
+  onPick,
+}: {
+  readonly patientId: string;
+  readonly onCancel: () => void;
+  readonly onUpload: () => void;
+  readonly onPick: (attachmentId: string, label: string) => void;
+}): JSX.Element {
+  const [existing, setExisting] = useState<AttachmentSummary[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async (): Promise<void> => {
+      try {
+        const res = await run(commands.patientListAttachments({ patientId }));
+        if (!cancelled) setExisting(res.attachments);
+      } catch {
+        /* pick-existing is best-effort; upload-new still works */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId]);
+
+  const selectedLabel = (): string => {
+    const a = existing.find((x) => x.attachmentId === selected);
+    return a?.originalName ?? a?.caption ?? '';
+  };
+
+  return (
+    <Dialog
+      testId="case-form-investigation-submit-popup"
+      title={t('case.form.investigations.submit.title')}
+      onCancel={onCancel}
+      footer={
+        <button
+          type="button"
+          data-testid="case-form-investigation-submit-cancel"
+          onClick={onCancel}
+          className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          {t('case.form.investigations.submit.cancel')}
+        </button>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          data-testid="case-form-investigation-submit-upload"
+          onClick={onUpload}
+          className="rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-700"
+        >
+          {t('case.form.investigations.submit.upload')}
+        </button>
+        <p
+          role="note"
+          data-testid="case-form-investigation-upload-warning"
+          className="rounded bg-amber-50 px-3 py-1.5 text-xs text-amber-800"
+        >
+          {t('case.form.investigations.uploadWarning')}
+        </p>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-600">
+            {t('case.form.investigations.submit.pickLabel')}
+          </span>
+          <ul
+            data-testid="case-form-investigation-submit-pick-list"
+            className="flex flex-col gap-1"
+          >
+            {existing.length === 0 ? (
+              <li className="text-xs text-slate-500">
+                {t('case.form.investigations.submit.pickEmpty')}
+              </li>
+            ) : (
+              existing.map((a, index) => {
+                const n = index + 1;
+                const label = a.originalName ?? a.caption ?? a.attachmentId;
+                return (
+                  <li key={a.attachmentId}>
+                    <button
+                      type="button"
+                      data-testid={`case-form-investigation-submit-pick-item-${n}`}
+                      aria-pressed={selected === a.attachmentId}
+                      onClick={() => setSelected(a.attachmentId)}
+                      className={[
+                        'w-full rounded border px-2 py-1 text-left text-xs focus:outline-none focus:ring-2 focus:ring-blue-600',
+                        selected === a.attachmentId
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-slate-300 hover:bg-slate-100',
+                      ].join(' ')}
+                    >
+                      {label}
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+          <button
+            type="button"
+            data-testid="case-form-investigation-submit-pick-confirm"
+            disabled={selected === null}
+            onClick={() => {
+              if (selected !== null) onPick(selected, selectedLabel());
+            }}
+            className="mt-1 rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-60"
+          >
+            {t('case.form.investigations.submit.pickConfirm')}
+          </button>
+        </div>
       </div>
     </Dialog>
   );
@@ -1487,6 +2214,7 @@ function InvestigationsPanel({
           visitId,
           sourcePath: picked.sourcePath,
           caption: caption.trim() === '' ? null : caption.trim(),
+          displayLabel: null,
         }),
       );
       setCaption('');

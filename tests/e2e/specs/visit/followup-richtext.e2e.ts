@@ -110,9 +110,11 @@ describe('M3-RWv2 follow-up PHASE B: dashboard Follow-up reopens the PRIOR rich 
     // eslint-disable-next-line no-console
     console.log('[rwv2-fu] PHASE B: follow-up reopened the PRIOR document incl the family-history 2-col table (data-loss fixed)');
 
-    // ===== Add entry appends a NEW dated entry; Save =======================
+    // ===== Add a follow-up entry appends a NEW dated entry; Save ===========
+    // M3-RWv4 §1 removed "Add new entry"; the surviving append control is
+    // "Add follow-up entry" (case-form-add-followup-entry).
     const entriesBefore = await caseRichPage.entryCount();
-    await caseRichPage.addEntry();
+    await caseRichPage.addFollowupEntry();
     await browser.waitUntil(
       async () => (await caseRichPage.entryCount()) === entriesBefore + 1,
       { timeout: 15000, timeoutMsg: 'follow-up Add entry did not append a new dated entry' },

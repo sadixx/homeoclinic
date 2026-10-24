@@ -547,6 +547,239 @@ export function buildPrescriptionSeed(
 }
 
 // ---------------------------------------------------------------------------
+// M3-RWv4 §4 — modalities APPEND helpers (one appendable table per entry).
+// Pure row-shaping + table-append so the editor glue (caseRichEditor
+// appendOrCreateModalities) and the unit tests can reason over plain JSON.
+// ---------------------------------------------------------------------------
+
+/**
+ * Append body `rows` (each a list of cell strings) to an existing `table` node,
+ * returning a NEW table node (immutable). The header row (first `tableRow`) and
+ * every existing body row are preserved in order; the appended rows become new
+ * `tableCell`/`paragraph` body rows at the end (M3-RWv4 §4). `attrs` (incl.
+ * `hcTableType`) are carried through unchanged so a modalities table stays a
+ * modalities table. A table with no `content` is treated as empty and the rows
+ * are simply added.
+ */
+export function appendRowsToTable(
+  table: ProseMirrorNode,
+  rows: ReadonlyArray<readonly string[]>,
+): ProseMirrorNode {
+  const bodyRows: ProseMirrorNode[] = rows.map((row) => ({
+    type: 'tableRow',
+    content: row.map((v) => cell('tableCell', v)),
+  }));
+  const existing = table.content ?? [];
+  return { ...table, content: [...existing, ...bodyRows] };
+}
+
+/** Modalities popup values (factor / aggravation / amelioration) — M3-RWv4 §4. */
+export interface ModalityRowValues {
+  readonly factor: string;
+  readonly agg: string;
+  readonly amel: string;
+}
+
+/**
+ * Shape modalities popup values into the `tableRow` node(s) an append inserts
+ * (M3-RWv4 §4). One row per press: `[factor, aggravation, amelioration]`, as
+ * plain `tableCell`/`paragraph` nodes carrying the cell text. Pure; no editor,
+ * no `t` — the column HEADERS are owned by the creating seed, appends add body
+ * cells only.
+ */
+export function buildModalityRows(
+  values: ModalityRowValues,
+): ProseMirrorNode[] {
+  return [
+    {
+      type: 'tableRow',
+      content: [values.factor, values.agg, values.amel].map((v) =>
+        cell('tableCell', v),
+      ),
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// M3-RWv4 §6 — removeComplaint / removeEntry (pure spine transforms).
+// A complaint section spans its `hcKind:"complaint"` header up to (but not
+// including) the next complaint header or doc end; an entry spans its
+// `hcKind:"entry"` heading up to the next entry/complaint header or doc end.
+// Removal drops those nodes and renumbers the remaining complaints 1..N; the
+// editor never drops below one complaint.
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove the complaint whose `hcComplaintId` is `complaintId` from the spine
+ * doc (M3-RWv4 §6): drop its complaint header and every node up to the next
+ * complaint header (or doc end), then renumber the remaining complaints 1..N in
+ * document order. If removing it would leave ZERO complaints, a single empty
+ * fallback complaint (one `first` dated entry + caret paragraph) is emitted so
+ * the editor is never empty (same invariant as {@link emptyRichDoc}). Pure;
+ * returns a new spine doc.
+ */
+export function removeComplaint(
+  spine: ProseMirrorNode,
+  complaintId: string,
+): ProseMirrorNode {
+  const complaints = splitSpineToComplaints(spine);
+  const kept = complaints.filter((c) => c.id !== complaintId);
+  if (kept.length === 0) {
+    return joinComplaintsToSpine(fallbackComplaints());
+  }
+  // Re-id sequentially so the rebuilt spine renumbers 1..N deterministically
+  // (joinComplaintsToSpine numbers by position; keep ids aligned to `cc<n>`).
+  const renumbered = kept.map((c, i) => ({ ...c, id: `cc${i + 1}` }));
+  return joinComplaintsToSpine(renumbered);
+}
+
+/**
+ * Remove the `entryIndex`-th entry (0-based, in document order WITHIN the
+ * complaint) of the complaint `complaintId` from the spine (M3-RWv4 §6): drop
+ * that `hcKind:"entry"` heading and every node after it up to the next
+ * entry/complaint header (or the complaint's end). Other entries and other
+ * complaints are untouched; complaint numbering is preserved. If the complaint
+ * or the entry index is not found, the spine is returned unchanged. Pure.
+ */
+export function removeEntry(
+  spine: ProseMirrorNode,
+  complaintId: string,
+  entryIndex: number,
+): ProseMirrorNode {
+  const complaints = splitSpineToComplaints(spine);
+  const next = complaints.map((c) => {
+    if (c.id !== complaintId) return c;
+    return { ...c, doc: dropEntryFromDoc(c.doc, entryIndex) };
+  });
+  return joinComplaintsToSpine(next);
+}
+
+/** Drop the `entryIndex`-th entry span from a complaint's per-complaint doc. */
+function dropEntryFromDoc(
+  doc: ProseMirrorNode,
+  entryIndex: number,
+): ProseMirrorNode {
+  const content = doc.content ?? [];
+  const out: ProseMirrorNode[] = [];
+  let entryCount = -1;
+  let dropping = false;
+  for (const node of content) {
+    const isEntryHeading =
+      node.type === 'heading' && node.attrs?.['hcKind'] === 'entry';
+    if (isEntryHeading) {
+      entryCount += 1;
+      dropping = entryCount === entryIndex;
+      if (dropping) continue; // skip the targeted entry heading itself
+    }
+    if (dropping) continue; // skip the nodes that follow it (its span)
+    out.push(node);
+  }
+  return { ...doc, content: out };
+}
+
+/** The single empty fallback complaint (one `first` entry + caret paragraph). */
+function fallbackComplaints(): RichComplaint[] {
+  return [
+    {
+      id: 'cc1',
+      title: '',
+      next_section_no: 1,
+      doc: {
+        type: 'doc',
+        content: [
+          entryHeading(todayCalendarDate(), '', '', 'first'),
+          { type: 'paragraph' },
+        ],
+      },
+    },
+  ];
+}
+
+/** Today's calendar date `YYYY-MM-DD` (fallback entry stamp; no visit ctx). */
+function todayCalendarDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+// M3-RWv4 §5.3/§5.5 — investigation link row + display-label sanitiser.
+// ---------------------------------------------------------------------------
+
+/** The max length of a display label (defence against an unbounded label). */
+const DISPLAY_LABEL_MAX = 255;
+
+/**
+ * Compose the display-ONLY label `<investigation>-<patient>-<date>` for a
+ * Submitted report (M3-RWv4 §5.5). This is a human-readable label for the
+ * `original_name`/`caption` column ONLY — NOT a filename, NOT a path (the
+ * on-disk blob stays the opaque encrypted UUID, R-PRIV-007) — and it is NEVER
+ * logged (R-PRIV-001). Sanitisation (mandatory): path separators (`/`, `\`),
+ * control chars and the field separator are stripped; whitespace runs collapse
+ * to a single `-`; a leading dot is removed (so the label never looks like a
+ * hidden file); and the result is capped at {@link DISPLAY_LABEL_MAX}. Pure.
+ */
+export function sanitizeDisplayLabel(
+  investigation: string,
+  patient: string,
+  date: string,
+): string {
+  // Mirror the Rust sibling `sanitize_display_label` (`c.is_control()`): build
+  // the cleaned string by iterating code points and mapping path separators
+  // (`/`, `\`) and any control char (code point < 0x20 or === 0x7f) to a space.
+  // A char FILTER — not a control-char regex literal — so there is no
+  // `no-control-regex` lint and nothing to suppress (R-LINT-006/007).
+  const stripSeparatorsAndControls = (v: string): string => {
+    let out = '';
+    for (const ch of v) {
+      const cp = ch.codePointAt(0)!;
+      if (ch === '/' || ch === '\\' || cp < 0x20 || cp === 0x7f) {
+        out += ' ';
+      } else {
+        out += ch;
+      }
+    }
+    return out;
+  };
+  const clean = (v: string): string =>
+    stripSeparatorsAndControls(v)
+      // collapse whitespace runs to a single '-', then trim leading/trailing '-'
+      .replace(/\s+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  const parts = [clean(investigation), clean(patient), clean(date)].filter(
+    (p) => p !== '',
+  );
+  let label = parts.join('-').replace(/^\.+/, '');
+  if (label.length > DISPLAY_LABEL_MAX) {
+    label = label.slice(0, DISPLAY_LABEL_MAX);
+  }
+  return label;
+}
+
+/** Args for the investigation link-row builder (M3-RWv4 §5.3). */
+export interface InvestigationLinkRowArgs {
+  /** The attachment this row links to (the shared patient attachment store). */
+  readonly attachmentId: string;
+  /** The visible cell texts (e.g. the display label + status). */
+  readonly cells: readonly string[];
+}
+
+/**
+ * Build an investigations table `tableRow` that LINKS a Submitted report
+ * (M3-RWv4 §5.3): the row carries `attrs.hcInvestigationLink = { attachmentId }`
+ * (the additive v3 attr, nullable/default-null elsewhere) and its visible cells
+ * hold the display label text so the link reads naturally and the FTS mirror's
+ * `tableRow` walk indexes it. Pure.
+ */
+export function buildInvestigationLinkRow(
+  args: InvestigationLinkRowArgs,
+): ProseMirrorNode {
+  return {
+    type: 'tableRow',
+    attrs: { hcInvestigationLink: { attachmentId: args.attachmentId } },
+    content: args.cells.map((v) => cell('tableCell', v)),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Node builders (the pure kernel of insertSectionTable / appendDatedEntry).
 // ---------------------------------------------------------------------------
 

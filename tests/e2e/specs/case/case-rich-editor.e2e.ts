@@ -129,18 +129,108 @@ describe('M3-RWv3 rich PHASE A: unified complaint-section record — add new com
     // eslint-disable-next-line no-console
     console.log(`[rwv3] step1: Add new complaint -> numbered section "${c1?.text}" + first dated entry; prose typed`);
 
-    // ===== STEP 2: Add new entry -> a NEW dated entry under this complaint ==
-    // Put the caret inside the Headache complaint (real click) so the new
-    // entry is attributed to it (currentComplaintName reads the PM selection).
-    await caseRichPage.focusComplaintByName(COMPLAINT_1);
-    const firstEntriesBefore = (await caseRichPage.entryHeadings()).length;
-    await caseRichPage.addEntry();
-    await browser.waitUntil(
-      async () => (await caseRichPage.entryHeadings()).length === firstEntriesBefore + 1,
-      { timeout: 15000, timeoutMsg: 'Add new entry did not append a dated entry' },
-    );
+    // ===== STEP 1b (RWv4 §1): heading is BOLD + UNDERLINED, name shows ONCE =
+    const headingStyle = await caseRichPage.complaintHeadingStyle(COMPLAINT_1);
+    expect(headingStyle.fontWeight).toBeGreaterThanOrEqual(600);
+    expect(headingStyle.underline).toBe(true);
+    expect(headingStyle.nameOccurrences).toBe(1);
     // eslint-disable-next-line no-console
-    console.log(`[rwv3] step2: Add new entry -> ${(await caseRichPage.entryHeadings()).length} dated entries`);
+    console.log(
+      `[rwv4] step1b: complaint heading BOLD(weight=${headingStyle.fontWeight})+UNDERLINE(${headingStyle.underline}); name "${COMPLAINT_1}" shows ${headingStyle.nameOccurrences}x`,
+    );
+
+    // ===== STEP 2 (RWv4 §1): "Add new entry" is REMOVED ====================
+    // Only "Add follow-up entry" + "Add new complaint" remain. There is NO
+    // "Add new entry" (case-form-add-entry) control.
+    expect(await caseRichPage.hasAddEntryButton()).toBe(false);
+    await expect(caseRichPage.addFollowupEntryButton).toBeDisplayed();
+    await expect(caseRichPage.addComplaintButton).toBeDisplayed();
+    // eslint-disable-next-line no-console
+    console.log('[rwv4] step2: NO "Add new entry" button; only Add follow-up entry + Add new complaint');
+
+    // ===== STEP 2b (RWv4 §3 + build-12 DEFECT 1 GUARD): lists work in entry
+    // prose, and are BLOCKED on the complaint heading =======================
+    // DEFECT 1 (DATA LOSS): toggling a list with the caret on the complaint
+    // h1[hcKind='complaint'] heading used to wrap the heading into a listItem,
+    // so splitSpineToComplaints lost the whole complaint section. The fix
+    // guards the toggles: the bullet + ordered buttons are DISABLED (and the
+    // handlers no-op) while the caret is on a complaint heading, and re-enable
+    // the instant the caret moves into entry body text.
+    //
+    // (a) Caret ON the complaint heading -> both list buttons DISABLED.
+    await caseRichPage.focusComplaintByName(COMPLAINT_1);
+    await expect(caseRichPage.formatToolbar).toBeDisplayed();
+    await browser.waitUntil(
+      async () => {
+        const g = await caseRichPage.listToolbarGuardState();
+        return g.bulletEnabled === false && g.orderedEnabled === false;
+      },
+      {
+        timeout: 15000,
+        timeoutMsg: 'DEFECT 1 guard: list buttons were NOT disabled with the caret on the complaint heading',
+      },
+    );
+    const guarded = await caseRichPage.listToolbarGuardState();
+    expect(guarded.bulletEnabled).toBe(false);
+    expect(guarded.orderedEnabled).toBe(false);
+    expect(guarded.bulletAriaDisabled).toBe('true');
+    expect(guarded.orderedAriaDisabled).toBe('true');
+    // eslint-disable-next-line no-console
+    console.log(
+      `[rwv4] step2b(a) DEFECT 1 GUARD: caret on complaint heading -> bullet/ordered DISABLED (enabled=${guarded.bulletEnabled}/${guarded.orderedEnabled}, aria-disabled=${guarded.bulletAriaDisabled}/${guarded.orderedAriaDisabled})`,
+    );
+
+    // (b) Caret IN entry prose -> buttons RE-ENABLE and lists render. typeProse
+    // collapses the caret to the end of the document inside a paragraph (entry
+    // body text), which is exactly where lists are allowed.
+    await caseRichPage.typeProse('List target line in entry prose');
+    await browser.waitUntil(
+      async () => {
+        const g = await caseRichPage.listToolbarGuardState();
+        return g.bulletEnabled === true && g.orderedEnabled === true;
+      },
+      {
+        timeout: 15000,
+        timeoutMsg: 'list buttons did not re-enable with the caret in entry prose',
+      },
+    );
+    const inProse = await caseRichPage.listToolbarGuardState();
+    expect(inProse.bulletEnabled).toBe(true);
+    expect(inProse.orderedEnabled).toBe(true);
+    // eslint-disable-next-line no-console
+    console.log('[rwv4] step2b(b) caret in entry prose -> bullet/ordered ENABLED');
+
+    // Bullet list in entry prose renders a <ul>.
+    await caseRichPage.toggleBulletList();
+    await caseRichPage.typeProse('Bullet item one');
+    await browser.waitUntil(async () => (await caseRichPage.listCounts()).ul >= 1, {
+      timeout: 15000,
+      timeoutMsg: 'bullet-list toolbar did not render a <ul> in entry prose',
+    });
+    // Exit the bullet list into a fresh top-level paragraph so the ordered
+    // list below forms as a SEPARATE block (otherwise toggling ordered at the
+    // same caret just converts the <ul> into an <ol> in place). The caret
+    // stays in entry prose throughout — never on the complaint heading.
+    await caseRichPage.exitListToNewParagraph();
+    // Ordered list in the new entry paragraph renders a distinct <ol>.
+    await caseRichPage.typeProse('Ordered target line in entry prose');
+    await caseRichPage.toggleOrderedList();
+    await caseRichPage.typeProse('Ordered item one');
+    await browser.waitUntil(async () => (await caseRichPage.listCounts()).ol >= 1, {
+      timeout: 15000,
+      timeoutMsg: 'ordered-list toolbar did not render an <ol> in entry prose',
+    });
+    const lists = await caseRichPage.listCounts();
+    expect(lists.ul).toBeGreaterThanOrEqual(1);
+    expect(lists.ol).toBeGreaterThanOrEqual(1);
+    expect(lists.li).toBeGreaterThanOrEqual(2);
+    // DEFECT 1 no-data-loss proof: the named complaint section SURVIVED all the
+    // list toggling (never wrapped into a listItem, never lost).
+    expect(
+      (await caseRichPage.complaintHeaders()).some((c) => c.text.includes(COMPLAINT_1)),
+    ).toBe(true);
+    // eslint-disable-next-line no-console
+    console.log(`[rwv4] step2b(c) LISTS render in prose ul=${lists.ul} ol=${lists.ol} li=${lists.li}; complaint "${COMPLAINT_1}" intact (no data loss)`);
 
     // ===== STEP 3: Add follow-up entry -> `<name>-follow-up — <date>` ======
     // Caret back inside the Headache complaint so the follow-up entry is
@@ -257,6 +347,25 @@ describe('M3-RWv3 rich PHASE A: unified complaint-section record — add new com
     // eslint-disable-next-line no-console
     console.log(`[rwv3] step6: APP-LEVEL zoom root base=${baseRoot}px in=${zoomedRoot}px reset=${await caseRichPage.rootFontPx()}px (scales the whole app, not just the editor)`);
 
+    // ===== STEP 7 (RWv4 §6): editor SCROLLS INTERNALLY within bounded area ==
+    // Type a long body into the Headache complaint, then assert the editor box
+    // overflows internally (scrollHeight > clientHeight, overflow-y:auto) and
+    // stays within the content container — it does NOT push past the record
+    // toolbar / Save, which remains clickable.
+    await caseRichPage.focusComplaintByName(COMPLAINT_1);
+    for (let i = 0; i < 40; i += 1) {
+      await caseRichPage.typeProse(`Long dictation line ${i} — symptom detail that fills the bounded editor.`);
+    }
+    const scroll = await caseRichPage.scrollMetrics();
+    expect(scroll.overflowY).toBe('auto');
+    expect(scroll.scrolls).toBe(true); // scrollHeight > clientHeight
+    expect(scroll.withinContent).toBe(true); // does not overflow past the toolbar/UI
+    await expect(caseRichPage.saveButton).toBeClickable(); // Save still reachable
+    // eslint-disable-next-line no-console
+    console.log(
+      `[rwv4] step7: bounded internal scroll overflowY=${scroll.overflowY} scrollH=${scroll.scrollHeight}>clientH=${scroll.clientHeight} withinContent=${scroll.withinContent}; Save still clickable`,
+    );
+
     // ===== Explicit SAVE -> "Saved" ========================================
     await caseRichPage.save();
     const savedText = await caseRichPage.waitForSaved();
@@ -316,6 +425,10 @@ describe('M3-RWv3 rich PHASE B: HEADLINE multi-complaint kill-restore (CASE-005 
     ).toBe(true);
     // Typed prose restored.
     expect(await caseRichPage.editorText()).toContain(PROSE);
+    // RWv4 §3: the bullet + ordered lists survived the relaunch.
+    const restoredLists = await caseRichPage.listCounts();
+    expect(restoredLists.ul).toBeGreaterThanOrEqual(1);
+    expect(restoredLists.ol).toBeGreaterThanOrEqual(1);
     // Vitals table restored incl. the edited Pulse cell, borders still visible.
     expect(await caseRichPage.tableCellText('vitals', 0, 0)).toBe(V_SYS);
     expect(await caseRichPage.tableCellText('vitals', 0, 1)).toBe(V_DIA);

@@ -170,6 +170,7 @@ fn pat009_attach_pdf_stores_encrypted_and_inserts_row_with_metadata() {
                 visit_id: visit_id.clone(),
                 source_path: src.to_string_lossy().to_string(),
                 caption: Some("CBC 21 Oct".to_string()),
+                display_label: None,
             },
         )
         .expect("attach pdf");
@@ -224,6 +225,7 @@ fn pat009_attach_png_stores_encrypted_and_inserts_row() {
                 visit_id,
                 source_path: src.to_string_lossy().to_string(),
                 caption: None,
+                display_label: None,
             },
         )
         .expect("attach png");
@@ -251,6 +253,7 @@ fn pat009_attach_writes_exactly_one_audit_row_without_patient_text() {
             visit_id,
             source_path: src.to_string_lossy().to_string(),
             caption: Some("sensitive caption".to_string()),
+            display_label: None,
         },
     )
     .expect("attach");
@@ -302,6 +305,7 @@ fn pat009_attach_non_pdf_non_image_is_rejected_validation() {
                 visit_id: visit_id.clone(),
                 source_path: src.to_string_lossy().to_string(),
                 caption: None,
+                display_label: None,
             },
         )
         .expect_err("non-report must be rejected");
@@ -346,6 +350,7 @@ fn pat009_list_returns_attachments_for_the_visit_only() {
                 visit_id: v.clone(),
                 source_path: src.to_string_lossy().to_string(),
                 caption: None,
+                display_label: None,
             },
         )
         .expect("attach");
@@ -383,6 +388,7 @@ fn pat009_open_returns_decrypted_bytes_and_mime() {
                 visit_id,
                 source_path: src.to_string_lossy().to_string(),
                 caption: None,
+                display_label: None,
             },
         )
         .expect("attach");
@@ -422,6 +428,7 @@ fn pat009_delete_removes_row_and_blob_and_writes_one_audit_row() {
                 visit_id: visit_id.clone(),
                 source_path: src.to_string_lossy().to_string(),
                 caption: None,
+                display_label: None,
             },
         )
         .expect("attach");
@@ -487,6 +494,7 @@ fn pat009_attach_to_missing_visit_is_not_found() {
                 visit_id: "0192f0c0-0000-7000-8000-000000000000".to_string(),
                 source_path: src.to_string_lossy().to_string(),
                 caption: None,
+                display_label: None,
             },
         )
         .expect_err("unknown visit must be NotFound");

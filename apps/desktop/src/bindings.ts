@@ -175,6 +175,12 @@ export const commands = {
 	visitAttachReport: (req: AttachReportRequest) => typedError<AttachReportResponse, UserFacingError>(__TAURI_INVOKE("visit_attach_report", { req })),
 	/**  List a visit's attachments (PAT-009). */
 	visitListAttachments: (req: ListAttachmentsRequest) => typedError<ListAttachmentsResponse, UserFacingError>(__TAURI_INVOKE("visit_list_attachments", { req })),
+	/**
+	 *  List ALL of a patient's attachments across visits (M3-RWv4 §5.4) — the
+	 *  shared two-way store behind the Lab reports & Scans dashboard panel and the
+	 *  Submitted pick-existing list. Read-only (`with_pool`), bounded (R-DATA-007).
+	 */
+	patientListAttachments: (req: PatientListAttachmentsRequest) => typedError<ListAttachmentsResponse, UserFacingError>(__TAURI_INVOKE("patient_list_attachments", { req })),
 	/**  Open (decrypt) an attachment for in-app preview (PAT-009, ADR 0017). */
 	visitOpenAttachment: (req: OpenAttachmentRequest) => typedError<OpenAttachmentResponse, UserFacingError>(__TAURI_INVOKE("visit_open_attachment", { req })),
 	/**  Delete an attachment row + its encrypted blob (PAT-009). */
@@ -233,6 +239,15 @@ export type AttachReportRequest = {
 	sourcePath: string,
 	/**  Optional doctor caption. */
 	caption: string | null,
+	/**
+	 *  Optional display-ONLY label (M3-RWv4 §5.5). When `Some`, the stored
+	 *  `original_name` becomes this label (sanitised: path separators / control
+	 *  chars stripped) instead of the raw file base name; when `None`, today's
+	 *  behaviour (the file base name) is kept. Display label ONLY — the on-disk
+	 *  blob + `blob_id` are unchanged (R-PRIV-007) and the label is NEVER
+	 *  logged / never in the audit diff (R-PRIV-001).
+	 */
+	displayLabel: string | null,
 };
 
 /**  `visit_attach_report` response. */
@@ -253,6 +268,10 @@ export type AttachReportResponse = {
 export type AttachmentSummary = {
 	/**  Attachment-row id. */
 	attachmentId: string,
+	/**  Owning patient id (M3-RWv4 §9: lets the patient-level list key/group). */
+	patientId: string,
+	/**  Owning visit id, or `None` for a patient-level attachment (M3-RWv4 §9). */
+	visitId: string | null,
 	/**  Canonical mime (drives the type badge). */
 	mime: string,
 	/**  Optional doctor caption. */
@@ -865,6 +884,16 @@ export type PatientFilter = {
 	duesPositive: boolean | null,
 	/**  Case-note full-text (PSR-009, P1; not applied at R2). */
 	casenoteText: string | null,
+};
+
+/**
+ *  `patient_list_attachments` request (M3-RWv4 §5.4 / §9). Lists ALL of a
+ *  patient's attachments across visits — the shared two-way store behind the
+ *  Lab reports & Scans panel and the Submitted pick-existing list.
+ */
+export type PatientListAttachmentsRequest = {
+	/**  The patient whose attachments (across visits) are listed. */
+	patientId: string,
 };
 
 /**  The sort spec (field + direction) for the list (PSR-008). */

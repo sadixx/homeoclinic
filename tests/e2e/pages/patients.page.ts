@@ -321,6 +321,109 @@ export class PatientsPage {
       },
     );
   }
+
+  // ---- S07 Lab reports & Scans PANEL (M3-RWv4 §4, two-way) ----------------
+  get labReportsPanel(): ChainablePromiseElement {
+    return byTestId("patient-dash-lab-reports-panel");
+  }
+
+  get labReportsList(): ChainablePromiseElement {
+    return byTestId("patient-dash-lab-reports-list");
+  }
+
+  get labReportsEmpty(): ChainablePromiseElement {
+    return byTestId("patient-dash-lab-reports-empty");
+  }
+
+  labReportsItem(n: number): ChainablePromiseElement {
+    return byTestId(`patient-dash-lab-reports-item-${n}`);
+  }
+
+  labReportsBadge(n: number): ChainablePromiseElement {
+    return byTestId(`patient-dash-lab-reports-badge-${n}`);
+  }
+
+  labReportsOpen(n: number): ChainablePromiseElement {
+    return byTestId(`patient-dash-lab-reports-open-${n}`);
+  }
+
+  labReportsDelete(n: number): ChainablePromiseElement {
+    return byTestId(`patient-dash-lab-reports-delete-${n}`);
+  }
+
+  get labReportsDeleteDialog(): ChainablePromiseElement {
+    return byTestId("patient-dash-lab-reports-delete-dialog");
+  }
+
+  get labReportsDeleteConfirm(): ChainablePromiseElement {
+    return byTestId("patient-dash-lab-reports-delete-confirm");
+  }
+
+  get labReportsDeleteCancel(): ChainablePromiseElement {
+    return byTestId("patient-dash-lab-reports-delete-cancel");
+  }
+
+  /** Wait until the Lab reports & Scans panel is visible on the dashboard. */
+  async waitForLabReportsPanel(timeout = 20000): Promise<void> {
+    await this.labReportsPanel.waitForExist({ timeout });
+    await this.labReportsPanel.waitForDisplayed({ timeout });
+  }
+
+  /** Number of lab-report items in the panel (0 when the list is absent). */
+  async labReportsCount(): Promise<number> {
+    if (!(await this.labReportsList.isExisting())) return 0;
+    const items = await $(
+      '[data-testid="patient-dash-lab-reports-list"]',
+    ).$$("li");
+    return items.length;
+  }
+
+  /** The visible display label/text of lab-report item n (1-based). */
+  async labReportsLabel(n: number): Promise<string> {
+    await this.labReportsItem(n).waitForDisplayed({ timeout: 15000 });
+    // Read the label span's textContent via the DOM. The item is
+    // `<li><div><span badge/><span label/></div><div>Open/Delete</div></li>`;
+    // WebDriver getText() on the whole item also returns the badge + button
+    // text (and the `truncate` label span can read empty under
+    // WebKitWebDriver), so take the first span WITHOUT the badge testid.
+    const label = await browser.execute((idx: number) => {
+      const li = document.querySelector(`[data-testid="patient-dash-lab-reports-item-${idx}"]`);
+      if (li === null) return "";
+      const spans = Array.from(li.querySelectorAll("span"));
+      for (const span of spans) {
+        const tid = span.getAttribute("data-testid");
+        if (tid === null || !tid.includes("lab-reports-badge")) {
+          const txt = (span.textContent ?? "").trim();
+          if (txt.length > 0) return txt;
+        }
+      }
+      return (li.textContent ?? "").trim();
+    }, n);
+    return label;
+  }
+
+  /**
+   * Delete lab-report item n from the panel behind the confirm dialog and wait
+   * for the list to shrink to `expected` items.
+   */
+  async deleteLabReportAndWaitForCount(
+    n: number,
+    expected: number,
+    timeout = 20000,
+  ): Promise<void> {
+    await this.labReportsDelete(n).waitForClickable({ timeout: 15000 });
+    await this.labReportsDelete(n).click();
+    await this.labReportsDeleteDialog.waitForDisplayed({ timeout: 15000 });
+    await this.labReportsDeleteConfirm.waitForClickable({ timeout: 15000 });
+    await this.labReportsDeleteConfirm.click();
+    await browser.waitUntil(
+      async () => (await this.labReportsCount()) === expected,
+      {
+        timeout,
+        timeoutMsg: `lab-reports panel did not shrink to ${expected} item(s) after delete`,
+      },
+    );
+  }
 }
 
 export const patientsPage = new PatientsPage();

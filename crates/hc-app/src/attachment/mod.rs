@@ -52,6 +52,13 @@ pub struct AttachReportRequest {
     pub source_path: String,
     /// Optional doctor caption.
     pub caption: Option<String>,
+    /// Optional display-ONLY label (M3-RWv4 §5.5). When `Some`, the stored
+    /// `original_name` becomes this label (sanitised: path separators / control
+    /// chars stripped) instead of the raw file base name; when `None`, today's
+    /// behaviour (the file base name) is kept. Display label ONLY — the on-disk
+    /// blob + `blob_id` are unchanged (R-PRIV-007) and the label is NEVER
+    /// logged / never in the audit diff (R-PRIV-001).
+    pub display_label: Option<String>,
 }
 
 /// `visit_attach_report` response.
@@ -89,6 +96,10 @@ pub struct ListAttachmentsRequest {
 pub struct AttachmentSummary {
     /// Attachment-row id.
     pub attachment_id: String,
+    /// Owning patient id (M3-RWv4 §9: lets the patient-level list key/group).
+    pub patient_id: String,
+    /// Owning visit id, or `None` for a patient-level attachment (M3-RWv4 §9).
+    pub visit_id: Option<String>,
     /// Canonical mime (drives the type badge).
     pub mime: String,
     /// Optional doctor caption.
@@ -108,6 +119,16 @@ pub struct AttachmentSummary {
 pub struct ListAttachmentsResponse {
     /// The visit's attachments, oldest first.
     pub attachments: Vec<AttachmentSummary>,
+}
+
+/// `patient_list_attachments` request (M3-RWv4 §5.4 / §9). Lists ALL of a
+/// patient's attachments across visits — the shared two-way store behind the
+/// Lab reports & Scans panel and the Submitted pick-existing list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PatientListAttachmentsRequest {
+    /// The patient whose attachments (across visits) are listed.
+    pub patient_id: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -215,17 +236,31 @@ impl<'a> AttachmentService<'a> {
         // 2. Read the chosen file and derive its display base name. The path is
         //    used only to read + derive the name; it is NEVER logged (R-PRIV-001).
         let source = Path::new(&req.source_path);
-        let original_name = source
+        let file_base_name = source
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_string();
+        // The extension signal for mime detection always comes from the real
+        // file name (the display label carries no extension).
+        let file_base_name_for_mime = file_base_name.clone();
+        // M3-RWv4 §5.5: when a display label is supplied, it REPLACES the file
+        // base name as the stored display `original_name` (sanitised: path
+        // separators + control chars stripped; display label ONLY, never a path
+        // — R-PRIV-007). Otherwise today's behaviour (the file base name) holds.
+        // The label / name is NEVER logged (R-PRIV-001).
+        let original_name = match &req.display_label {
+            Some(label) => sanitize_display_label(label),
+            None => file_base_name,
+        };
         let bytes = std::fs::read(source)
             .map_err(|e| AppError::Storage(Box::new(hc_storage::StorageError::Io(e))))?;
 
         // 3. Validate PDF/image by extension + magic; reject everything else as
-        //    Validation (no blob, no row).
-        let mime = detect_report_mime(&original_name, &bytes)
+        //    Validation (no blob, no row). The EXTENSION must come from the real
+        //    file base name (the display label carries no extension), while the
+        //    stored display `original_name` may be the composed label (§5.5).
+        let mime = detect_report_mime(&file_base_name_for_mime, &bytes)
             .ok_or_else(|| AppError::from(hc_storage::StorageError::UnsupportedAttachmentType))?;
 
         // 4. Encrypt-store the bytes (opaque <uuid>.bin, AES-256-GCM — reuse the
@@ -299,17 +334,23 @@ impl<'a> AttachmentService<'a> {
         let rows = pool.with_reader(|c| {
             attachment_repo::list_attachments_for_visit(c, &req.visit_id, ATTACHMENT_LIST_LIMIT)
         })?;
-        let attachments = rows
-            .into_iter()
-            .map(|r| AttachmentSummary {
-                attachment_id: r.id,
-                mime: r.mime,
-                caption: r.caption,
-                original_name: r.original_name,
-                byte_size: r.byte_size,
-                created_at: r.created_at,
-            })
-            .collect();
+        let attachments = rows.into_iter().map(summary_from_row).collect();
+        Ok(ListAttachmentsResponse { attachments })
+    }
+
+    /// List ALL of a patient's attachments across visits — the shared two-way
+    /// store behind the Lab reports & Scans panel + the Submitted pick-existing
+    /// list (M3-RWv4 §5.4). Read-only; bounded (R-DATA-007). Each summary
+    /// carries its owning `patient_id` + `visit_id` so the UI can key/group.
+    pub fn list_attachments_for_patient(
+        &self,
+        pool: &Pool,
+        req: PatientListAttachmentsRequest,
+    ) -> Result<ListAttachmentsResponse, AppError> {
+        let rows = pool.with_reader(|c| {
+            attachment_repo::list_attachments_for_patient(c, &req.patient_id, ATTACHMENT_LIST_LIMIT)
+        })?;
+        let attachments = rows.into_iter().map(summary_from_row).collect();
         Ok(ListAttachmentsResponse { attachments })
     }
 
@@ -390,4 +431,45 @@ impl<'a> AttachmentService<'a> {
 
         Ok(DeleteAttachmentResponse { ok: true })
     }
+}
+
+/// Project a stored [`AttachmentRow`] into the typed [`AttachmentSummary`],
+/// carrying the owning `patient_id` + `visit_id` (M3-RWv4 §9).
+fn summary_from_row(r: AttachmentRow) -> AttachmentSummary {
+    AttachmentSummary {
+        attachment_id: r.id,
+        patient_id: r.patient_id,
+        visit_id: r.visit_id,
+        mime: r.mime,
+        caption: r.caption,
+        original_name: r.original_name,
+        byte_size: r.byte_size,
+        created_at: r.created_at,
+    }
+}
+
+/// Maximum length of a stored display label (defence against an unbounded one).
+const DISPLAY_LABEL_MAX: usize = 255;
+
+/// Sanitise a display-ONLY label (M3-RWv4 §5.5). Strips path separators
+/// (`/`, `\`) and control characters, trims a leading dot so the label never
+/// looks like a hidden file, and caps the length. This is a display string for
+/// the `original_name`/`caption` column ONLY — NOT a filename, NOT a path (the
+/// on-disk blob stays the opaque encrypted UUID, R-PRIV-007) — and it is NEVER
+/// logged (R-PRIV-001). Pure (no IO).
+fn sanitize_display_label(label: &str) -> String {
+    let cleaned: String = label
+        .chars()
+        .map(|c| {
+            if c == '/' || c == '\\' || c.is_control() {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect();
+    // Collapse internal whitespace, trim, drop a leading dot.
+    let collapsed = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
+    let trimmed = collapsed.trim_start_matches('.').to_string();
+    trimmed.chars().take(DISPLAY_LABEL_MAX).collect()
 }

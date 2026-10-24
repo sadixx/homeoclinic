@@ -60,7 +60,6 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // tests/e2e/specs/case -> tests/e2e/fixtures/investigations
 const FIXTURES = path.resolve(here, '..', '..', 'fixtures', 'investigations');
 const PDF_FIXTURE = path.join(FIXTURES, 'lab-report.pdf');
-const PNG_FIXTURE = path.join(FIXTURES, 'scan.png');
 
 // The seam reads HC_E2E_REPORT_FILE from the APP process, which inherits its
 // env from the tauri-driver chain spawned by helpers/driver.ts as
@@ -74,14 +73,11 @@ const PNG_FIXTURE = path.join(FIXTURES, 'scan.png');
 
 const PIN = '7531';
 const PATIENT_NAME = 'Reporta Testpatient';
-const PDF_CAPTION = 'CBC blood report';
-const PNG_CAPTION = 'USG abdomen scan';
-
 // Carried from PHASE A to PHASE B (the visit reopened after the relaunch).
 let patientId = '';
 let visitId = '';
 
-describe('R3 UX3 Investigations PHASE A: upload a PDF report via the seam, list with a PDF badge, open the preview (PAT-009)', () => {
+describe('R3 UX4 Investigations PHASE A: Submitted dropdown -> upload via the seam -> link row + warning note + two-way Lab reports panel with <investigation>-<patient>-<date> label (PAT-009; M3-RWv4)', () => {
   // Arm the seam at the PDF fixture and relaunch the fresh 'main' dir so the
   // app process (respawned with the current env) returns the PDF from
   // visit_pick_report_file. 'main' is unused so far -> a fresh install -> the
@@ -91,7 +87,7 @@ describe('R3 UX3 Investigations PHASE A: upload a PDF report via the seam, list 
     await relaunchInto('main');
   });
 
-  it('opens a case, uploads a PDF through the HC_E2E_REPORT_FILE seam, lists it with a PDF badge and opens its in-app preview', async () => {
+  it('opens a case, selects Submitted in the investigations dropdown, uploads via the HC_E2E_REPORT_FILE seam, links it with a renamed display label and shows it in the patient-dashboard Lab reports & Scans panel', async () => {
     // ---- Boot-gate + provision + seed a patient ---------------------------
     const decided = await bootPage.waitForDecidedScreen();
     expect(decided).toBe('#/setup');
@@ -115,42 +111,60 @@ describe('R3 UX3 Investigations PHASE A: upload a PDF report via the seam, list 
     // eslint-disable-next-line no-console
     console.log(`[inv] Take case -> /patient/${patientId}/case/${visitId}`);
 
-    // The uploader (caption + Upload + list) lives under the Investigations
-    // section's SUBMITTED tab, so expand the rail section then switch to the
-    // Submitted tab before touching the empty-state / uploader (T1 fix).
-    await investigationsPage.waitForEmpty();
-    expect(await investigationsPage.itemCount()).toBe(0);
+    // ---- Open the Submitted dropdown -> upload via the seam ---------------
+    // RWv4 §4: Record investigations -> type a name -> status DROPDOWN ->
+    // Submitted opens a popup with upload-new + pick-existing + a warning note.
+    await investigationsPage.openSubmittedFor('CBC');
+    await expect(investigationsPage.uploadWarning).toBeDisplayed();
+    await expect(investigationsPage.submitUpload).toBeDisplayed();
+    await expect(investigationsPage.submitPickList).toBeDisplayed();
     // eslint-disable-next-line no-console
-    console.log('[inv] Investigations panel open, empty-state shown');
+    console.log('[inv] Submitted dropdown -> popup with upload-new + pick-existing + warning note');
 
-    // ---- Upload the PDF via the seam -> lists with a PDF badge ------------
-    await investigationsPage.setCaption(PDF_CAPTION);
-    await investigationsPage.uploadAndWaitForCount(1);
-    await expect(investigationsPage.item(1)).toBeDisplayed();
-    const pdfBadge = await investigationsPage.badgeText(1);
-    expect(pdfBadge.toUpperCase()).toBe('PDF');
+    await investigationsPage.uploadNewAndWaitForLink(1);
+    const linkLabel = await investigationsPage.linkLabel(1);
+    // RWv4 label shape '<investigation>-<patient>-<date>' (composeDisplayLabel).
+    expect(linkLabel).toMatch(/CBC/i);
     // eslint-disable-next-line no-console
-    console.log(`[inv] uploaded PDF via seam -> item 1 badge="${pdfBadge}" (PAT-009 upload + PDF badge)`);
+    console.log(`[inv] uploaded via seam -> investigation link row 1 label="${linkLabel}"`);
 
-    // ---- Open the PDF -> in-app preview (download anchor, CSP: no embed) ---
-    await investigationsPage.openItem(1);
-    await expect(investigationsPage.previewDownload).toBeDisplayed();
+    // ---- Two-way panel: it ALSO appears in the patient dashboard ----------
+    await patientsPage.openDashboard(patientId);
+    await patientsPage.waitForLabReportsPanel();
+    await browser.waitUntil(async () => (await patientsPage.labReportsCount()) === 1, {
+      timeout: 20000,
+      timeoutMsg: 'uploaded report did not appear in the patient-dashboard Lab reports & Scans panel',
+    });
+    const panelLabel = await patientsPage.labReportsLabel(1);
+    // Display label shaped '<investigation>-<patient>-<date>': three '-'-joined
+    // parts, the first the investigation, and a date digit present.
+    expect(panelLabel).toMatch(/CBC/i);
+    expect(panelLabel.split('-').length).toBeGreaterThanOrEqual(3);
+    expect(panelLabel).toMatch(/\d/);
     // eslint-disable-next-line no-console
-    console.log('[inv] opened PDF -> in-app preview dialog shows the "Save to open" download anchor (visit_open_attachment)');
-    await investigationsPage.closePreview();
+    console.log(`[inv] 2-way panel: dashboard Lab reports & Scans shows 1 item, label="${panelLabel}" (<investigation>-<patient>-<date>)`);
+
+    // Back into the SAME case to continue the lifecycle checks below.
+    await caseRichPage.openVisit(patientId, visitId);
+    await browser.waitUntil(async () => (await investigationsPage.linkCount()) === 1, {
+      timeout: 20000,
+      timeoutMsg: 'investigation link row not present after returning to the case',
+    });
+    // eslint-disable-next-line no-console
+    console.log('[inv] returned to the case; investigation link row still present');
   });
 });
 
-describe('R3 UX3 Investigations PHASE B: relaunch SAME dir, PDF persisted, upload an image (Image badge), open, then remove -> list updates (PAT-009)', () => {
-  // SECOND launch against the SAME 'main' dir, with the seam now pointed at the
-  // PNG fixture. Done in a before() hook (the boot-gate/case-form pattern) so
-  // the relaunch is a genuine restart and its post-reload commands run.
+describe('R3 UX4 Investigations PHASE B: relaunch SAME dir, link persisted, UNLINK keeps the file in the panel, DELETE removes it from the panel too (PAT-009; M3-RWv4)', () => {
+  // SECOND launch against the SAME 'main' dir. The seam stays pointed at the
+  // PDF fixture (no new upload in PHASE B); the before() hook is still needed
+  // so the relaunch is a genuine restart and its post-reload commands run.
   before(async () => {
-    process.env.HC_E2E_REPORT_FILE = PNG_FIXTURE;
+    process.env.HC_E2E_REPORT_FILE = PDF_FIXTURE;
     await relaunchInto('main');
   });
 
-  it('relaunches on the SAME data dir, still lists the PDF, uploads a PNG with an Image badge, opens its preview, and removes it so the list updates', async () => {
+  it('relaunches on the SAME data dir, still shows the link, UNLINK keeps the file in the Lab reports panel, and DELETE removes it from the panel', async () => {
     // Genuine relaunch proof: the app self-routes to #/lock on reopen (SET-004).
     const decided = await bootPage.waitForDecidedScreen();
     expect(decided).toBe('#/lock');
@@ -160,37 +174,40 @@ describe('R3 UX3 Investigations PHASE B: relaunch SAME dir, PDF persisted, uploa
     // eslint-disable-next-line no-console
     console.log('[inv] relaunched on SAME data dir -> booted to #/lock -> unlocked with PIN');
 
-    // Reopen the EXACT same visit and prove the PHASE A PDF persisted.
+    // Reopen the EXACT same visit and prove the PHASE A link persisted.
     await caseRichPage.openVisit(patientId, visitId);
     await browser.waitUntil(
-      async () => (await investigationsPage.itemCount()) === 1,
-      { timeout: 20000, timeoutMsg: 'PHASE A PDF not persisted across relaunch' },
+      async () => (await investigationsPage.linkCount()) === 1,
+      { timeout: 20000, timeoutMsg: 'PHASE A investigation link not persisted across relaunch' },
     );
-    expect((await investigationsPage.badgeText(1)).toUpperCase()).toBe('PDF');
     // eslint-disable-next-line no-console
-    console.log('[inv] after relaunch the PDF report is STILL listed (persisted, encrypted-at-rest)');
+    console.log('[inv] after relaunch the investigation link is STILL present (persisted, encrypted-at-rest)');
 
-    // ---- Upload the PNG via the seam -> second item, Image badge ----------
-    await investigationsPage.setCaption(PNG_CAPTION);
-    await investigationsPage.uploadAndWaitForCount(2);
-    await expect(investigationsPage.item(2)).toBeDisplayed();
-    const imageBadge = await investigationsPage.badgeText(2);
-    expect(imageBadge.toUpperCase()).toBe('IMAGE');
+    // ---- UNLINK from the investigation -> link row gone, FILE stays -------
+    // RWv4 §5.6: unlink is a data_json edit only; the attachment file is NOT
+    // deleted. After unlink the investigation link list is empty BUT the file
+    // still shows in the patient-dashboard Lab reports & Scans panel.
+    await investigationsPage.unlinkAndWaitForCount(1, 0);
+    expect(await investigationsPage.linkCount()).toBe(0);
     // eslint-disable-next-line no-console
-    console.log(`[inv] uploaded PNG via seam -> item 2 badge="${imageBadge}" (PAT-009 upload + Image badge)`);
+    console.log('[inv] UNLINK (behind confirm) -> investigation link row gone');
 
-    // ---- Open the image -> preview shows the <img> ------------------------
-    await investigationsPage.openItem(2);
-    await expect(investigationsPage.previewImage).toBeDisplayed();
+    await patientsPage.openDashboard(patientId);
+    await patientsPage.waitForLabReportsPanel();
+    await browser.waitUntil(async () => (await patientsPage.labReportsCount()) === 1, {
+      timeout: 20000,
+      timeoutMsg: 'unlink wrongly removed the file from the Lab reports panel (should KEEP the file)',
+    });
     // eslint-disable-next-line no-console
-    console.log('[inv] opened image -> in-app preview dialog shows the <img> (visit_open_attachment, data: URL)');
-    await investigationsPage.closePreview();
+    console.log('[inv] after UNLINK the file STILL shows in the Lab reports & Scans panel (keep file)');
 
-    // ---- Remove the image behind the confirm -> list updates --------------
-    await investigationsPage.removeItemAndWaitForCount(2, 1);
-    expect(await investigationsPage.itemCount()).toBe(1);
-    expect((await investigationsPage.badgeText(1)).toUpperCase()).toBe('PDF');
+    // ---- DELETE the file from the panel -> gone everywhere ----------------
+    // RWv4 §5.6: delete removes the file (behind its own confirm) from the
+    // panel too.
+    await patientsPage.deleteLabReportAndWaitForCount(1, 0);
+    expect(await patientsPage.labReportsCount()).toBe(0);
+    await expect(patientsPage.labReportsEmpty).toBeDisplayed();
     // eslint-disable-next-line no-console
-    console.log('[inv] removed the image behind the confirm dialog -> list updates back to the single PDF (visit_delete_attachment)');
+    console.log('[inv] DELETE (behind confirm) -> file gone from the Lab reports & Scans panel too');
   });
 });

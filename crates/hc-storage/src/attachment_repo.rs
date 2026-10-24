@@ -108,6 +108,28 @@ pub fn list_attachments_for_visit(
     Ok(rows)
 }
 
+/// List a patient's non-deleted attachments ACROSS visits, bounded by `limit`
+/// (R-DATA-007), ordered `created_at DESC, id DESC` (newest first). Uses the
+/// `ix_attachment_patient` index on `patient_id` (R-DATA-008). This is the
+/// shared patient-level store the Lab reports & Scans panel + the Submitted
+/// pick-existing list read (M3-RWv4 §5.4).
+pub fn list_attachments_for_patient(
+    conn: &Connection,
+    patient_id: &str,
+    limit: i64,
+) -> Result<Vec<AttachmentRow>, StorageError> {
+    let sql = format!(
+        "SELECT {ATTACHMENT_COLUMNS} FROM attachment \
+         WHERE patient_id = ?1 AND deleted_at IS NULL \
+         ORDER BY created_at DESC, id DESC LIMIT ?2"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map(params![patient_id, limit], map_attachment_row)?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
 /// Read one non-deleted attachment row by id, or `None`.
 pub fn get_attachment(conn: &Connection, id: &str) -> Result<Option<AttachmentRow>, StorageError> {
     let sql =

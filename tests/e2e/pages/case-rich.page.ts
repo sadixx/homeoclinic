@@ -68,8 +68,62 @@ export class CaseRichPage {
     return byTestId('case-form-complaint-title');
   }
 
-  get addEntryButton(): ChainablePromiseElement {
-    return byTestId('case-form-add-entry');
+  // M3-RWv4 §1: "Add new entry" (case-form-add-entry) was REMOVED. Only
+  // "Add follow-up entry" + "Add new complaint" survive. Expose a presence
+  // probe so specs can assert its ABSENCE.
+  async hasAddEntryButton(): Promise<boolean> {
+    return byTestId('case-form-add-entry').isExisting();
+  }
+
+  // ---- M3-RWv4 §3: list formatting toolbar -------------------------------
+  get formatToolbar(): ChainablePromiseElement {
+    return byTestId('case-form-format-toolbar');
+  }
+
+  get formatBulletButton(): ChainablePromiseElement {
+    return byTestId('case-form-format-bullet');
+  }
+
+  get formatOrderedButton(): ChainablePromiseElement {
+    return byTestId('case-form-format-ordered');
+  }
+
+  // ---- M3-RWv4 §4: modalities record button ------------------------------
+  get recordModalitiesButton(): ChainablePromiseElement {
+    return byTestId('case-form-modalities');
+  }
+
+  get modalitiesPopup(): ChainablePromiseElement {
+    return byTestId('case-form-modalities-popup');
+  }
+
+  get modalitiesConfirm(): ChainablePromiseElement {
+    return byTestId('case-form-modalities-confirm');
+  }
+
+  // ---- M3-RWv4 §5: remove controls + shared confirm dialog ---------------
+  get removeControls(): ChainablePromiseElement {
+    return byTestId('case-form-remove-controls');
+  }
+
+  complaintRemoveButton(complaintId: string): ChainablePromiseElement {
+    return byTestId(`case-form-complaint-remove-${complaintId}`);
+  }
+
+  entryRemoveButton(n: number): ChainablePromiseElement {
+    return byTestId(`case-form-entry-remove-${n}`);
+  }
+
+  get removeDialog(): ChainablePromiseElement {
+    return byTestId('case-form-remove-dialog');
+  }
+
+  get removeConfirm(): ChainablePromiseElement {
+    return byTestId('case-form-remove-confirm');
+  }
+
+  get removeCancel(): ChainablePromiseElement {
+    return byTestId('case-form-remove-cancel');
   }
 
   get recordVitalsButton(): ChainablePromiseElement {
@@ -391,13 +445,245 @@ export class CaseRichPage {
     throw new Error(`complaint header containing "${name}" not found to focus`);
   }
 
-  async addEntry(timeout = 15000): Promise<void> {
-    await this.addEntryButton.waitForClickable({ timeout });
-    await this.addEntryButton.click();
+  // ---- M3-RWv4 §1: complaint-heading standout ----------------------------
+  /**
+   * Computed boldness + underline of the complaint heading whose text contains
+   * `name`, plus how many times `name` occurs in that heading's text. The
+   * RWv4 CSS `.hc-case-editor h1[data-hc-kind='complaint']` sets
+   * font-weight:700 + text-decoration:underline, and the name must render ONCE.
+   */
+  async complaintHeadingStyle(
+    name: string,
+    cid = DEFAULT_CID,
+  ): Promise<{ fontWeight: number; underline: boolean; nameOccurrences: number; text: string }> {
+    return browser.execute(
+      (selector: string, nm: string) => {
+        const root = document.querySelector(selector);
+        const empty = { fontWeight: 0, underline: false, nameOccurrences: 0, text: '' };
+        if (root === null) return empty;
+        const h = Array.from(root.querySelectorAll("[data-hc-kind='complaint']")).find((el) =>
+          ((el as HTMLElement).textContent ?? '').includes(nm),
+        ) as HTMLElement | undefined;
+        if (h === undefined) return empty;
+        const cs = window.getComputedStyle(h);
+        const deco = `${cs.textDecoration} ${cs.textDecorationLine}`;
+        const text = (h.textContent ?? '').trim();
+        const occ = nm.length === 0 ? 0 : text.split(nm).length - 1;
+        return {
+          fontWeight: Number.parseInt(cs.fontWeight, 10) || 0,
+          underline: deco.includes('underline'),
+          nameOccurrences: occ,
+          text,
+        };
+      },
+      `[data-testid="case-form-editor-${cid}"]`,
+      name,
+    ) as Promise<{ fontWeight: number; underline: boolean; nameOccurrences: number; text: string }>;
+  }
+
+  // ---- M3-RWv4 §3: lists -------------------------------------------------
+  async toggleBulletList(timeout = 15000): Promise<void> {
+    await this.formatBulletButton.waitForClickable({ timeout });
+    await this.formatBulletButton.click();
+  }
+
+  async toggleOrderedList(timeout = 15000): Promise<void> {
+    await this.formatOrderedButton.waitForClickable({ timeout });
+    await this.formatOrderedButton.click();
   }
 
   /**
-   * M3-RWv3: "Add follow-up entry" appends a dated entry headed
+   * Exit the list the caret currently sits in and land in a FRESH top-level
+   * paragraph after it. TipTap/ProseMirror lifts out of a list when Enter is
+   * pressed on an EMPTY trailing list item; pressing it twice from the end of
+   * the document guarantees an empty item first, then the lift. This keeps a
+   * subsequently-created list a SEPARATE block (a `<ul>` and an `<ol>` can
+   * then coexist) instead of the second toggle converting the first list in
+   * place. The caret stays in entry body text the whole time (never on the
+   * complaint heading), so the DEFECT 1 list guard is not engaged.
+   */
+  async exitListToNewParagraph(cid = DEFAULT_CID): Promise<void> {
+    const ed = this.editor(cid);
+    await ed.waitForDisplayed({ timeout: 15000 });
+    const ok = await browser.execute((selector: string) => {
+      const root = document.querySelector(selector);
+      const pm = (root?.querySelector('.ProseMirror') ?? root) as HTMLElement | null;
+      if (pm === null) return false;
+      pm.focus();
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(pm);
+      range.collapse(false); // caret to the very end (inside the last list item)
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      // First Enter: open a new (empty) list item. Second Enter on the empty
+      // item: ProseMirror lifts the caret out of the list into a paragraph.
+      document.execCommand('insertParagraph');
+      document.execCommand('insertParagraph');
+      return true;
+    }, `[data-testid="case-form-editor-${cid}"]`);
+    if (ok !== true) {
+      throw new Error('could not exit the list into a fresh paragraph');
+    }
+    // Blur to flush autosave, mirroring typeProse().
+    await this.complaintTitle.click();
+  }
+
+  /** Counts of rendered list nodes inside the editor. */
+  async listCounts(cid = DEFAULT_CID): Promise<{ ul: number; ol: number; li: number }> {
+    return browser.execute((selector: string) => {
+      const root = document.querySelector(selector);
+      if (root === null) return { ul: 0, ol: 0, li: 0 };
+      return {
+        ul: root.querySelectorAll('ul').length,
+        ol: root.querySelectorAll('ol').length,
+        li: root.querySelectorAll('li').length,
+      };
+    }, `[data-testid="case-form-editor-${cid}"]`) as Promise<{ ul: number; ol: number; li: number }>;
+  }
+
+  /**
+   * M3-RWv4 build-12 DEFECT 1 (DATA LOSS) guard state of the list toolbar.
+   * When the ProseMirror caret is on a complaint heading the bullet + ordered
+   * buttons are DISABLED (`disabled` + `aria-disabled='true'`) so a complaint
+   * heading can never be wrapped into a list item and lost; they re-enable the
+   * moment the caret moves into entry body text. Returns the webview-observable
+   * enabled flag (from the native `disabled` attribute) and the `aria-disabled`
+   * string for each button so a spec can prove the guard both ways.
+   */
+  async listToolbarGuardState(): Promise<{
+    bulletEnabled: boolean;
+    orderedEnabled: boolean;
+    bulletAriaDisabled: string | null;
+    orderedAriaDisabled: string | null;
+  }> {
+    await this.formatBulletButton.waitForExist({ timeout: 15000 });
+    await this.formatOrderedButton.waitForExist({ timeout: 15000 });
+    const [bulletEnabled, orderedEnabled, bulletAriaDisabled, orderedAriaDisabled] =
+      await Promise.all([
+        this.formatBulletButton.isEnabled(),
+        this.formatOrderedButton.isEnabled(),
+        this.formatBulletButton.getAttribute('aria-disabled'),
+        this.formatOrderedButton.getAttribute('aria-disabled'),
+      ]);
+    return { bulletEnabled, orderedEnabled, bulletAriaDisabled, orderedAriaDisabled };
+  }
+
+  // ---- M3-RWv4 §4: modalities single-append table ------------------------
+  /** Open Record modalities, fill factor/agg/amel, Record. Appends to the same table on re-press. */
+  async recordModalities(
+    factor: string,
+    agg: string,
+    amel: string,
+    timeout = 15000,
+  ): Promise<void> {
+    await this.recordModalitiesButton.waitForClickable({ timeout });
+    await this.recordModalitiesButton.click();
+    const fill = async (testId: string, value: string): Promise<void> => {
+      const el = byTestId(testId);
+      await el.waitForDisplayed({ timeout });
+      await el.setValue(value);
+    };
+    await fill('case-modalities-factor', factor);
+    await fill('case-modalities-agg', agg);
+    await fill('case-modalities-amel', amel);
+    await this.modalitiesConfirm.waitForClickable({ timeout });
+    await this.modalitiesConfirm.click();
+  }
+
+  /** Number of modalities tables (RWv4 §4: must stay 1 per entry). */
+  async modalitiesTableCount(cid = DEFAULT_CID): Promise<number> {
+    return browser.execute((selector: string) => {
+      const root = document.querySelector(selector);
+      if (root === null) return 0;
+      return Array.from(root.querySelectorAll('table')).filter(
+        (t) => t.getAttribute('data-hc-table-type') === 'modalities',
+      ).length;
+    }, `[data-testid="case-form-editor-${cid}"]`);
+  }
+
+  /** Body-row count of the (single) modalities table. */
+  async modalitiesRowCount(cid = DEFAULT_CID): Promise<number> {
+    const t = await this.tableByType('modalities', cid);
+    return t?.rows.length ?? 0;
+  }
+
+  // ---- M3-RWv4 §5: remove with confirm + renumber ------------------------
+  async removeComplaint(complaintId: string, timeout = 15000): Promise<void> {
+    await this.complaintRemoveButton(complaintId).waitForClickable({ timeout });
+    await this.complaintRemoveButton(complaintId).click();
+    await this.removeDialog.waitForDisplayed({ timeout });
+    await this.removeConfirm.waitForClickable({ timeout });
+    await this.removeConfirm.click();
+    await this.removeDialog.waitForDisplayed({ reverse: true, timeout });
+  }
+
+  async removeComplaintCancel(complaintId: string, timeout = 15000): Promise<void> {
+    await this.complaintRemoveButton(complaintId).waitForClickable({ timeout });
+    await this.complaintRemoveButton(complaintId).click();
+    await this.removeDialog.waitForDisplayed({ timeout });
+    await this.removeCancel.waitForClickable({ timeout });
+    await this.removeCancel.click();
+    await this.removeDialog.waitForDisplayed({ reverse: true, timeout });
+  }
+
+  async removeEntry(n: number, timeout = 15000): Promise<void> {
+    await this.entryRemoveButton(n).waitForClickable({ timeout });
+    await this.entryRemoveButton(n).click();
+    await this.removeDialog.waitForDisplayed({ timeout });
+    await this.removeConfirm.waitForClickable({ timeout });
+    await this.removeConfirm.click();
+    await this.removeDialog.waitForDisplayed({ reverse: true, timeout });
+  }
+
+  /** Whether a complaint-remove control exists for the given id (floor-of-one probe). */
+  async hasComplaintRemove(complaintId: string): Promise<boolean> {
+    return this.complaintRemoveButton(complaintId).isExisting();
+  }
+
+  // ---- M3-RWv4 §6: bounded internal scroll -------------------------------
+  /**
+   * Scroll + overflow metrics of the editor box and whether it stays within
+   * the content container (does not overflow past the record toolbar / Save).
+   */
+  async scrollMetrics(cid = DEFAULT_CID): Promise<{
+    scrollHeight: number;
+    clientHeight: number;
+    overflowY: string;
+    scrolls: boolean;
+    withinContent: boolean;
+  }> {
+    return browser.execute((selector: string) => {
+      const ed = document.querySelector(selector) as HTMLElement | null;
+      const content = document.querySelector('[data-testid="case-form-content"]') as HTMLElement | null;
+      if (ed === null) {
+        return { scrollHeight: 0, clientHeight: 0, overflowY: 'visible', scrolls: false, withinContent: false };
+      }
+      const cs = window.getComputedStyle(ed);
+      const edRect = ed.getBoundingClientRect();
+      const contentRect = content?.getBoundingClientRect();
+      const withinContent =
+        contentRect === undefined
+          ? true
+          : edRect.bottom <= Math.ceil(contentRect.bottom) + 1;
+      return {
+        scrollHeight: ed.scrollHeight,
+        clientHeight: ed.clientHeight,
+        overflowY: cs.overflowY,
+        scrolls: ed.scrollHeight > ed.clientHeight,
+        withinContent,
+      };
+    }, `[data-testid="case-form-editor-${cid}"]`) as Promise<{
+      scrollHeight: number;
+      clientHeight: number;
+      overflowY: string;
+      scrolls: boolean;
+      withinContent: boolean;
+    }>;
+  }
+
+  /**
+   * M3-RWv4 §1: "Add follow-up entry" appends a dated entry headed
    * `<complaint-name>-follow-up — <date>` under the CURRENT complaint (same
    * section), proving the follow-up suffix path.
    */

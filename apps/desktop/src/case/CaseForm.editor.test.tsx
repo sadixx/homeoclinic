@@ -544,12 +544,14 @@ describe('CaseForm — inserted sections carry a hr separator and a monotonic nu
 // ---------------------------------------------------------------------------
 
 describe('CaseForm — Add entry inserts a dated-entry heading (ADR 0019 #5)', () => {
-  it('appends a heading node with hcKind=entry on Add entry', async () => {
+  it('appends a heading node with hcKind=entry on Add (follow-up) entry', async () => {
     vi.useFakeTimers();
     renderForm();
     await getEditorRegionWithFakeTimers();
 
-    fireEvent.click(screen.getByTestId('case-form-add-entry'));
+    // RWv4 A2 removed the standalone "Add new entry"; the surviving affordance
+    // that appends a dated-entry heading is "Add follow-up entry".
+    fireEvent.click(screen.getByTestId('case-form-add-followup-entry'));
     await vi.advanceTimersByTimeAsync(2000);
     await vi.waitFor(() => expect(autosave).toHaveBeenCalled());
 

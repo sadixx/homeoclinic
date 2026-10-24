@@ -229,29 +229,29 @@ async function getEditorFake(): Promise<HTMLElement> {
 // C1. the THREE buttons replace the single "Add entry"
 // ---------------------------------------------------------------------------
 
-describe('CaseForm RWv3 — three complaint/entry buttons (spec §5)', () => {
-  it('renders Add new entry / Add follow-up entry / Add new complaint and NOT the old single "Add entry" label', async () => {
+describe('CaseForm RWv4 — complaint/entry buttons (spec §2/§5)', () => {
+  it('renders Add follow-up entry / Add new complaint and NOT the removed "Add new entry" nor the legacy single "Add entry" label', async () => {
     renderForm();
     await waitForEditor();
 
-    const addEntry = screen.getByTestId('case-form-add-entry');
     const addFollowup = screen.getByTestId('case-form-add-followup-entry');
     const addComplaint = screen.getByTestId('case-form-add-complaint');
 
-    expect(addEntry).toBeInTheDocument();
     expect(addFollowup).toBeInTheDocument();
     expect(addComplaint).toBeInTheDocument();
 
-    // clear, accessible labels (not the single legacy "Add entry")
-    expect(addEntry).toHaveTextContent(/add new entry/i);
+    // clear, accessible labels on the two surviving affordances
     expect(addFollowup).toHaveTextContent(/add follow-up entry/i);
     expect(addComplaint).toHaveTextContent(/add new complaint/i);
 
-    // the old single-button label is gone (replaced by "Add new entry")
+    // RWv4 A2: the "Add new entry" affordance was removed entirely…
+    expect(screen.queryByTestId('case-form-add-entry')).toBeNull();
+    expect(screen.queryByText(/add new entry/i)).toBeNull();
+    // …and the legacy single-button "Add entry" label is gone too
     expect(screen.queryByText('Add entry')).toBeNull();
 
-    // all three are real buttons (keyboard-focusable)
-    for (const b of [addEntry, addFollowup, addComplaint]) {
+    // both surviving controls are real buttons (keyboard-focusable)
+    for (const b of [addFollowup, addComplaint]) {
       expect(b.tagName).toBe('BUTTON');
     }
   });
@@ -297,30 +297,31 @@ describe('CaseForm RWv3 — Add new complaint (spec §5)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// C3. Add new entry -> a fresh FIRST dated entry under the current complaint
+// C3. Appending a dated entry (RWv4 A2: the only entry affordance left is
+//     "Add follow-up entry") adds an entry under the CURRENT complaint without
+//     creating a new complaint section.
 // ---------------------------------------------------------------------------
 
-describe('CaseForm RWv3 — Add new entry (spec §5)', () => {
-  it('appends a FIRST dated entry (no -follow-up) under the current complaint', async () => {
+describe('CaseForm RWv4 — appending a dated entry under the current complaint (spec §2/§5)', () => {
+  it('appends a new dated entry under the current complaint (no new complaint section)', async () => {
     vi.useFakeTimers();
     renderForm();
     await getEditorFake();
 
-    fireEvent.click(screen.getByTestId('case-form-add-entry'));
+    // RWv4 removed the standalone "Add new entry"; the surviving affordance
+    // that appends a dated entry to the open complaint is "Add follow-up entry".
+    expect(screen.queryByTestId('case-form-add-entry')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('case-form-add-followup-entry'));
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS);
     await vi.waitFor(() => expect(autosave).toHaveBeenCalled());
 
     const saved = lastSavedJson();
-    const firsts = entryHeadings(saved).filter(
-      (h) => attrs(h)['hcEntryKind'] === 'first',
-    );
-    // the opened doc had one first entry; Add new entry makes a SECOND first entry
-    expect(firsts.length).toBeGreaterThanOrEqual(2);
-    // Add new entry never creates a follow-up
-    const followups = entryHeadings(saved).filter(
-      (h) => attrs(h)['hcEntryKind'] === 'follow_up',
-    );
-    expect(followups).toHaveLength(0);
+    // a new dated entry was appended (the opened doc had one entry already)
+    expect(entryHeadings(saved).length).toBeGreaterThanOrEqual(2);
+    // it stays under the SAME single complaint — no new complaint created
+    const complaints = saved['complaints'] as Record<string, unknown>[];
+    expect(complaints).toHaveLength(1);
   });
 });
 

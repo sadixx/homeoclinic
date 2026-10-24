@@ -108,6 +108,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 // typed file-open + encrypted store + one txn/one audit row.
                 commands::attachment::visit_attach_report,
                 commands::attachment::visit_list_attachments,
+                commands::attachment::patient_list_attachments,
                 commands::attachment::visit_open_attachment,
                 commands::attachment::visit_delete_attachment,
                 commands::attachment::visit_pick_report_file
@@ -171,6 +172,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 // Visit lab-report attachments (PAT-009, M3ux3).
                 commands::attachment::visit_attach_report,
                 commands::attachment::visit_list_attachments,
+                commands::attachment::patient_list_attachments,
                 commands::attachment::visit_open_attachment,
                 commands::attachment::visit_delete_attachment,
                 commands::attachment::visit_pick_report_file,

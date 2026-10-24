@@ -389,3 +389,100 @@ the library, the CSP, or the record-section popups.
   borders and full-width layout are all preserved. The orphaned
   `case.form.zoomIn/zoomOut` en.json keys (editor no longer has its own zoom) are
   pruned.
+
+---
+
+## Increment M3-RWv4 — editor refinement batch (2026-10-24)
+
+Status: Accepted (increment on this ADR, branch `HC-MVP1-M3a-case-visits`).
+Detail handoff: `.worklog/HC-MVP1-M3/handoffs/M3-RWv4-design.md` (the full spec —
+exact data/command shapes, testids, slice plan). This note records the decision
+only. No production code in the design stage.
+
+This increment refines the RWv3 multi-complaint editor. It does NOT change the
+editor library, the strict CSP (`script-src 'self'`, no relaxation), the offline
+guarantee (TipTap bundled, no network), or the storage contract (`visit.data_json`
+stays opaque `TEXT`; `visit_fts` still indexes `COALESCE(data_json,'')` via the
+top-level `text` mirror; autosave stays one `UPDATE visit` + one audit row).
+
+- **Serialization: EXTEND v3, no v4 bump** (RWv3 precedent — a bump is reserved
+  for a breaking change). The ONLY additive doc change is a new, backward-tolerant
+  `tableRow.attrs.hcInvestigationLink` (`{ attachmentId }` | null; missing ⇒ not a
+  link row), registered on `tableRow` in the `HcAttributes` extension the same
+  hardened way as the other `hc*` attrs. Every existing v3 document is already a
+  valid RWv4 document; `normalizeV3` needs no upcast (absence ⇒ null). The FTS
+  `text` mirror continues to cover complaint headings, entry headings, list text
+  and every table cell including the linked-investigation display labels — no
+  trigger change.
+
+- **Complaint heading** renders ONCE as a **bold + underlined** standout heading
+  via CSS scoped to `.hc-case-editor h1[data-hc-kind='complaint']` (a `style-src`
+  change only), NOT via toggleable ProseMirror marks — so the standout styling
+  cannot be stripped while editing and the attr-derived heading text still
+  round-trips. No node/attr/version change.
+
+- **Buttons:** REMOVE "Add new entry"; keep ONLY "Add follow-up entry" and "Add
+  new complaint". "Add new complaint" creates the section + its initial (`first`)
+  entry; thereafter only follow-up entries are added. The `'first'` entry kind is
+  unchanged (still produced by `buildNewComplaintNodes`); the orphaned
+  `case.form.addNewEntry` en.json key is pruned.
+
+- **Lists:** a Word-style bullet/ordered-list toolbar using the `BulletList`/
+  `OrderedList`/`ListItem` nodes already bundled in the pinned `@tiptap/starter-
+  kit@2.11.5` (no new dependency). Lists round-trip as standard nodes; list text
+  is already extracted into the FTS mirror via the paragraph walk.
+
+- **Modalities = one appendable table per entry:** the FIRST "Record modalities"
+  in an entry creates the table; subsequent presses in the SAME entry APPEND body
+  rows to that table (located by the last `hcTableType:"modalities"` table within
+  the current entry span) rather than inserting a new numbered table. ONLY
+  modalities appends (explicit user default); vitals/family/physical-generals/
+  investigations/prescription keep one-table-per-press. Appends consume no new
+  section number.
+
+- **Investigations Suggested/Submitted DROPDOWN + two-way link + a new "Lab
+  reports & Scans" view.** Status becomes a two-option dropdown. "Submitted" opens
+  a popup offering (a) upload a new report or (b) pick an already-uploaded patient
+  attachment. The patient's attachments are ONE shared store: an upload via
+  Submitted (keyed to the visit, patient resolved backend-side) also appears in
+  Lab reports & Scans, and a file there is pick-able by Submitted. Linking writes a
+  `data_json` link row (`hcInvestigationLink`), distinct from the attachment
+  itself.
+  - **Rename = display label only:** on save the stored `original_name`/`caption`
+    display label becomes `<investigation-name>-<patient-name>-<current-date>`
+    (sanitised: no path separators/control chars; never logged — R-PRIV-001). The
+    on-disk blob stays the opaque encrypted UUID (R-PRIV-007); `blob_id`/file
+    name never change.
+  - **Unlink ≠ Delete (kept separate, both confirmed).** "Remove from this
+    investigation" (UNLINK) drops the link row from the doc — a `data_json` edit
+    via the existing `case_visit_autosave` (one `UPDATE visit` + one audit row);
+    the `attachment` row and blob are untouched. "Delete file" removes the
+    attachment everywhere via the existing `visit_delete_attachment` (one txn +
+    one audit row + post-commit blob delete, ADR 0017). A deleted file leaves link
+    rows dangling by design; the UI shows a "file no longer available" state and
+    offers Unlink. A warning note "make sure to upload the correct file against
+    the name" sits under the upload control.
+  - **Commands (regenerate specta bindings):** NEW `patient_list_attachments`
+    (read-only, bounded, uses the existing `ix_attachment_patient`); CHANGED
+    `AttachmentSummary` (+`patientId`,`visitId`) and `AttachReportRequest`
+    (+optional `displayLabel`, a display label only, audit diff unchanged). NO new
+    migration (the `patient_id` column + index already exist in migration 0010).
+    NO command for unlink (it is a `data_json` edit).
+
+- **Remove (x) on every complaint section AND follow-up entry**, each behind a
+  CONFIRM warning. Removal is a pure doc transform (`removeComplaint`/`removeEntry`
+  in `caseRich.ts`) that drops the node range and re-numbers remaining complaints
+  by position (RWv3 §4); the editor never drops to zero complaints (falls back to
+  one empty complaint with one `first` entry).
+
+- **Editor height/scroll:** the editor container becomes BOUNDED with INTERNAL
+  `overflow-y-auto` within the flex column (today `min-h-[16rem] w-full flex-1`
+  with no max/overflow overgrows and overwrites the record toolbar / Investigations
+  panel). The format toolbar stays fixed above and the record toolbar + panel stay
+  fixed below. Layout/CSS only — no serialization, command or CSP impact.
+
+- **One BLOCKING item:** the new "Lab reports & Scans" screen needs a UI spec —
+  either a new `docs/ui/S23-lab-reports.md` or embedding it as a panel in the S07
+  dashboard spec. Recorded in the handoff §12; everything else proceeds on the
+  non-blocking assumptions (modalities-only append; rename = display label only;
+  Submitted pick-from-existing; version stays 3; link-delete independence).

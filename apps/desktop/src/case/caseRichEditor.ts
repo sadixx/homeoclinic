@@ -28,6 +28,7 @@ import TableCell from '@tiptap/extension-table-cell';
 import {
   CASE_RICH_SCHEMA,
   CASE_RICH_VERSION,
+  appendRowsToTable,
   buildDatedEntryNodes,
   buildNewComplaintNodes,
   buildSectionNodes,
@@ -38,6 +39,7 @@ import {
   type ProseMirrorNode,
   type RichComplaint,
   type SectionNodesArgs,
+  type TableSeed,
   type V3Doc,
 } from './caseRich';
 
@@ -59,10 +61,23 @@ const HcAttributes = Extension.create({
           hcKind: {
             default: null,
             parseHTML: (el) => el.getAttribute('data-hc-kind'),
-            renderHTML: (attrs) =>
-              attrs['hcKind'] !== null && attrs['hcKind'] !== undefined
-                ? { 'data-hc-kind': attrs['hcKind'] as string }
-                : {},
+            renderHTML: (attrs) => {
+              const kind = attrs['hcKind'];
+              if (kind === null || kind === undefined) return {};
+              const out: Record<string, string> = {
+                'data-hc-kind': kind as string,
+              };
+              // M3-RWv4 §1: the complaint heading is a BOLD + UNDERLINED
+              // standout. The styling is primarily the scoped index.css rule on
+              // h1[data-hc-kind="complaint"]; these utility classes carry the
+              // same intent on the element itself so the standout survives even
+              // where the stylesheet is not applied (e.g. jsdom/RTL assertions)
+              // — still style-only, no new node/attr, no serialization change.
+              if (kind === 'complaint') {
+                out['class'] = 'font-bold underline';
+              }
+              return out;
+            },
           },
           hcSectionNo: {
             default: null,
@@ -143,6 +158,44 @@ const HcAttributes = Extension.create({
               attrs['hcComplaintId'] !== undefined
                 ? { 'data-hc-complaint-id': attrs['hcComplaintId'] as string }
                 : {},
+          },
+        },
+      },
+      {
+        // M3-RWv4 §5.3: the investigation LINK attr lives on the table ROW so a
+        // row can REFERENCE a shared patient attachment without duplicating it.
+        // The value is a JSON object `{ attachmentId }` (or null) serialised to
+        // a single `data-hc-investigation-link` data-attr, the same hardened
+        // pattern as the other `hc*` attrs; `reviveSafe` in parseCaseDoc guards
+        // the parse boundary against prototype pollution. Additive to v3:
+        // absence ⇒ null ⇒ not a link row (backward tolerant, no upcast).
+        types: ['tableRow'],
+        attributes: {
+          hcInvestigationLink: {
+            default: null,
+            parseHTML: (el) => {
+              const raw = el.getAttribute('data-hc-investigation-link');
+              if (raw === null) return null;
+              try {
+                const parsed = JSON.parse(raw) as unknown;
+                return isRecord(parsed) &&
+                  typeof parsed['attachmentId'] === 'string'
+                  ? { attachmentId: parsed['attachmentId'] }
+                  : null;
+              } catch {
+                return null;
+              }
+            },
+            renderHTML: (attrs) => {
+              const link = attrs['hcInvestigationLink'];
+              return isRecord(link) && typeof link['attachmentId'] === 'string'
+                ? {
+                    'data-hc-investigation-link': JSON.stringify({
+                      attachmentId: link['attachmentId'],
+                    }),
+                  }
+                : {};
+            },
           },
         },
       },
@@ -300,6 +353,31 @@ function resolveCurrentComplaintId(editor: Editor): string {
 }
 
 /**
+ * Is the current selection anchored on a top-level complaint heading
+ * (`heading[hcKind='complaint']`)? Walks every ancestor depth of the selection
+ * `$from` for a heading node carrying `hcKind === 'complaint'`.
+ *
+ * M3-RWv4 build-12 DEFECT 1 (DATA LOSS): the Word-style list toggles wrap the
+ * node under the caret into a list item. If the caret sits on the complaint
+ * heading, TipTap wraps the HEADING into a `listItem`, so
+ * {@link splitSpineToComplaints} (which delimits complaint sections by a
+ * top-level `heading[hcKind='complaint']`) can no longer see it and the WHOLE
+ * complaint section is lost (and is not restored after relaunch). The list
+ * toolbar MUST therefore refuse to run over a complaint heading — the toggles
+ * stay fully available inside entry body text.
+ */
+export function selectionIsOnComplaintHeading(editor: Editor): boolean {
+  const { $from } = editor.state.selection;
+  for (let depth = $from.depth; depth >= 0; depth -= 1) {
+    const node = $from.node(depth);
+    if (node.type.name === 'heading' && node.attrs['hcKind'] === 'complaint') {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Append the record-section nodes (full-width rule + numbered heading + seeded
  * table) at the END of the document (M3-RWv3 §5: into the current entry — the
  * last entry of the current complaint, which in a chronological append is the
@@ -386,4 +464,231 @@ export function currentComplaintName(editor: Editor): string {
     .map((c) => (c.type === 'text' && typeof c.text === 'string' ? c.text : ''))
     .join('');
   return raw.replace(/^\s*\d+\.\s*/, '');
+}
+
+/** Type guard: a non-null, non-array object (parse-boundary + attr helpers). */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * M3-RWv4 §4 — "Record modalities" is ONE appendable table per entry. The FIRST
+ * press in an entry creates the modalities table (rule + numbered heading +
+ * table, via {@link insertSectionNodes}); a SUBSEQUENT press in the SAME entry
+ * APPENDS the seed's body rows to that same table instead of inserting a new
+ * one.
+ *
+ * The "current entry" is the LAST entry of the current complaint, which in a
+ * chronological append is the document tail — so the target modalities table is
+ * the LAST top-level `table` with `attrs.hcTableType === 'modalities'` that
+ * follows the last entry heading. When one exists the new rows are spliced into
+ * it as a fresh document (re-set from the edited JSON, consistent with the
+ * other glue that re-sets content); otherwise the create path runs.
+ *
+ * Only modalities appends (M3-RWv4 assumption A); vitals/family/etc. keep the
+ * one-table-per-press behaviour. No `.focus()`/scrollIntoView (jsdom lacks the
+ * geometry APIs). The first seed row shapes the created table's header; each
+ * append contributes its seed rows as body rows.
+ */
+export function appendOrCreateModalities(
+  editor: Editor,
+  seed: TableSeed,
+): void {
+  const content = (editor.getJSON() as JsonDoc).content ?? [];
+  const targetIndex = lastModalitiesTableIndex(content);
+  if (targetIndex === -1) {
+    // No modalities table in the current (tail) entry yet → create one.
+    const sectionNo = modalitiesSectionNo(content);
+    insertSectionNodes(editor, {
+      kind: 'modalities',
+      sectionNo,
+      seed,
+    });
+    return;
+  }
+  // Append the seed's body rows to the existing modalities table and re-set the
+  // document from the edited JSON (same re-set pattern as initialContent).
+  const grown = appendRowsToTable(
+    content[targetIndex]!,
+    seed.rows.map((r) => [...r]),
+  );
+  const nextContent = content.map((n, i) => (i === targetIndex ? grown : n));
+  const nextDoc = JSON.parse(
+    JSON.stringify({ type: 'doc', content: nextContent }),
+  ) as Content;
+  editor.chain().setContent(nextDoc).run();
+}
+
+/**
+ * The index in `content` of the LAST top-level `table` with
+ * `hcTableType === 'modalities'` that belongs to the CURRENT (tail) entry — the
+ * nodes after the last `hcKind:"entry"` heading. Returns -1 when the current
+ * entry has no modalities table yet. Scanning only after the last entry heading
+ * keeps a prior entry's modalities table from being appended to.
+ */
+function lastModalitiesTableIndex(content: readonly ProseMirrorNode[]): number {
+  let lastEntryIndex = -1;
+  for (let i = 0; i < content.length; i += 1) {
+    const n = content[i]!;
+    if (n.type === 'heading' && n.attrs?.['hcKind'] === 'entry') {
+      lastEntryIndex = i;
+    }
+  }
+  let found = -1;
+  for (let i = lastEntryIndex + 1; i < content.length; i += 1) {
+    const n = content[i]!;
+    if (n.type === 'table' && n.attrs?.['hcTableType'] === 'modalities') {
+      found = i;
+    }
+  }
+  return found;
+}
+
+/** The next section number to stamp on a freshly-created modalities table. */
+function modalitiesSectionNo(content: readonly ProseMirrorNode[]): number {
+  let max = 0;
+  const walk = (n: ProseMirrorNode): void => {
+    if (n.type === 'heading' && n.attrs?.['hcKind'] === 'section') {
+      const no = n.attrs?.['hcSectionNo'];
+      if (typeof no === 'number' && no > max) max = no;
+    }
+    for (const c of n.content ?? []) walk(c);
+  };
+  for (const n of content) walk(n);
+  return max + 1;
+}
+
+/** One complaint's structure for the React remove-control overlay (M3-RWv4 §6). */
+export interface ComplaintStructure {
+  /** The complaint id (`cc<n>`), used in the remove-control testid. */
+  readonly complaintId: string;
+  /** The display name (from the header text), for the control's aria-label. */
+  readonly name: string;
+  /** How many `hcKind:"entry"` entries this complaint has. */
+  readonly entryCount: number;
+}
+
+/**
+ * Derive the complaint/entry structure of the live editor doc (M3-RWv4 §6) so
+ * the React layer can render a focusable remove (x) control per complaint and
+ * per entry WITHOUT making them editable doc nodes. Entry indices are
+ * doc-order, global across complaints (matching the `case-form-entry-remove-<n>`
+ * testid, n = 1-based entry position in the whole document).
+ */
+export function caseStructure(editor: Editor): {
+  complaints: ComplaintStructure[];
+  /** Flat, doc-order list of `{ complaintId, entryIndex }` per entry. */
+  entries: { complaintId: string; entryIndex: number }[];
+} {
+  const content = (editor.getJSON() as JsonDoc).content ?? [];
+  const complaints: ComplaintStructure[] = [];
+  const entries: { complaintId: string; entryIndex: number }[] = [];
+  let currentId = 'cc1';
+  for (const n of content) {
+    if (n.type === 'heading' && n.attrs?.['hcKind'] === 'complaint') {
+      const id = n.attrs?.['hcComplaintId'];
+      currentId = typeof id === 'string' ? id : `cc${complaints.length + 1}`;
+      const name = (n.content ?? [])
+        .map((c) =>
+          c.type === 'text' && typeof c.text === 'string' ? c.text : '',
+        )
+        .join('')
+        .replace(/^\s*\d+\.\s*/, '');
+      complaints.push({ complaintId: currentId, name, entryCount: 0 });
+    } else if (n.type === 'heading' && n.attrs?.['hcKind'] === 'entry') {
+      const last = complaints[complaints.length - 1];
+      const entryIndex = last ? last.entryCount : 0;
+      entries.push({ complaintId: currentId, entryIndex });
+      if (last) {
+        complaints[complaints.length - 1] = {
+          ...last,
+          entryCount: last.entryCount + 1,
+        };
+      }
+    }
+  }
+  return { complaints, entries };
+}
+
+/** Re-set the editor's whole document from a spine doc, deep-cloned (glue). */
+export function setEditorSpine(editor: Editor, spine: ProseMirrorNode): void {
+  const next = JSON.parse(JSON.stringify(spine)) as Content;
+  editor.chain().setContent(next).run();
+}
+
+/** The live editor doc as a spine `ProseMirrorNode` (for pure transforms). */
+export function editorSpine(editor: Editor): ProseMirrorNode {
+  return { type: 'doc', content: (editor.getJSON() as JsonDoc).content ?? [] };
+}
+
+/**
+ * Remove the investigation LINK row carrying `attrs.hcInvestigationLink.
+ * attachmentId === attachmentId` from the live editor doc (M3-RWv4 §5.6 UNLINK)
+ * — a `data_json` edit ONLY; the underlying attachment is NOT touched. Returns
+ * the new spine so the caller re-sets content + autosaves.
+ */
+export function unlinkInvestigationRow(
+  editor: Editor,
+  attachmentId: string,
+): ProseMirrorNode {
+  const stripRows = (node: ProseMirrorNode): ProseMirrorNode => {
+    const children = node.content;
+    if (children === undefined) return node;
+    const kept = children
+      .filter((c) => {
+        const link = c.attrs?.['hcInvestigationLink'] as
+          | { attachmentId?: string }
+          | null
+          | undefined;
+        return !(
+          c.type === 'tableRow' &&
+          link != null &&
+          link.attachmentId === attachmentId
+        );
+      })
+      .map(stripRows);
+    return { ...node, content: kept };
+  };
+  return stripRows(editorSpine(editor));
+}
+
+/**
+ * Append an investigation LINK row (display-label cells + `hcInvestigationLink`)
+ * to the LAST investigations table in the current (tail) entry, creating the
+ * table if none exists (M3-RWv4 §5.3). Returns the new spine for the caller to
+ * re-set + autosave. `linkRow` is built by `caseRich.buildInvestigationLinkRow`.
+ */
+export function appendInvestigationLink(
+  editor: Editor,
+  linkRow: ProseMirrorNode,
+  createTable: () => ProseMirrorNode[],
+): ProseMirrorNode {
+  const content = [...((editor.getJSON() as JsonDoc).content ?? [])];
+  // Find the last investigations table after the last entry heading.
+  let lastEntryIndex = -1;
+  for (let i = 0; i < content.length; i += 1) {
+    const n = content[i]!;
+    if (n.type === 'heading' && n.attrs?.['hcKind'] === 'entry') {
+      lastEntryIndex = i;
+    }
+  }
+  let tableIndex = -1;
+  for (let i = lastEntryIndex + 1; i < content.length; i += 1) {
+    const n = content[i]!;
+    if (n.type === 'table' && n.attrs?.['hcTableType'] === 'investigations') {
+      tableIndex = i;
+    }
+  }
+  if (tableIndex === -1) {
+    // No investigations table yet → create one that already carries the link.
+    const created = createTable();
+    return { type: 'doc', content: [...content, ...created] };
+  }
+  const table = content[tableIndex]!;
+  const grown: ProseMirrorNode = {
+    ...table,
+    content: [...(table.content ?? []), linkRow],
+  };
+  const next = content.map((n, i) => (i === tableIndex ? grown : n));
+  return { type: 'doc', content: next };
 }

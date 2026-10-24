@@ -16,7 +16,8 @@ use tauri::State;
 use crate::attachment::{
     AttachReportRequest, AttachReportResponse, AttachmentService, DeleteAttachmentRequest,
     DeleteAttachmentResponse, ListAttachmentsRequest, ListAttachmentsResponse,
-    OpenAttachmentRequest, OpenAttachmentResponse, PickReportFileResponse,
+    OpenAttachmentRequest, OpenAttachmentResponse, PatientListAttachmentsRequest,
+    PickReportFileResponse,
 };
 use crate::error::{map_error, to_user_result, AppError, UserFacingError};
 use crate::state::AppState;
@@ -76,6 +77,20 @@ pub fn visit_list_attachments(
     req: ListAttachmentsRequest,
 ) -> Result<ListAttachmentsResponse, UserFacingError> {
     with_pool(&state, |pool| service(&state).list_attachments(pool, req))
+}
+
+/// List ALL of a patient's attachments across visits (M3-RWv4 §5.4) — the
+/// shared two-way store behind the Lab reports & Scans dashboard panel and the
+/// Submitted pick-existing list. Read-only (`with_pool`), bounded (R-DATA-007).
+#[tauri::command]
+#[specta::specta]
+pub fn patient_list_attachments(
+    state: State<'_, AppState>,
+    req: PatientListAttachmentsRequest,
+) -> Result<ListAttachmentsResponse, UserFacingError> {
+    with_pool(&state, |pool| {
+        service(&state).list_attachments_for_patient(pool, req)
+    })
 }
 
 /// Open (decrypt) an attachment for in-app preview (PAT-009, ADR 0017).

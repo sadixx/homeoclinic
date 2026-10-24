@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import {
   commands,
+  type AttachmentSummary,
   type PatientDashboard as PatientDashboardData,
 } from '@/bindings';
 import { run } from '@/shared/command';
@@ -498,6 +499,12 @@ export function PatientDashboard({
         </div>
       </div>
 
+      {/* M3-RWv4 §5.4 (leader decision): "Lab reports & Scans" is a PANEL on the
+          S07 dashboard (not a new route). Lists the patient's attachments across
+          visits via the shared two-way store (patient_list_attachments) with
+          open/preview and a delete-everywhere behind a confirm. */}
+      <LabReportsPanel patientId={patientId} />
+
       {/* Move-to-bin confirm dialog, names the patient (PAT-008, §4) */}
       {confirmingDelete ? (
         <div
@@ -530,6 +537,276 @@ export function PatientDashboard({
               >
                 {t('patient.dash.delete.confirm')}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** Whether a mime is an image (drives the type badge + preview mode). */
+function isImageMime(mime: string): boolean {
+  return mime.startsWith('image/');
+}
+
+/**
+ * M3-RWv4 §5.4 — the "Lab reports & Scans" panel (leader decision: a PANEL on
+ * the S07 dashboard, NOT a new route). Lists ALL of the patient's attachments
+ * across visits via the shared two-way store `patient_list_attachments`, with
+ * open/preview and a delete-everywhere behind a confirm (visit_delete_attachment
+ * removes the row + blob everywhere). Calls ONLY typed bindings; the display
+ * label (not the opaque blob id) is shown. No patient data is logged
+ * (R-PRIV-001).
+ */
+function LabReportsPanel({
+  patientId,
+}: {
+  readonly patientId: string;
+}): JSX.Element {
+  const [attachments, setAttachments] = useState<AttachmentSummary[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    url: string;
+    name: string;
+    isImage: boolean;
+  } | null>(null);
+
+  const reload = useCallback(async (): Promise<void> => {
+    const res = await run(commands.patientListAttachments({ patientId }));
+    setAttachments(res.attachments);
+    setLoaded(true);
+  }, [patientId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoaded(false);
+    setError(false);
+    void (async (): Promise<void> => {
+      try {
+        const res = await run(commands.patientListAttachments({ patientId }));
+        if (!cancelled) {
+          setAttachments(res.attachments);
+          setLoaded(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setLoaded(true);
+          setError(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId]);
+
+  const onOpen = useCallback(async (attachmentId: string): Promise<void> => {
+    try {
+      const res = await run(commands.visitOpenAttachment({ attachmentId }));
+      setPreview({
+        url: `data:${res.mime};base64,${res.dataBase64}`,
+        name: res.originalName ?? '',
+        isImage: isImageMime(res.mime),
+      });
+    } catch {
+      setError(true);
+    }
+  }, []);
+
+  const onConfirmDelete = useCallback(async (): Promise<void> => {
+    if (confirmId === null) return;
+    const id = confirmId;
+    setConfirmId(null);
+    try {
+      await run(commands.visitDeleteAttachment({ attachmentId: id }));
+      await reload();
+    } catch {
+      setError(true);
+    }
+  }, [confirmId, reload]);
+
+  return (
+    <section
+      data-testid="patient-dash-lab-reports-panel"
+      aria-label={t('patient.dash.labReports.title')}
+      className="rounded border border-slate-200 p-3"
+    >
+      <h2 className="mb-1 text-xs font-semibold uppercase text-slate-500">
+        {t('patient.dash.labReports.title')}
+      </h2>
+      <p className="mb-2 text-xs text-slate-500">
+        {t('patient.dash.labReports.hint')}
+      </p>
+
+      {!loaded ? (
+        <p
+          data-testid="patient-dash-lab-reports-loading"
+          aria-busy="true"
+          className="text-sm text-slate-500"
+        >
+          {t('patient.dash.labReports.loading')}
+        </p>
+      ) : null}
+
+      {loaded && error ? (
+        <p
+          role="alert"
+          data-testid="patient-dash-lab-reports-error"
+          className="text-sm text-red-700"
+        >
+          {t('patient.dash.labReports.error')}
+        </p>
+      ) : null}
+
+      {loaded && !error && attachments.length === 0 ? (
+        <p
+          data-testid="patient-dash-lab-reports-empty"
+          className="text-sm text-slate-500"
+        >
+          {t('patient.dash.labReports.empty')}
+        </p>
+      ) : null}
+
+      {attachments.length > 0 ? (
+        <ul
+          data-testid="patient-dash-lab-reports-list"
+          className="flex flex-col gap-2"
+        >
+          {attachments.map((a, index) => {
+            const n = index + 1;
+            const image = isImageMime(a.mime);
+            return (
+              <li
+                key={a.attachmentId}
+                data-testid={`patient-dash-lab-reports-item-${n}`}
+                className="flex items-center justify-between gap-3 rounded border border-slate-200 px-3 py-2"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    data-testid={`patient-dash-lab-reports-badge-${n}`}
+                    className={[
+                      'flex-none rounded px-1.5 py-0.5 text-[0.7rem] font-semibold uppercase',
+                      image
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-rose-100 text-rose-800',
+                    ].join(' ')}
+                  >
+                    {image
+                      ? t('patient.dash.labReports.badge.image')
+                      : t('patient.dash.labReports.badge.pdf')}
+                  </span>
+                  <span className="min-w-0 truncate font-medium">
+                    {a.originalName ?? a.caption ?? ''}
+                  </span>
+                </div>
+                <div className="flex flex-none items-center gap-2">
+                  <button
+                    type="button"
+                    data-testid={`patient-dash-lab-reports-open-${n}`}
+                    onClick={() => void onOpen(a.attachmentId)}
+                    className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    {t('patient.dash.labReports.open')}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`patient-dash-lab-reports-delete-${n}`}
+                    onClick={() => setConfirmId(a.attachmentId)}
+                    className="rounded border border-slate-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    {t('patient.dash.labReports.delete')}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      {confirmId !== null ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('patient.dash.labReports.delete.title')}
+          data-testid="patient-dash-lab-reports-delete-dialog"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setConfirmId(null);
+          }}
+        >
+          <div className="w-[26rem] rounded border border-slate-300 bg-white p-4 shadow-lg">
+            <h3 className="mb-1 text-sm font-semibold">
+              {t('patient.dash.labReports.delete.title')}
+            </h3>
+            <p className="mb-3 text-xs text-slate-600">
+              {t('patient.dash.labReports.delete.body')}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                data-testid="patient-dash-lab-reports-delete-cancel"
+                onClick={() => setConfirmId(null)}
+                className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {t('patient.dash.labReports.delete.cancel')}
+              </button>
+              <button
+                type="button"
+                data-testid="patient-dash-lab-reports-delete-confirm"
+                onClick={() => void onConfirmDelete()}
+                className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-red-700"
+              >
+                {t('patient.dash.labReports.delete.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {preview !== null ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={preview.name}
+          data-testid="patient-dash-lab-reports-preview"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setPreview(null);
+          }}
+        >
+          <div className="flex max-h-[85vh] w-[48rem] flex-col rounded border border-slate-300 bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
+              <h3 className="truncate text-sm font-semibold">{preview.name}</h3>
+              <button
+                type="button"
+                data-testid="patient-dash-lab-reports-preview-close"
+                onClick={() => setPreview(null)}
+                className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {t('patient.dash.labReports.preview.close')}
+              </button>
+            </div>
+            <div className="overflow-auto p-4">
+              {preview.isImage ? (
+                <img
+                  data-testid="patient-dash-lab-reports-preview-image"
+                  src={preview.url}
+                  alt={preview.name}
+                  className="mx-auto max-h-[70vh] max-w-full"
+                />
+              ) : (
+                <a
+                  data-testid="patient-dash-lab-reports-preview-download"
+                  href={preview.url}
+                  download={preview.name}
+                  className="inline-block rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-700"
+                >
+                  {t('patient.dash.labReports.preview.download')}
+                </a>
+              )}
             </div>
           </div>
         </div>

@@ -76,6 +76,19 @@
   cursor: col-resize;
 }
 
+/* ---------------------------------------------------------------------------
+   M3-RWv4 §1 — complaint-section heading standout. A complaint renders ONCE as
+   an `hcKind:"complaint"` h1 (data-hc-kind="complaint"); this scopes a BOLD +
+   UNDERLINED standout look to it so the section it heads visibly dominates.
+   Style-only (style-src 'self'), no new node/attr, no serialization change.
+   --------------------------------------------------------------------------- */
+.hc-case-editor h1[data-hc-kind='complaint'] {
+  font-weight: 700; /* bold */
+  text-decoration: underline; /* underlined */
+  font-size: 1.35em; /* standout size, scales with the zoom baseline */
+  margin: 0.75rem 0 0.5rem;
+}
+
 :root {
   /* Normal font size baseline (SET-005 / 00-conventions §1): 14px. */
   font-size: 14px;
