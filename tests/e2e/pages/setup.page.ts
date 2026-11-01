@@ -8,6 +8,10 @@ function byTestId(id: string): ChainablePromiseElement {
   return $(`[data-testid="${id}"]`);
 }
 
+/** Council every shared-setup spec picks from the Step 1 dropdown. */
+export const DEFAULT_COUNCIL_LABEL =
+  'Maharashtra — Maharashtra Council of Homoeopathy';
+
 /** The four-step first-run wizard (SET-001..004, LIC-063 dev trial). */
 export class SetupPage {
   get wizard(): ChainablePromiseElement {
@@ -65,17 +69,98 @@ export class SetupPage {
     await el.setValue(value);
   }
 
-  /** Fill step 1 (doctor) and advance. */
-  async fillDoctorAndNext(): Promise<void> {
+  get back(): ChainablePromiseElement {
+    return byTestId('setup-back');
+  }
+
+  // Step 1 registration council (HC-MVP1-M3set): a <select> of the verified
+  // registering authorities + "Other (type manually)" revealing a text box.
+  get council(): ChainablePromiseElement {
+    return byTestId('setup-doctor-council');
+  }
+
+  get councilError(): ChainablePromiseElement {
+    return byTestId('setup-doctor-council-error');
+  }
+
+  get councilOther(): ChainablePromiseElement {
+    return byTestId('setup-doctor-council-other');
+  }
+
+  get councilOtherError(): ChainablePromiseElement {
+    return byTestId('setup-doctor-council-other-error');
+  }
+
+  /**
+   * Choose a council by its visible label. The current build renders a
+   * <select>; an older build (the R1 binary driven by upgrade-path PHASE C)
+   * still renders a free-text <input>, so type the label there instead.
+   */
+  async selectCouncil(label: string): Promise<void> {
+    const el = this.council;
+    await el.waitForDisplayed({ timeout: 10000 });
+    if ((await el.getTagName()).toLowerCase() === 'select') {
+      await el.selectByVisibleText(label);
+      await browser.waitUntil(async () => (await el.getValue()) !== '', {
+        timeout: 10000,
+        timeoutMsg: `council option "${label}" was not selected`,
+      });
+    } else {
+      await el.setValue(label);
+    }
+  }
+
+  /** Visible texts of every council <option>, in DOM order (read via the testid'd select). */
+  async councilOptionTexts(): Promise<string[]> {
+    const el = await this.council;
+    await el.waitForDisplayed({ timeout: 10000 });
+    return browser.execute(
+      (sel: HTMLSelectElement) =>
+        Array.from(sel.options).map((o) => o.text),
+      el as unknown as HTMLSelectElement,
+    );
+  }
+
+  /** Current value of the council <select> ('' | listed label | '__other__'). */
+  async councilValue(): Promise<string> {
+    return this.council.getValue();
+  }
+
+  /** Type into the Other council text box (shown only when Other is chosen). */
+  async typeCouncilOther(text: string): Promise<void> {
+    await this.setField('setup-doctor-council-other', text);
+  }
+
+  /** Fill the non-council required step-1 fields with synthetic data. */
+  async fillDoctorBasics(): Promise<void> {
     await this.setField('setup-doctor-name', 'Dr Aarti Rao');
     await this.setField('setup-doctor-qualification', 'BHMS');
     await this.setField('setup-doctor-regno', 'HMC-12345');
-    await this.setField('setup-doctor-council', 'Maharashtra Homoeopathy Council');
+  }
+
+  /** Press Next and wait until the step rail reports `step`. */
+  async nextAndWaitForStep(step: number, what: string): Promise<void> {
     await this.next.click();
     await browser.waitUntil(
-      async () => (await this.stepIndicator.getText()).includes(' 2 '),
-      { timeout: 10000, timeoutMsg: 'did not advance to step 2 (clinic)' },
+      async () => (await this.stepIndicator.getText()).includes(` ${step} `),
+      { timeout: 10000, timeoutMsg: `did not advance to step ${step} (${what})` },
     );
+  }
+
+  /** Press Back and wait until the step rail reports `step`. */
+  async backAndWaitForStep(step: number): Promise<void> {
+    await this.back.click();
+    await browser.waitUntil(
+      async () => (await this.stepIndicator.getText()).includes(` ${step} `),
+      { timeout: 10000, timeoutMsg: `did not go back to step ${step}` },
+    );
+  }
+
+  /** Fill step 1 (doctor) and advance. */
+  async fillDoctorAndNext(): Promise<void> {
+    await this.fillDoctorBasics();
+    await this.selectCouncil(DEFAULT_COUNCIL_LABEL);
+    await this.nextAndWaitForStep(2, 'clinic');
   }
 
   /** Fill step 2 (clinic) and advance. */

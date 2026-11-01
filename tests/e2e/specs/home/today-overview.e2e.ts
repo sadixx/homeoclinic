@@ -20,7 +20,7 @@
 import { expect } from '@wdio/globals';
 
 import { bootPage } from '../../pages/boot.page.js';
-import { casePage } from '../../pages/case.page.js';
+import { caseRichPage } from '../../pages/case-rich.page.js';
 import { followupPage } from '../../pages/followup.page.js';
 import { patientsPage } from '../../pages/patients.page.js';
 import { shellPage } from '../../pages/shell.page.js';
@@ -48,16 +48,14 @@ async function seedPatientWithFollowup(
   await patientsPage.fillCore({ name, age, city: 'Pune' });
   await patientsPage.saveAndWaitForDashboard();
 
+  // First case through the current rich case form (ADR 0019; the retired
+  // journal box is gone since M3-RWv2).
   await patientsPage.dashTakeCase();
-  await casePage.waitForForm();
-  const ids = await casePage.routeIds();
-  await casePage.complaintTitle.waitForDisplayed({ timeout: 15000 });
-  await casePage.complaintTitle.setValue(`Chief complaint for ${name}`);
-  await casePage.addTextBlock();
-  const blockId = await casePage.firstBlockId('cc1');
-  await casePage.typeInBlock('cc1', blockId, `Chief complaint for ${name}`);
-  await casePage.save();
-  const caseSaved = await casePage.waitForSaved();
+  await caseRichPage.waitForForm();
+  const ids = await caseRichPage.routeIds();
+  await caseRichPage.typeProse(`Chief complaint for ${name}`);
+  await caseRichPage.save();
+  const caseSaved = await caseRichPage.waitForSaved();
   expect(caseSaved).toMatch(/^Saved/);
 
   // Open the S09 follow-up via the deep-linkable route (same create+navigate

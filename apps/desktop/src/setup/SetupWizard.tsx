@@ -27,6 +27,11 @@ import { features } from '@/shared/features';
 import { parseRupeesToPaise } from '@/shared/money';
 import { t } from '@/shared/strings';
 
+import {
+  REGISTRATION_COUNCIL_LABELS,
+  councilSelectionFor,
+} from './registrationCouncils';
+
 /** Called by the wizard once setup completes, to route to Today. */
 export interface SetupWizardProps {
   readonly onComplete?: () => void;
@@ -61,6 +66,24 @@ const AUTOLOCK_OPTIONS = [5, 10, 15, 30, 60] as const;
 
 type FieldErrors = Record<string, string>;
 
+/**
+ * Dropdown value of the "Other (type manually)" option. Not a valid council
+ * label, so it can never collide with a listed authority or be stored.
+ */
+const COUNCIL_OTHER_VALUE = '__other__';
+
+/** Dropdown + Other-text state that re-opens a stored council string. */
+function initialCouncilState(stored: string): {
+  readonly choice: string;
+  readonly other: string;
+} {
+  const sel = councilSelectionFor(stored);
+  if (sel.choice === 'listed') return { choice: sel.text, other: '' };
+  if (sel.choice === 'other')
+    return { choice: COUNCIL_OTHER_VALUE, other: sel.text };
+  return { choice: '', other: '' };
+}
+
 /** First-run setup wizard (4 steps). */
 export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
   const [step, setStep] = useState<Step>(1);
@@ -72,7 +95,18 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
   const [docName, setDocName] = useState('');
   const [docQual, setDocQual] = useState('');
   const [docRegNo, setDocRegNo] = useState('');
-  const [docCouncil, setDocCouncil] = useState('');
+  // Registration council (HC-MVP1-M3set): the dropdown value ('' | a listed
+  // label | COUNCIL_OTHER_VALUE) plus the typed text used only when Other is
+  // chosen. Both are seeded from the stored string so a value not in the list
+  // re-opens as Other with its text kept. The wizard has no stored profile to
+  // pre-fill yet, so the seed is empty; Back from step 2 keeps this state.
+  const [councilChoice, setCouncilChoice] = useState(
+    () => initialCouncilState('').choice,
+  );
+  const [councilOther, setCouncilOther] = useState(
+    () => initialCouncilState('').other,
+  );
+  const isCouncilOther = councilChoice === COUNCIL_OTHER_VALUE;
   const [docPhone, setDocPhone] = useState('');
   const [docEmail, setDocEmail] = useState('');
 
@@ -114,9 +148,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
         t('setup.error.required'),
       ],
       ['setup-doctor-regno', docRegNo.trim() === '', t('setup.error.required')],
+      ['setup-doctor-council', councilChoice === '', t('setup.error.required')],
       [
-        'setup-doctor-council',
-        docCouncil.trim() === '',
+        'setup-doctor-council-other',
+        isCouncilOther && councilOther.trim() === '',
         t('setup.error.required'),
       ],
       [
@@ -135,7 +170,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
         name: docName.trim(),
         qualification: docQual.trim(),
         regNo: docRegNo.trim(),
-        regCouncil: docCouncil.trim(),
+        // Same String field as before: the listed label verbatim, or the
+        // typed Other text (never the "Other" option label itself).
+        regCouncil: isCouncilOther ? councilOther.trim() : councilChoice,
         phone: docPhone.trim() === '' ? null : docPhone.trim(),
         email: docEmail.trim() === '' ? null : docEmail.trim(),
         signatureImagePath: null,
@@ -143,7 +180,16 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
       }),
     );
     return true;
-  }, [docName, docQual, docRegNo, docCouncil, docPhone, docEmail]);
+  }, [
+    docName,
+    docQual,
+    docRegNo,
+    councilChoice,
+    councilOther,
+    isCouncilOther,
+    docPhone,
+    docEmail,
+  ]);
 
   const submitClinic = useCallback(async (): Promise<boolean> => {
     const feeFirstPaise = parseRupeesToPaise(feeFirst);
@@ -435,15 +481,60 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
                 required: true,
               },
             )}
-            {field(
-              'setup-doctor-council',
-              t('setup.doctor.council'),
-              docCouncil,
-              setDocCouncil,
-              {
-                required: true,
-              },
-            )}
+            <div className="flex flex-col">
+              <label
+                htmlFor="setup-doctor-council-input"
+                className="text-sm text-slate-700"
+              >
+                {t('setup.doctor.council')}
+                <span aria-hidden="true">{t('setup.requiredMark')}</span>
+              </label>
+              <select
+                id="setup-doctor-council-input"
+                data-testid="setup-doctor-council"
+                aria-required
+                aria-invalid={errors['setup-doctor-council'] !== undefined}
+                value={councilChoice}
+                onChange={(e) => setCouncilChoice(e.target.value)}
+                className="h-10 rounded border border-slate-300 px-3 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                <option value="">{t('setup.doctor.councilPlaceholder')}</option>
+                {REGISTRATION_COUNCIL_LABELS.map((label) => (
+                  <option key={label} value={label}>
+                    {label}
+                  </option>
+                ))}
+                <option value={COUNCIL_OTHER_VALUE}>
+                  {t('setup.doctor.councilOtherOption')}
+                </option>
+              </select>
+              {inlineError('setup-doctor-council')}
+            </div>
+            {isCouncilOther ? (
+              <div className="flex flex-col">
+                <label
+                  htmlFor="setup-doctor-council-other-input"
+                  className="text-sm text-slate-700"
+                >
+                  {t('setup.doctor.councilOther')}
+                  <span aria-hidden="true">{t('setup.requiredMark')}</span>
+                </label>
+                <input
+                  id="setup-doctor-council-other-input"
+                  data-testid="setup-doctor-council-other"
+                  type="text"
+                  aria-required
+                  aria-invalid={
+                    errors['setup-doctor-council-other'] !== undefined
+                  }
+                  placeholder={t('setup.doctor.councilOtherPlaceholder')}
+                  value={councilOther}
+                  onChange={(e) => setCouncilOther(e.target.value)}
+                  className="h-10 rounded border border-slate-300 px-3 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+                {inlineError('setup-doctor-council-other')}
+              </div>
+            ) : null}
             {field(
               'setup-doctor-phone',
               t('setup.doctor.phone'),

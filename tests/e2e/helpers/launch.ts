@@ -13,7 +13,14 @@
 // restart the driver chain at the chosen dir and `reloadSession()` so the Tauri
 // app is relaunched there — the exact "separate launch, specific data dir"
 // behaviour the orchestrator got from separate processes.
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -53,9 +60,43 @@ export function initSpecData(baseRoot: string): NodeJS.ProcessEnv {
   return dataDirEnv(primary);
 }
 
+/**
+ * Copy every `logs/app.log*` under the spec's data dirs into
+ * `<HC_E2E_OUTDIR>/app-logs/` before cleanup, so the analyzer can scan the
+ * app's own log for panics / patient data. Opt-in via HC_E2E_KEEP_APP_LOGS=1;
+ * best-effort (never fails a run).
+ */
+function retainAppLogs(s: SpecDataState): void {
+  const outDir = process.env.HC_E2E_OUTDIR;
+  if (process.env.HC_E2E_KEEP_APP_LOGS !== '1' || outDir === undefined) return;
+  const dest = path.join(outDir, 'app-logs');
+  const walk = (dir: string, dirName: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full, dirName);
+      } else if (
+        path.basename(dir) === 'logs' &&
+        entry.name.startsWith('app.log')
+      ) {
+        mkdirSync(dest, { recursive: true });
+        copyFileSync(full, path.join(dest, `${dirName}-${entry.name}`));
+      }
+    }
+  };
+  for (const [name, dir] of s.dirs) {
+    try {
+      walk(dir, name);
+    } catch {
+      // best-effort: a missing or unreadable dir must not fail teardown
+    }
+  }
+}
+
 /** Tear down per-spec state and remove the whole base root. */
 export function cleanupSpecData(): void {
   if (state) {
+    retainAppLogs(state);
     try {
       rmSync(state.baseRoot, { recursive: true, force: true });
     } catch {

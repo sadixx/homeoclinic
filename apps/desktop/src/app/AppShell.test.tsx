@@ -568,7 +568,7 @@ describe('AppShell', () => {
         target: { value: 'REG-0001' },
       });
       fireEvent.change(screen.getByTestId('setup-doctor-council'), {
-        target: { value: 'Test Council' },
+        target: { value: 'Maharashtra — Maharashtra Council of Homoeopathy' },
       });
       await user.click(screen.getByTestId('setup-next'));
 

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-24T16:22:42.049Z",
+  "generatedAt": "2026-11-01T12:31:13.841Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -190,6 +190,17 @@
       "targets": [
         "linux",
         "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/setup/registration-council.e2e.ts",
+      "reqs": [
+        "SET-002"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
       ]
     },
     {
