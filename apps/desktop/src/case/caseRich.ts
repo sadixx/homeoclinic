@@ -266,9 +266,23 @@ function sectionLabel(kind: RichTableType): string {
   return t(key);
 }
 
-/** Render the "N. Label" heading prefix text from the stamped number (§4). */
-function sectionHeadingText(sectionNo: number, kind: RichTableType): string {
-  return `${sectionNo}. ${sectionLabel(kind)}`;
+/**
+ * The bullet marker that prefixes every record-section heading (M3-RWv5 C).
+ * A typographic symbol, not language text, so it is not an en.json string.
+ */
+const SECTION_BULLET = '\u2022';
+
+/** Matches a legacy numeric "<n>. " section-heading prefix (pre-RWv5). */
+const LEGACY_SECTION_PREFIX = /^\s*\d+\.\s*/;
+
+/**
+ * Render a record-section heading as "<bullet> Label" (M3-RWv5 C). The stamped
+ * `hcSectionNo` attr is still written (additive v3) but is no longer shown: the
+ * old "N. Label" prefix let vitals and modalities both read "2" because the
+ * number was per-complaint while the eye reads it per document.
+ */
+function sectionHeadingText(kind: RichTableType): string {
+  return `${SECTION_BULLET} ${sectionLabel(kind)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -565,12 +579,21 @@ export function appendRowsToTable(
   table: ProseMirrorNode,
   rows: ReadonlyArray<readonly string[]>,
 ): ProseMirrorNode {
-  const bodyRows: ProseMirrorNode[] = rows.map((row) => ({
+  const existing = table.content ?? [];
+  return { ...table, content: [...existing, ...buildBodyRows(rows)] };
+}
+
+/**
+ * Shape `rows` (each a list of cell strings) into body `tableRow` nodes of
+ * `tableCell`/`paragraph` text (the rows an append adds; M3-RWv5 A). Pure.
+ */
+export function buildBodyRows(
+  rows: ReadonlyArray<readonly string[]>,
+): ProseMirrorNode[] {
+  return rows.map((row) => ({
     type: 'tableRow',
     content: row.map((v) => cell('tableCell', v)),
   }));
-  const existing = table.content ?? [];
-  return { ...table, content: [...existing, ...bodyRows] };
 }
 
 /** Modalities popup values (factor / aggravation / amelioration) — M3-RWv4 §4. */
@@ -809,7 +832,7 @@ function sectionNodesFor(
       hcSectionNo: sectionNo,
       hcSectionType: kind,
     },
-    content: [{ type: 'text', text: sectionHeadingText(sectionNo, kind) }],
+    content: [{ type: 'text', text: sectionHeadingText(kind) }],
   };
   return [{ type: 'horizontalRule' }, heading, tableNode(seed)];
 }
@@ -945,6 +968,15 @@ export function joinComplaintsToSpine(
 ): ProseMirrorNode {
   const content: ProseMirrorNode[] = [];
   complaints.forEach((complaint, index) => {
+    // M3-RWv5 C: an UNNAMED first complaint (a fresh case) gets no header, so
+    // no "Untitled complaint" sample is shown. Its entries lead the spine and
+    // splitSpineToComplaints attaches them back to `cc1` (title ''), so the
+    // round trip is unchanged. The header appears once the doctor names it
+    // ("Add new complaint" -> nameLeadingComplaint).
+    if (index === 0 && complaint.title === '') {
+      for (const node of complaint.doc.content ?? []) content.push(node);
+      return;
+    }
     content.push(
       buildComplaintHeaderNode({
         complaintNo: index + 1,
@@ -1020,6 +1052,10 @@ export function currentComplaintId(
   caretPos: number,
 ): string {
   const top = spine.content ?? [];
+  // M3-RWv5 C: an unnamed first complaint has no header; nodes before the first
+  // header belong to `cc1` (see joinComplaintsToSpine).
+  const leadingUnnamed =
+    top.length > 0 && !isComplaintHeadingNode(top[0]!) ? 'cc1' : null;
   let pos = 0;
   let owning: string | null = null;
   for (const node of top) {
@@ -1027,12 +1063,13 @@ export function currentComplaintId(
       const id = node.attrs?.['hcComplaintId'];
       if (typeof id === 'string') {
         if (pos <= caretPos) owning = id;
-        else if (owning === null) owning = id;
+        else if (owning === null) owning = leadingUnnamed ?? id;
       }
     }
     pos += proseMirrorNodeSize(node);
   }
   if (owning !== null) return owning;
+  if (leadingUnnamed !== null) return leadingUnnamed;
   const firstHeader = top.find(
     (n) => n.type === 'heading' && n.attrs?.['hcKind'] === 'complaint',
   );
@@ -1041,19 +1078,278 @@ export function currentComplaintId(
 }
 
 /**
- * The ProseMirror `nodeSize` of a JSON node, matching `Node.nodeSize` on a live
- * document: a text leaf spans its string length; any other leaf (no `content`)
- * spans 1; a non-leaf (block) spans `2 + Σ child sizes` (one token for each
- * boundary). Used by {@link currentComplaintId} so caret resolution runs in the
- * same position scale as `editor.state.selection.head`.
+ * Non-text LEAF node types of the case-editor schema (`caseEditorExtensions`:
+ * StarterKit + the four table extensions). A leaf has no content hole, so its
+ * ProseMirror `nodeSize` is 1. Every other non-text type is a container whose
+ * size is `2 + Σ child sizes` EVEN WHEN EMPTY (an empty paragraph/heading/cell
+ * is still an open + close token pair, size 2). Membership is by schema type,
+ * never by "has no `content` in JSON" — `getJSON()` omits `content` for empty
+ * containers, which is exactly the case that must NOT be sized 1 (rwv5-cr-1).
+ * Add a type here only if the schema gains another atom/leaf node.
  */
-function proseMirrorNodeSize(node: ProseMirrorNode): number {
+const LEAF_TYPES: ReadonlySet<string> = new Set([
+  'horizontalRule',
+  'hardBreak',
+]);
+
+/**
+ * The ProseMirror `nodeSize` of a JSON node, matching `Node.nodeSize` on a live
+ * document: a text node spans its string length; a {@link LEAF_TYPES} node
+ * spans 1; every other node spans `2 + Σ child sizes` (one token for each
+ * boundary), including an EMPTY container (size 2). Used by
+ * {@link currentComplaintId} and {@link topLevelIndexAt} so caret resolution
+ * runs in the same position scale as `editor.state.selection.head`.
+ */
+export function proseMirrorNodeSize(node: ProseMirrorNode): number {
   if (node.type === 'text') return node.text?.length ?? 0;
-  const children = node.content ?? [];
-  if (children.length === 0) return 1;
+  if (LEAF_TYPES.has(node.type)) return 1;
   let inner = 0;
-  for (const child of children) inner += proseMirrorNodeSize(child);
+  for (const child of node.content ?? []) inner += proseMirrorNodeSize(child);
   return inner + 2;
+}
+
+// ---------------------------------------------------------------------------
+// M3-RWv5 A — ONE TABLE PER TYPE PER ENTRY (all six record kinds).
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a Record of `kind` lands in a spine (M3-RWv5 A), as top-level node
+ * indices so both the pure kernel and the live-editor glue apply the SAME plan:
+ *
+ * - `create`: insert `nodes` (`[hr, section heading, table]`) before the
+ *   top-level node at `index` (`index === content.length` means the end);
+ * - `append`: add `rows` as body rows to the `table` at top-level `index`.
+ */
+export type TableRecordPlan =
+  | {
+      readonly mode: 'create';
+      readonly index: number;
+      readonly nodes: readonly ProseMirrorNode[];
+    }
+  | {
+      readonly mode: 'append';
+      readonly index: number;
+      readonly rows: ReadonlyArray<readonly string[]>;
+    };
+
+function isEntryHeadingNode(n: ProseMirrorNode): boolean {
+  return n.type === 'heading' && n.attrs?.['hcKind'] === 'entry';
+}
+
+function isComplaintHeadingNode(n: ProseMirrorNode): boolean {
+  return n.type === 'heading' && n.attrs?.['hcKind'] === 'complaint';
+}
+
+/**
+ * The top-level index of the node holding `caretPos`, measured in REAL
+ * ProseMirror positions (the first top-level child starts at 0 and each spans
+ * its {@link proseMirrorNodeSize}). A caret at/after the end maps to the last
+ * node; an empty doc yields -1.
+ */
+function topLevelIndexAt(
+  content: readonly ProseMirrorNode[],
+  caretPos: number,
+): number {
+  let pos = 0;
+  for (let i = 0; i < content.length; i += 1) {
+    const end = pos + proseMirrorNodeSize(content[i]!);
+    if (caretPos < end) return i;
+    pos = end;
+  }
+  return content.length - 1;
+}
+
+/**
+ * The `[start, end)` top-level span of the dated entry that owns the caret
+ * (M3-RWv5 A). The span starts at its `hcKind:"entry"` heading and runs up to
+ * the next entry/complaint heading or the end of the doc. Resolution:
+ *
+ * 1. the nearest entry heading at or before the caret, within the caret's
+ *    complaint section (never crossing back over a complaint header);
+ * 2. else (caret on a complaint header, before its first entry) the first entry
+ *    of that complaint;
+ * 3. else the last entry in the doc; 4. else the whole doc (no entries).
+ */
+export function currentEntrySpan(
+  spine: ProseMirrorNode,
+  caretPos: number,
+): readonly [number, number] {
+  const content = spine.content ?? [];
+  const at = topLevelIndexAt(content, caretPos);
+  let start = -1;
+  for (let i = at; i >= 0; i -= 1) {
+    const n = content[i]!;
+    if (isEntryHeadingNode(n)) {
+      start = i;
+      break;
+    }
+    if (isComplaintHeadingNode(n)) break;
+  }
+  if (start === -1) {
+    for (let i = Math.max(at + 1, 0); i < content.length; i += 1) {
+      const n = content[i]!;
+      if (isEntryHeadingNode(n)) {
+        start = i;
+        break;
+      }
+      if (isComplaintHeadingNode(n)) break;
+    }
+  }
+  if (start === -1) {
+    for (let i = content.length - 1; i >= 0; i -= 1) {
+      if (isEntryHeadingNode(content[i]!)) {
+        start = i;
+        break;
+      }
+    }
+  }
+  if (start === -1) return [0, content.length];
+  let end = start + 1;
+  while (
+    end < content.length &&
+    !isEntryHeadingNode(content[end]!) &&
+    !isComplaintHeadingNode(content[end]!)
+  ) {
+    end += 1;
+  }
+  return [start, end];
+}
+
+/**
+ * Plan a Record of `kind` into the caret's entry (M3-RWv5 A): APPEND the seed
+ * rows to the entry's existing table of that kind, or CREATE the
+ * `[hr, bullet heading, table]` section at the end of the entry span. Pure.
+ */
+export function planTableRecord(
+  spine: ProseMirrorNode,
+  caretPos: number,
+  kind: RichTableType,
+  seed: TableSeed,
+): TableRecordPlan {
+  const content = spine.content ?? [];
+  const [start, end] = currentEntrySpan(spine, caretPos);
+  let tableIndex = -1;
+  for (let i = start; i < end; i += 1) {
+    const n = content[i]!;
+    if (n.type === 'table' && n.attrs?.['hcTableType'] === kind) tableIndex = i;
+  }
+  if (tableIndex !== -1) {
+    return {
+      mode: 'append',
+      index: tableIndex,
+      rows: seed.rows.map((r) => [...r]),
+    };
+  }
+  return {
+    mode: 'create',
+    index: end,
+    nodes: sectionNodesFor(kind, nextSectionNoOf(content), seed),
+  };
+}
+
+/**
+ * Record a table of `kind` into the CURRENT entry of a spine (M3-RWv5 A, the
+ * pure kernel of `caseRichEditor.appendOrCreateTable`). The current entry is
+ * resolved from `caretPos` in REAL ProseMirror positions
+ * (`editor.state.selection.head`). The first Record of a kind in that entry
+ * creates the section; every later Record of the same kind appends rows to it;
+ * other entries (and a follow-up's fresh table) are never touched. Returns a
+ * new spine; the input is not mutated.
+ */
+export function appendOrCreateTableInSpine(
+  spine: ProseMirrorNode,
+  caretPos: number,
+  kind: RichTableType,
+  seed: TableSeed,
+): ProseMirrorNode {
+  const content = spine.content ?? [];
+  const plan = planTableRecord(spine, caretPos, kind, seed);
+  if (plan.mode === 'append') {
+    const grown = appendRowsToTable(content[plan.index]!, plan.rows);
+    return {
+      ...spine,
+      content: content.map((n, i) => (i === plan.index ? grown : n)),
+    };
+  }
+  return {
+    ...spine,
+    content: [
+      ...content.slice(0, plan.index),
+      ...plan.nodes,
+      ...content.slice(plan.index),
+    ],
+  };
+}
+
+/**
+ * Rewrite legacy "<n>. Label" record-section heading text to the RWv5
+ * "<bullet> Label" form (M3-RWv5 C), so a case saved before RWv5 no longer
+ * shows colliding numbers when reopened. Only top-level `hcKind:"section"`
+ * headings whose text is exactly a numeric prefix + their own label are
+ * touched; attrs (incl. the stamped `hcSectionNo`) are kept. Pure.
+ */
+export function bulletSectionHeadings(spine: ProseMirrorNode): ProseMirrorNode {
+  const content = spine.content;
+  if (content === undefined) return spine;
+  return {
+    ...spine,
+    content: content.map((n) => {
+      if (n.type !== 'heading' || n.attrs?.['hcKind'] !== 'section') return n;
+      const kind = n.attrs?.['hcSectionType'];
+      if (typeof kind !== 'string') return n;
+      const text = (n.content ?? [])
+        .map((c) => (c.type === 'text' ? (c.text ?? '') : ''))
+        .join('');
+      if (!LEGACY_SECTION_PREFIX.test(text)) return n;
+      const label = text.replace(LEGACY_SECTION_PREFIX, '');
+      if (label !== sectionLabel(kind as RichTableType)) return n;
+      return {
+        ...n,
+        content: [
+          { type: 'text', text: sectionHeadingText(kind as RichTableType) },
+        ],
+      };
+    }),
+  };
+}
+
+/**
+ * Name a spine's LEADING unnamed complaint (M3-RWv5 C, "first complaint
+ * appears when named"). A fresh case carries its first entry with no complaint
+ * header; when the doctor names it via "Add new complaint", the numbered `cc1`
+ * header is inserted at the top and the leading entry headings take the name
+ * (attr + visible text). Returns `null` when the spine already has a
+ * complaint header (the caller then appends a new complaint instead). Pure.
+ */
+export function nameLeadingComplaint(
+  spine: ProseMirrorNode,
+  name: string,
+): ProseMirrorNode | null {
+  const content = spine.content ?? [];
+  if (content.some(isComplaintHeadingNode)) return null;
+  const renamed = content.map((n) => {
+    if (!isEntryHeadingNode(n)) return n;
+    const attrs = n.attrs ?? {};
+    const kind: EntryKind =
+      attrs['hcEntryKind'] === 'follow_up' ? 'follow_up' : 'first';
+    const date = typeof attrs['hcDate'] === 'string' ? attrs['hcDate'] : '';
+    return {
+      ...n,
+      attrs: { ...attrs, hcComplaintName: name },
+      content: [{ type: 'text', text: entryHeadingText(name, kind, date, t) }],
+    };
+  });
+  return {
+    ...spine,
+    content: [
+      buildComplaintHeaderNode({
+        complaintNo: 1,
+        complaintId: 'cc1',
+        name,
+      }),
+      ...renamed,
+    ],
+  };
 }
 
 /** Recover a complaint title from its header text (`"<no>. <name>"`). */

@@ -275,7 +275,7 @@ export function BackupScreen(): JSX.Element {
   return (
     <div
       data-testid="backup-screen"
-      className="mx-auto flex max-w-[900px] flex-col gap-6 p-6 text-[0.875rem]"
+      className="flex w-full min-w-0 flex-col gap-6 p-6 text-[0.875rem]"
     >
       <h1 className="text-xl font-semibold text-slate-900">
         {t('backup.title')}

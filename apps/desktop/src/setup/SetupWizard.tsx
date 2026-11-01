@@ -398,7 +398,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
   return (
     <div
       data-testid="setup-wizard"
-      className="mx-auto flex min-h-screen max-w-[900px] flex-col gap-6 p-8"
+      className="flex min-h-screen w-full min-w-0 flex-col gap-6 p-8"
     >
       {/* Header: title + English-only language selector (SET-001). */}
       <header className="flex items-center justify-between border-b border-slate-200 pb-3">

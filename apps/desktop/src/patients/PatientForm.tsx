@@ -19,6 +19,7 @@ import { Camera, Upload, Trash2, RefreshCw } from 'lucide-react';
 
 import { commands } from '@/bindings';
 import { run } from '@/shared/command';
+import { PatientAvatar, avatarKindForSex } from '@/shared/PatientAvatar';
 import { t } from '@/shared/strings';
 import { type AttachedPhoto, captureWebcamPhoto, webcamRef } from './photo';
 
@@ -77,6 +78,29 @@ const EMPTY: FormState = {
   referredBy: '',
 };
 
+/** The marital-status choices offered for new input (M3-RWv5 C1). */
+const MARITAL_OPTIONS: readonly string[] = [
+  'single',
+  'married',
+  'divorced',
+  'widowed',
+];
+
+/**
+ * A stored marital value outside {@link MARITAL_OPTIONS} (a legacy value such
+ * as pre-RWv5 `other`), shown as an extra option so it stays readable and is
+ * saved back unchanged; `null` when the value is empty or a current option.
+ */
+function legacyMaritalOption(
+  value: string,
+): { value: string; label: string } | null {
+  if (value === '' || MARITAL_OPTIONS.includes(value)) return null;
+  return {
+    value,
+    label: value === 'other' ? t('patient.form.marital.other') : value,
+  };
+}
+
 /** Field-level validation errors keyed by field name. */
 type FieldErrors = Partial<Record<'name' | 'age' | 'mobile' | 'form', string>>;
 
@@ -131,6 +155,9 @@ export function PatientForm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // M3-RWv5 C2: default silhouette when a gender is set and no photo exists.
+  const avatarKind = avatarKindForSex(form.sex);
+  const legacyMarital = legacyMaritalOption(form.marital);
 
   // Preview the next code (new) or load the patient (edit).
   useEffect(() => {
@@ -163,6 +190,7 @@ export function PatientForm({
           mobile: demo.mobile ?? '',
           city: demo.city ?? '',
           referredBy: demo.referredBy ?? '',
+          marital: demo.maritalStatus ?? '',
         });
         if (demo.photoPath) {
           setPhoto({
@@ -356,7 +384,7 @@ export function PatientForm({
     <section
       data-testid="patient-form"
       aria-label={title}
-      className="mx-auto flex max-w-4xl flex-col gap-4 p-6 text-[0.875rem] text-slate-900"
+      className="flex w-full min-w-0 flex-col gap-4 p-6 text-[0.875rem] text-slate-900"
     >
       <header className="flex items-center justify-between">
         <h1 className="text-lg font-semibold" data-testid="patient-form-title">
@@ -404,9 +432,9 @@ export function PatientForm({
         </p>
       ) : null}
 
-      <div className="flex gap-6">
+      <div className="flex flex-wrap gap-6">
         {/* Photo column (HC-MVP1-038) */}
-        <div className="flex w-40 flex-col items-center gap-2">
+        <div className="flex w-40 flex-none flex-col items-center gap-2">
           <div
             data-testid="patient-form-photo"
             className="flex h-32 w-32 items-center justify-center overflow-hidden rounded border border-slate-300 bg-slate-50"
@@ -417,6 +445,11 @@ export function PatientForm({
                 src={photo.previewUrl}
                 alt={t('patient.form.photo')}
                 className="h-full w-full object-cover"
+              />
+            ) : avatarKind !== null ? (
+              <PatientAvatar
+                kind={avatarKind}
+                testId="patient-form-photo-avatar"
               />
             ) : (
               <span
@@ -496,7 +529,7 @@ export function PatientForm({
         </div>
 
         {/* Fields column */}
-        <div className="grid flex-1 grid-cols-2 gap-x-4 gap-y-3">
+        <div className="grid min-w-[16rem] flex-1 grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-x-4 gap-y-3">
           <Field
             label={t('patient.form.name')}
             required
@@ -589,7 +622,19 @@ export function PatientForm({
               <option value="married">
                 {t('patient.form.marital.married')}
               </option>
-              <option value="other">{t('patient.form.marital.other')}</option>
+              <option value="divorced">
+                {t('patient.form.marital.divorced')}
+              </option>
+              <option value="widowed">
+                {t('patient.form.marital.widowed')}
+              </option>
+              {/* A legacy stored value (e.g. pre-RWv5 `other`) stays visible and
+                  selected so an edit-save never wipes it. */}
+              {legacyMarital !== null ? (
+                <option value={legacyMarital.value}>
+                  {legacyMarital.label}
+                </option>
+              ) : null}
             </select>
           </Field>
 

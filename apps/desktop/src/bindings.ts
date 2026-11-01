@@ -206,6 +206,12 @@ export const commands = {
 	 *  and the `e2e-test-keys` gating of `patient_import_fixture`. The seam is
 	 *  compiled OUT of the release/public build, which always opens the native
 	 *  picker only — behaviour unchanged for real doctors.
+	 * 
+	 *  Threading (M3-RWv5): this MUST be an async command. A sync command runs
+	 *  inline on the GTK main thread, and a `blocking_pick_file()` there parks the
+	 *  main loop while the dialog build waits for that same loop (deadlock; GNOME
+	 *  then offers "Force Quit"). The non-blocking `pick_file(callback)` is bridged
+	 *  through a tokio oneshot and awaited on the async runtime instead.
 	 */
 	visitPickReportFile: () => typedError<PickReportFileResponse, UserFacingError>(__TAURI_INVOKE("visit_pick_report_file")),
 };
@@ -493,6 +499,11 @@ export type Demographics = {
 	referredBy: string | null,
 	/**  Opaque photo ref, or `None`. */
 	photoPath: string | null,
+	/**
+	 *  Stored marital status, verbatim (legacy values such as `other` are
+	 *  kept so the edit form can show them and never wipe them), or `None`.
+	 */
+	maritalStatus: string | null,
 };
 
 /**  One candidate duplicate (PAT-004). */

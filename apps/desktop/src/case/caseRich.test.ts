@@ -453,7 +453,10 @@ describe('buildSectionNodes (separator + numbered heading + table)', () => {
     expect(nodes[2]?.attrs?.['hcTableType']).toBe('vitals');
   });
 
-  it('renders the heading text as "N. Label" derived from the stamped number', () => {
+  // M3-RWv5 supersedes the old "N. Label" heading text. Numeric prefixes made
+  // vitals and modalities both show "2", so the heading now reads
+  // "<bullet> Label". The stamped hcSectionNo attr is kept (additive v3).
+  it('renders the heading text as a bullet marker + Label (no "N. " prefix)', () => {
     const nodes = buildSectionNodes({
       kind: 'vitals',
       sectionNo: 3,
@@ -472,7 +475,11 @@ describe('buildSectionNodes (separator + numbered heading + table)', () => {
       ),
     });
     const headingText = allText(nodes[1]).trim();
-    expect(headingText).toBe(`3. ${tr('case.section.label.vitals')}`);
+    expect(headingText).not.toMatch(/^\s*\d+\.\s/);
+    expect(headingText).toMatch(
+      new RegExp(`^[•●▪◦‣]\\s*${tr('case.section.label.vitals')}$`),
+    );
+    expect(nodes[1]?.attrs?.['hcSectionNo']).toBe(3);
   });
 
   it('per-complaint numbering is monotonic and not reused after a delete', () => {

@@ -322,6 +322,53 @@ export class PatientsPage {
     );
   }
 
+  // ---- M3-RWv5 C1/C2: marital options + default gender avatar -------------
+  get formMarital(): ChainablePromiseElement {
+    return byTestId("patient-form-marital");
+  }
+
+  /** The marital <select> options as {value,label}, in order. */
+  async maritalOptions(): Promise<{ value: string; label: string }[]> {
+    await this.formMarital.waitForExist({ timeout: 10000 });
+    return browser.execute(() => {
+      const sel = document.querySelector(
+        '[data-testid="patient-form-marital"]',
+      ) as HTMLSelectElement | null;
+      if (sel === null) return [];
+      return Array.from(sel.options).map((o) => ({
+        value: o.value,
+        label: (o.textContent ?? "").trim(),
+      }));
+    });
+  }
+
+  async setMarital(value: string): Promise<void> {
+    await this.formMarital.selectByAttribute("value", value);
+  }
+
+  /** Pick a sex radio (M / F / O) inside the patient-form-sex group. */
+  async setSex(value: "M" | "F" | "O"): Promise<void> {
+    const radio = $(`[data-testid="patient-form-sex"] input[value="${value}"]`);
+    await radio.waitForExist({ timeout: 10000 });
+    await radio.click();
+  }
+
+  /** `data-avatar` of the avatar with `testId`, or null when it is absent. */
+  async avatarKind(testId: string): Promise<string | null> {
+    const el = byTestId(testId);
+    if (!(await el.isExisting())) return null;
+    return el.getAttribute("data-avatar");
+  }
+
+  /** True when the dashboard photo slot shows a real <img>. */
+  async dashHasPhotoImg(): Promise<boolean> {
+    return browser.execute(
+      () =>
+        document.querySelector('[data-testid="patient-dash-photo"] img') !==
+        null,
+    );
+  }
+
   // ---- S07 Lab reports & Scans PANEL (M3-RWv4 §4, two-way) ----------------
   get labReportsPanel(): ChainablePromiseElement {
     return byTestId("patient-dash-lab-reports-panel");

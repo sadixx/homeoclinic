@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-01T12:31:13.841Z",
+  "generatedAt": "2026-11-01T16:55:42.719Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -8,6 +8,20 @@
         "SET-004"
       ],
       "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/app/layout-rwv5-resize.e2e.ts",
+      "reqs": [
+        "NFR-030",
+        "SET-005",
+        "PAT-001",
+        "CASE-001"
+      ],
+      "tier": "stable",
       "area": "settings",
       "targets": [
         "linux"
@@ -92,6 +106,31 @@
       ]
     },
     {
+      "path": "tests/e2e/specs/case/case-rwv5-per-entry-tables.e2e.ts",
+      "reqs": [
+        "CASE-001",
+        "CASE-003",
+        "CASE-005",
+        "VIS-001"
+      ],
+      "tier": "stable",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/case/real-picker-smoke.e2e.ts",
+      "reqs": [
+        "PAT-009"
+      ],
+      "tier": "smoke",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
       "path": "tests/e2e/specs/home/today-overview.e2e.ts",
       "reqs": [
         "VIS-004",
@@ -110,6 +149,20 @@
         "PAT-006",
         "PAT-008",
         "PAT-001"
+      ],
+      "tier": "stable",
+      "area": "patients",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/patients/patient-rwv5-marital-avatar.e2e.ts",
+      "reqs": [
+        "PAT-001",
+        "PAT-005",
+        "PAT-038",
+        "PSR-001"
       ],
       "tier": "stable",
       "area": "patients",

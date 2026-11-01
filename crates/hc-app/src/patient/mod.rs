@@ -225,6 +225,9 @@ pub struct Demographics {
     pub referred_by: Option<String>,
     /// Opaque photo ref, or `None`.
     pub photo_path: Option<String>,
+    /// Stored marital status, verbatim (legacy values such as `other` are
+    /// kept so the edit form can show them and never wipe them), or `None`.
+    pub marital_status: Option<String>,
 }
 
 /// A visit timeline entry (PAT-005). R3+; EMPTY list for R2.
@@ -789,6 +792,7 @@ impl<'a> PatientService<'a> {
             city: row.city,
             referred_by: row.referred_by,
             photo_path: row.photo_path,
+            marital_status: row.marital_status,
         };
         let family = family
             .into_iter()

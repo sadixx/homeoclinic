@@ -87,7 +87,7 @@ export function SideNav({
     <nav
       data-testid="side-nav"
       aria-label={t('nav.today')}
-      className="flex w-[180px] flex-col gap-1 border-r border-slate-200 bg-slate-50 p-2 text-sm"
+      className="flex w-[11.25rem] flex-none flex-col gap-1 border-r border-slate-200 bg-slate-50 p-2 text-sm"
     >
       {ITEMS.map((item) => {
         const active = item.enabled && activeRoute === item.route;

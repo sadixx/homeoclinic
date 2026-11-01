@@ -506,7 +506,7 @@ function ShellFrame({
   return (
     <div
       data-testid="app-shell"
-      className="flex h-screen flex-col bg-white text-[14px]"
+      className="flex h-screen min-w-0 flex-col bg-white text-[1rem]"
     >
       <TopBar onLock={goToLock} onOpenSearch={openSearch} />
       {/* Shared app-bar (Slice C2/C3): the ONE consistent place for the common

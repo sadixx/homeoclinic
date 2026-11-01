@@ -49,7 +49,7 @@ import {
 } from '@/case/caseRich';
 import {
   appendInvestigationLink,
-  appendOrCreateModalities,
+  appendOrCreateTable,
   caseEditorExtensions,
   caseStructure,
   currentComplaintName,
@@ -57,7 +57,6 @@ import {
   initialContent,
   insertComplaint,
   insertDatedEntry,
-  insertSectionNodes,
   selectionIsOnComplaintHeading,
   setEditorSpine,
   unlinkInvestigationRow,
@@ -358,14 +357,16 @@ export function CaseForm({
 
   // ---- Inserts -------------------------------------------------------------
 
-  /** Insert a seeded record section (rule + numbered heading + table). */
+  /**
+   * Record a seeded table into the caret's entry (M3-RWv5 A): ONE table per
+   * type per entry — the first Record of a kind in the entry creates the
+   * section (rule + bullet heading + table), later Records append rows to it.
+   */
   const insertSection = useCallback(
     (kind: RichTableType, seed: TableSeed): void => {
       const ed = editorRef.current;
       if (ed === null) return;
-      const sectionNo = nextSectionNoRef.current;
-      nextSectionNoRef.current = sectionNo + 1;
-      insertSectionNodes(ed, { kind, sectionNo, seed });
+      appendOrCreateTable(ed, kind, seed);
       void flushSave();
     },
     [flushSave],
@@ -388,7 +389,22 @@ export function CaseForm({
     const ed = editorRef.current;
     if (ed === null) return;
     const name = complaintTitleRef.current.trim();
+    // M3-RWv5 C: a fresh case's first complaint appears only once it is named,
+    // so an unnamed "Add new complaint" there just points at the name field.
+    if (
+      name === '' &&
+      !caseStructure(ed).complaints.some((c) => c.name !== '')
+    ) {
+      complaintTitleInputRef.current?.focus();
+      return;
+    }
     insertComplaint(ed, { name, date: todayIsoDate(), visitId });
+    // b15-r1-f1 (M3-RWv5 build-15): naming the leading complaint re-sets the doc
+    // via setEditorSpine (TipTap setContent, emitUpdate=false), so onUpdate never
+    // fires. Refresh the derived structure explicitly, so the empty prompt hides
+    // and the remove (x) overlay appears without waiting for another edit. The
+    // append path does emit onUpdate. Refreshing again there is idempotent.
+    refreshStructure();
     // The complaint name has been consumed into its own section header; clear
     // the shared input so the next complaint starts blank (M3-RWv3 §5).
     complaintTitleRef.current = '';
@@ -396,7 +412,7 @@ export function CaseForm({
       complaintTitleInputRef.current.value = '';
     }
     void flushSave();
-  }, [visitId, flushSave]);
+  }, [visitId, flushSave, refreshStructure]);
 
   const onRecordVitals = useCallback(
     (seed: TableSeed, structured: Record<string, number>): void => {
@@ -431,20 +447,14 @@ export function CaseForm({
     [insertSection],
   );
 
-  // B4 (M3-RWv4 §4): modalities is ONE appendable table per entry. The first
-  // "Record modalities" creates the table; a later press in the SAME entry
-  // appends rows to it (appendOrCreateModalities). Vitals/family/etc keep the
-  // one-table-per-press behaviour (onRecordGenericSeed). No fresh section
-  // number is consumed on append.
+  // Modalities follows the same one-table-per-entry rule as every other kind
+  // (M3-RWv4 §4, generalised by M3-RWv5 A).
   const onRecordModalities = useCallback(
     (seed: TableSeed): void => {
-      const ed = editorRef.current;
-      if (ed === null) return;
-      appendOrCreateModalities(ed, seed);
+      insertSection('modalities', seed);
       setPopup(null);
-      void flushSave();
     },
-    [flushSave],
+    [insertSection],
   );
 
   // A3 (M3-RWv4 §3): Word-style list toggles over the current selection.
@@ -485,10 +495,10 @@ export function CaseForm({
         : removeEntry(spine, target.complaintId, target.entryIndex);
     setEditorSpine(ed, next);
     setRemoveTarget(null);
-    setStructure(caseStructure(ed));
-    setLinkRows(collectLinkRows(editorSpine(ed)));
+    // setContent does not emit onUpdate: refresh the derived structure here.
+    refreshStructure();
     void flushSave();
-  }, [removeTarget, flushSave]);
+  }, [removeTarget, flushSave, refreshStructure]);
 
   // D5 (M3-RWv4 §5.6): confirmed UNLINK — drop the investigation link row
   // (data_json edit) WITHOUT deleting the attachment file.
@@ -499,10 +509,10 @@ export function CaseForm({
     const next = unlinkInvestigationRow(ed, attachmentId);
     setEditorSpine(ed, next);
     setUnlinkTarget(null);
-    setStructure(caseStructure(ed));
-    setLinkRows(collectLinkRows(editorSpine(ed)));
+    // setContent does not emit onUpdate: refresh the derived structure here.
+    refreshStructure();
     void flushSave();
-  }, [unlinkTarget, flushSave]);
+  }, [unlinkTarget, flushSave, refreshStructure]);
 
   // D5 (M3-RWv4 §5.2a/§5.5): a Submitted UPLOAD — pick a file, attach it with a
   // composed display-ONLY label `<investigation>-<date>` (patient name is set
@@ -648,6 +658,19 @@ export function CaseForm({
               </button>
             </div>
           </div>
+
+          {/* M3-RWv5 C: a fresh case shows no "Untitled complaint" sample;
+              this prompt asks for the name, and the first complaint header
+              appears once it is named via Add new complaint. */}
+          {structure.complaints.every((c) => c.name === '') ? (
+            <p
+              data-testid="case-form-complaint-empty-prompt"
+              role="note"
+              className="mb-2 rounded bg-slate-50 px-3 py-1.5 text-sm text-slate-700"
+            >
+              {t('case.form.complaint.emptyPrompt')}
+            </p>
+          ) : null}
 
           {/* A3 (M3-RWv4 §3): Word-style list formatting toolbar, fixed above
               the bounded editor. Bullet + ordered toggles reflect the active

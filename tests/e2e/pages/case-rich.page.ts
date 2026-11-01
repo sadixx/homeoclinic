@@ -636,6 +636,42 @@ export class CaseRichPage {
     await this.removeDialog.waitForDisplayed({ reverse: true, timeout });
   }
 
+  /**
+   * M3-RWv5 C / b15-r1-f1: ONE synchronous DOM snapshot of the complaint
+   * naming state — the complaint headers, whether the empty prompt exists, and
+   * every complaint-remove control (id + aria-label). Taken in a single
+   * browser.execute so the three facts describe the same instant.
+   */
+  async complaintNamingSnapshot(cid = DEFAULT_CID): Promise<{
+    headers: { id: string | null; text: string }[];
+    promptExists: boolean;
+    removes: { testId: string; ariaLabel: string }[];
+  }> {
+    return browser.execute((selector: string) => {
+      const root = document.querySelector(selector);
+      const headers =
+        root === null
+          ? []
+          : Array.from(root.querySelectorAll('[data-hc-kind="complaint"]')).map((el) => ({
+              id: (el as HTMLElement).getAttribute('data-hc-complaint-id'),
+              text: ((el as HTMLElement).textContent ?? '').trim(),
+            }));
+      const promptExists =
+        document.querySelector('[data-testid="case-form-complaint-empty-prompt"]') !== null;
+      const removes = Array.from(
+        document.querySelectorAll('[data-testid^="case-form-complaint-remove-"]'),
+      ).map((el) => ({
+        testId: el.getAttribute('data-testid') ?? '',
+        ariaLabel: el.getAttribute('aria-label') ?? '',
+      }));
+      return { headers, promptExists, removes };
+    }, `[data-testid="case-form-editor-${cid}"]`) as Promise<{
+      headers: { id: string | null; text: string }[];
+      promptExists: boolean;
+      removes: { testId: string; ariaLabel: string }[];
+    }>;
+  }
+
   /** Whether a complaint-remove control exists for the given id (floor-of-one probe). */
   async hasComplaintRemove(complaintId: string): Promise<boolean> {
     return this.complaintRemoveButton(complaintId).isExisting();
@@ -897,6 +933,164 @@ export class CaseRichPage {
       const el = document.querySelector(selector) as HTMLElement | null;
       const editor = el === null ? 0 : el.getBoundingClientRect().width;
       return { editor, viewport: window.innerWidth };
+    }, `[data-testid="case-form-editor-${cid}"]`);
+  }
+
+  // ---- M3-RWv5 A: per-entry one-table-per-type ---------------------------
+  /** RWv5 C: the prompt a fresh (unnamed) case shows instead of "Untitled complaint". */
+  get complaintEmptyPrompt(): ChainablePromiseElement {
+    return byTestId('case-form-complaint-empty-prompt');
+  }
+
+  /** Open Record physical generals, fill the four fields, Record. */
+  async recordGenerals(
+    v: { appetite: string; thirst: string; thermal: string; notes: string },
+    timeout = 15000,
+  ): Promise<void> {
+    await byTestId('case-form-record-generals').waitForClickable({ timeout });
+    await byTestId('case-form-record-generals').click();
+    await byTestId('case-form-generals-popup').waitForDisplayed({ timeout });
+    const fill = async (testId: string, value: string): Promise<void> => {
+      const el = byTestId(testId);
+      await el.waitForDisplayed({ timeout });
+      await el.setValue(value);
+    };
+    await fill('case-generals-appetite', v.appetite);
+    await fill('case-generals-thirst', v.thirst);
+    await fill('case-generals-thermal', v.thermal);
+    await fill('case-generals-notes', v.notes);
+    await byTestId('case-form-record-generals-confirm').waitForClickable({ timeout });
+    await byTestId('case-form-record-generals-confirm').click();
+    await byTestId('case-form-generals-popup').waitForDisplayed({ reverse: true, timeout });
+  }
+
+  /** Open Record investigations, leave status Suggested, fill name + notes, Record. */
+  async recordInvestigationSuggested(name: string, notes: string, timeout = 15000): Promise<void> {
+    await byTestId('case-form-record-investigations').waitForClickable({ timeout });
+    await byTestId('case-form-record-investigations').click();
+    await byTestId('case-form-investigations-popup').waitForDisplayed({ timeout });
+    await byTestId('case-investigations-name').waitForDisplayed({ timeout });
+    await byTestId('case-investigations-name').setValue(name);
+    await byTestId('case-investigations-notes').setValue(notes);
+    await byTestId('case-form-record-investigations-confirm').waitForClickable({ timeout });
+    await byTestId('case-form-record-investigations-confirm').click();
+    await byTestId('case-form-investigations-popup').waitForDisplayed({ reverse: true, timeout });
+  }
+
+  /**
+   * Type an EMPTY line after the prose line containing `afterText`: caret to
+   * the END of that top-level paragraph, then Enter (insertParagraph) -> a new
+   * empty paragraph right after it. This is what a doctor does (click at the
+   * end of a line, press Enter) and it exercises RWv5's ProseMirror nodeSize
+   * fix: an empty paragraph has nodeSize 2, which the old JSON-length caret
+   * mapping mis-counted. Blurs afterwards like typeProse().
+   */
+  async typeEmptyLineAfter(afterText: string, cid = DEFAULT_CID): Promise<void> {
+    const before = await this.topLevelBlockCount(cid);
+    const ok = await browser.execute(
+      (selector: string, needle: string) => {
+        const root = document.querySelector(selector);
+        const pm = (root?.querySelector('.ProseMirror') ?? root) as HTMLElement | null;
+        if (pm === null) return false;
+        const para = Array.from(pm.children).find(
+          (c) => c.tagName === 'P' && (c.textContent ?? '').includes(needle),
+        );
+        if (para === undefined) return false;
+        pm.focus();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(para);
+        range.collapse(false);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        return document.execCommand('insertParagraph');
+      },
+      `[data-testid="case-form-editor-${cid}"]`,
+      afterText,
+    );
+    if (ok !== true) throw new Error(`could not type an empty line after "${afterText}"`);
+    await browser.waitUntil(async () => (await this.topLevelBlockCount(cid)) > before, {
+      timeout: 15000,
+      timeoutMsg: 'Enter did not add an empty paragraph',
+    });
+    await this.complaintTitle.click();
+  }
+
+  /** Count of top-level ProseMirror blocks (for the empty-line wait). */
+  async topLevelBlockCount(cid = DEFAULT_CID): Promise<number> {
+    return browser.execute((selector: string) => {
+      const root = document.querySelector(selector);
+      const pm = (root?.querySelector('.ProseMirror') ?? root) as HTMLElement | null;
+      return pm === null ? 0 : pm.children.length;
+    }, `[data-testid="case-form-editor-${cid}"]`);
+  }
+
+  /**
+   * The tables of each dated entry, in document order. Walks the TOP-LEVEL
+   * ProseMirror blocks; every `[data-hc-kind="entry"]` heading opens a new
+   * entry and every table (TipTap may wrap it in div.tableWrapper) is
+   * attributed to the entry it follows. `emptyParagraphs` counts empty
+   * top-level <p> in the entry (proves the typed empty line is there).
+   */
+  async entryTables(cid = DEFAULT_CID): Promise<
+    {
+      heading: string;
+      kind: string | null;
+      emptyParagraphs: number;
+      tables: { type: string | null; rows: string[][] }[];
+    }[]
+  > {
+    return browser.execute((selector: string) => {
+      const root = document.querySelector(selector);
+      const pm = (root?.querySelector('.ProseMirror') ?? root) as HTMLElement | null;
+      const out: {
+        heading: string;
+        kind: string | null;
+        emptyParagraphs: number;
+        tables: { type: string | null; rows: string[][] }[];
+      }[] = [];
+      if (pm === null) return out;
+      for (const child of Array.from(pm.children)) {
+        const el = child as HTMLElement;
+        if (el.getAttribute('data-hc-kind') === 'entry') {
+          out.push({
+            heading: (el.textContent ?? '').trim(),
+            kind: el.getAttribute('data-hc-entry-kind'),
+            emptyParagraphs: 0,
+            tables: [],
+          });
+          continue;
+        }
+        const cur = out[out.length - 1];
+        if (cur === undefined) continue;
+        if (el.tagName === 'P' && (el.textContent ?? '').trim() === '') cur.emptyParagraphs += 1;
+        const tbls = el.tagName === 'TABLE' ? [el] : Array.from(el.querySelectorAll('table'));
+        for (const tbl of tbls) {
+          const rows = Array.from(tbl.querySelectorAll('tr'))
+            .filter((tr) => tr.querySelectorAll('td').length > 0)
+            .map((tr) => Array.from(tr.querySelectorAll('td')).map((c) => (c.textContent ?? '').trim()));
+          cur.tables.push({ type: tbl.getAttribute('data-hc-table-type'), rows });
+        }
+      }
+      return out;
+    }, `[data-testid="case-form-editor-${cid}"]`) as Promise<
+      {
+        heading: string;
+        kind: string | null;
+        emptyParagraphs: number;
+        tables: { type: string | null; rows: string[][] }[];
+      }[]
+    >;
+  }
+
+  /** Texts of every record-section heading (`[data-hc-section-no]`), in order. */
+  async sectionHeadingTexts(cid = DEFAULT_CID): Promise<string[]> {
+    return browser.execute((selector: string) => {
+      const root = document.querySelector(selector);
+      if (root === null) return [] as string[];
+      return Array.from(root.querySelectorAll('[data-hc-section-no]')).map((el) =>
+        ((el as HTMLElement).textContent ?? '').trim(),
+      );
     }, `[data-testid="case-form-editor-${cid}"]`);
   }
 

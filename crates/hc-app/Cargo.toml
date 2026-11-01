@@ -38,6 +38,10 @@ tauri = { workspace = true }
 # Pinned to the exact version resolved in Cargo.lock for tauri 2.9.
 tauri-plugin-dialog = "=2.4.1"
 tauri-specta = { workspace = true }
+# Oneshot channel bridging the non-blocking dialog callback into the async
+# visit_pick_report_file command (M3-RWv5 main-thread deadlock fix). Already in
+# the tree via tauri; pinned to the exact Cargo.lock version, `sync` only.
+tokio = { version = "=1.53.3", default-features = false, features = ["sync"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

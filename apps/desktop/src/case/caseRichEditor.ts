@@ -28,16 +28,20 @@ import TableCell from '@tiptap/extension-table-cell';
 import {
   CASE_RICH_SCHEMA,
   CASE_RICH_VERSION,
-  appendRowsToTable,
+  buildBodyRows,
   buildDatedEntryNodes,
   buildNewComplaintNodes,
   buildSectionNodes,
   currentComplaintId,
+  bulletSectionHeadings,
   joinComplaintsToSpine,
+  nameLeadingComplaint,
+  planTableRecord,
   splitSpineToComplaints,
   type EntryKind,
   type ProseMirrorNode,
   type RichComplaint,
+  type RichTableType,
   type SectionNodesArgs,
   type TableSeed,
   type V3Doc,
@@ -321,22 +325,20 @@ export function v3DocFromEditor(
  * deep-cloned into the mutable object graph TipTap owns.
  */
 export function initialContent(doc: V3Doc): Content {
-  const spine = joinComplaintsToSpine(doc.complaints);
+  // M3-RWv5 C: legacy "<n>. Label" section headings reopen as "<bullet> Label".
+  const spine = bulletSectionHeadings(joinComplaintsToSpine(doc.complaints));
   return JSON.parse(JSON.stringify(spine)) as Content;
 }
 
 /**
  * The 1-based complaint number the NEXT "Add new complaint" allocates: the
- * count of existing top-level complaint headers + 1 (M3-RWv3 §4, position-based
- * numbering). Read from the live editor doc so it reflects in-session adds.
+ * count of existing complaints + 1 (M3-RWv3 §4, position-based numbering).
+ * Counted via {@link splitSpineToComplaints} so an unnamed, header-less first
+ * complaint (M3-RWv5 C) still occupies `cc1`. Read from the live editor doc so
+ * it reflects in-session adds.
  */
 function nextComplaintNo(editor: Editor): number {
-  const content = (editor.getJSON() as JsonDoc).content ?? [];
-  return (
-    content.filter(
-      (n) => n.type === 'heading' && n.attrs?.['hcKind'] === 'complaint',
-    ).length + 1
-  );
+  return splitSpineToComplaints(editorSpine(editor)).length + 1;
 }
 
 /**
@@ -434,6 +436,16 @@ export function insertComplaint(
   editor: Editor,
   args: { name: string; date: string; visitId: string },
 ): void {
+  // M3-RWv5 C: a fresh case's first complaint has no header until it is
+  // named. Naming it ("Add new complaint" with a name) turns that leading
+  // unnamed section into "1. <name>" instead of appending a second complaint.
+  if (args.name !== '') {
+    const named = nameLeadingComplaint(editorSpine(editor), args.name);
+    if (named !== null) {
+      setEditorSpine(editor, named);
+      return;
+    }
+  }
   const no = nextComplaintNo(editor);
   const nodes = buildNewComplaintNodes({
     complaintNo: no,
@@ -472,90 +484,68 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * M3-RWv4 §4 — "Record modalities" is ONE appendable table per entry. The FIRST
- * press in an entry creates the modalities table (rule + numbered heading +
- * table, via {@link insertSectionNodes}); a SUBSEQUENT press in the SAME entry
- * APPENDS the seed's body rows to that same table instead of inserting a new
- * one.
+ * M3-RWv5 A — ONE TABLE PER TYPE PER ENTRY, for every record kind (vitals,
+ * modalities, family history, physical generals, investigations,
+ * prescription). The CURRENT entry is the dated entry holding the live caret
+ * (`editor.state.selection.head`, REAL ProseMirror positions — never a
+ * serialised-JSON length). The first Record of `kind` in that entry creates
+ * `[hr, bullet heading, table]` at the end of the entry; every later Record of
+ * the same kind in the same entry appends the seed's body rows to that table.
+ * A new follow-up entry has no table yet, so it starts fresh.
  *
- * The "current entry" is the LAST entry of the current complaint, which in a
- * chronological append is the document tail — so the target modalities table is
- * the LAST top-level `table` with `attrs.hcTableType === 'modalities'` that
- * follows the last entry heading. When one exists the new rows are spliced into
- * it as a fresh document (re-set from the edited JSON, consistent with the
- * other glue that re-sets content); otherwise the create path runs.
- *
- * Only modalities appends (M3-RWv4 assumption A); vitals/family/etc. keep the
- * one-table-per-press behaviour. No `.focus()`/scrollIntoView (jsdom lacks the
- * geometry APIs). The first seed row shapes the created table's header; each
- * append contributes its seed rows as body rows.
+ * The plan comes from the pure {@link planTableRecord} (the same kernel as
+ * `appendOrCreateTableInSpine`) and is applied as ONE ProseMirror transaction
+ * (`tr.insert`), so the selection is MAPPED through the change and the caret
+ * stays in the same entry for the next Record (a whole-doc `setContent` would
+ * reset it). No `.focus()`/scrollIntoView (jsdom lacks the geometry APIs).
+ */
+export function appendOrCreateTable(
+  editor: Editor,
+  kind: RichTableType,
+  seed: TableSeed,
+): void {
+  const spine = editorSpine(editor);
+  const plan = planTableRecord(spine, editor.state.selection.head, kind, seed);
+  const doc = editor.state.doc;
+  // Top-level start offset of every child, plus the doc end.
+  const offsets: number[] = [];
+  doc.forEach((_node, offset) => {
+    offsets.push(offset);
+  });
+  offsets.push(doc.content.size);
+  const schema = editor.schema;
+  editor
+    .chain()
+    .command(({ tr, dispatch }) => {
+      if (plan.mode === 'create') {
+        const at = offsets[plan.index] ?? doc.content.size;
+        const nodes = plan.nodes.map((n) =>
+          schema.nodeFromJSON(JSON.parse(JSON.stringify(n))),
+        );
+        if (dispatch) tr.insert(at, nodes);
+        return true;
+      }
+      const table = doc.child(plan.index);
+      // Inside the table, just after its last row.
+      const at = (offsets[plan.index] ?? 0) + table.nodeSize - 1;
+      const rows = buildBodyRows(plan.rows).map((r) =>
+        schema.nodeFromJSON(JSON.parse(JSON.stringify(r))),
+      );
+      if (dispatch) tr.insert(at, rows);
+      return true;
+    })
+    .run();
+}
+
+/**
+ * M3-RWv4 §4 modalities entry point, kept for its callers/tests: modalities is
+ * now simply one of the kinds handled by {@link appendOrCreateTable}.
  */
 export function appendOrCreateModalities(
   editor: Editor,
   seed: TableSeed,
 ): void {
-  const content = (editor.getJSON() as JsonDoc).content ?? [];
-  const targetIndex = lastModalitiesTableIndex(content);
-  if (targetIndex === -1) {
-    // No modalities table in the current (tail) entry yet → create one.
-    const sectionNo = modalitiesSectionNo(content);
-    insertSectionNodes(editor, {
-      kind: 'modalities',
-      sectionNo,
-      seed,
-    });
-    return;
-  }
-  // Append the seed's body rows to the existing modalities table and re-set the
-  // document from the edited JSON (same re-set pattern as initialContent).
-  const grown = appendRowsToTable(
-    content[targetIndex]!,
-    seed.rows.map((r) => [...r]),
-  );
-  const nextContent = content.map((n, i) => (i === targetIndex ? grown : n));
-  const nextDoc = JSON.parse(
-    JSON.stringify({ type: 'doc', content: nextContent }),
-  ) as Content;
-  editor.chain().setContent(nextDoc).run();
-}
-
-/**
- * The index in `content` of the LAST top-level `table` with
- * `hcTableType === 'modalities'` that belongs to the CURRENT (tail) entry — the
- * nodes after the last `hcKind:"entry"` heading. Returns -1 when the current
- * entry has no modalities table yet. Scanning only after the last entry heading
- * keeps a prior entry's modalities table from being appended to.
- */
-function lastModalitiesTableIndex(content: readonly ProseMirrorNode[]): number {
-  let lastEntryIndex = -1;
-  for (let i = 0; i < content.length; i += 1) {
-    const n = content[i]!;
-    if (n.type === 'heading' && n.attrs?.['hcKind'] === 'entry') {
-      lastEntryIndex = i;
-    }
-  }
-  let found = -1;
-  for (let i = lastEntryIndex + 1; i < content.length; i += 1) {
-    const n = content[i]!;
-    if (n.type === 'table' && n.attrs?.['hcTableType'] === 'modalities') {
-      found = i;
-    }
-  }
-  return found;
-}
-
-/** The next section number to stamp on a freshly-created modalities table. */
-function modalitiesSectionNo(content: readonly ProseMirrorNode[]): number {
-  let max = 0;
-  const walk = (n: ProseMirrorNode): void => {
-    if (n.type === 'heading' && n.attrs?.['hcKind'] === 'section') {
-      const no = n.attrs?.['hcSectionNo'];
-      if (typeof no === 'number' && no > max) max = no;
-    }
-    for (const c of n.content ?? []) walk(c);
-  };
-  for (const n of content) walk(n);
-  return max + 1;
+  appendOrCreateTable(editor, 'modalities', seed);
 }
 
 /** One complaint's structure for the React remove-control overlay (M3-RWv4 §6). */
@@ -596,6 +586,10 @@ export function caseStructure(editor: Editor): {
         .replace(/^\s*\d+\.\s*/, '');
       complaints.push({ complaintId: currentId, name, entryCount: 0 });
     } else if (n.type === 'heading' && n.attrs?.['hcKind'] === 'entry') {
+      if (complaints.length === 0) {
+        // M3-RWv5 C: entries of the unnamed, header-less first complaint.
+        complaints.push({ complaintId: currentId, name: '', entryCount: 0 });
+      }
       const last = complaints[complaints.length - 1];
       const entryIndex = last ? last.entryCount : 0;
       entries.push({ complaintId: currentId, entryIndex });

@@ -139,9 +139,15 @@ pub fn visit_delete_attachment(
 /// and the `e2e-test-keys` gating of `patient_import_fixture`. The seam is
 /// compiled OUT of the release/public build, which always opens the native
 /// picker only — behaviour unchanged for real doctors.
+///
+/// Threading (M3-RWv5): this MUST be an async command. A sync command runs
+/// inline on the GTK main thread, and a `blocking_pick_file()` there parks the
+/// main loop while the dialog build waits for that same loop (deadlock; GNOME
+/// then offers "Force Quit"). The non-blocking `pick_file(callback)` is bridged
+/// through a tokio oneshot and awaited on the async runtime instead.
 #[tauri::command]
 #[specta::specta]
-pub fn visit_pick_report_file(
+pub async fn visit_pick_report_file(
     app: tauri::AppHandle,
 ) -> Result<PickReportFileResponse, UserFacingError> {
     use tauri_plugin_dialog::DialogExt as _;
@@ -163,11 +169,16 @@ pub fn visit_pick_report_file(
         }
     }
 
-    let chosen = app
-        .dialog()
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
         .file()
         .add_filter("Reports", &["pdf", "png", "jpg", "jpeg", "webp"])
-        .blocking_pick_file();
+        .pick_file(move |picked| {
+            // A dropped receiver only means the command future went away.
+            let _ = tx.send(picked);
+        });
+    // A dropped sender (dialog torn down without a callback) == cancelled.
+    let chosen = rx.await.ok().flatten();
 
     let source_path =
         chosen.and_then(|p| p.into_path().ok().map(|p| p.to_string_lossy().to_string()));

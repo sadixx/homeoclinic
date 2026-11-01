@@ -24,6 +24,7 @@ import { formatDate } from '@/shared/datetime';
 import { features } from '@/shared/features';
 import { formatMobile } from '@/shared/mobile';
 import { formatPaise } from '@/shared/money';
+import { PatientAvatar, avatarKindForSex } from '@/shared/PatientAvatar';
 import { t } from '@/shared/strings';
 
 export interface PatientDashboardProps {
@@ -190,6 +191,8 @@ export function PatientDashboard({
   }
 
   const demo = data.demographics;
+  // M3-RWv5 C2: default silhouette when a gender is set and no photo exists.
+  const avatarKind = avatarKindForSex(demo.sex);
   // Pre-composed so the confirm dialog renders an identifier, not a JSX literal
   // (R-UI-007 / jsx-no-literals); the names come from the loaded record.
   const deleteTarget = `${demo.name} (${demo.code})`;
@@ -252,6 +255,11 @@ export function PatientDashboard({
                 src={demo.photoPath}
                 alt={demo.name}
                 className="h-full w-full object-cover"
+              />
+            ) : avatarKind !== null ? (
+              <PatientAvatar
+                kind={avatarKind}
+                testId="patient-dash-photo-avatar"
               />
             ) : (
               <span>{t('patient.dash.photo.none')}</span>

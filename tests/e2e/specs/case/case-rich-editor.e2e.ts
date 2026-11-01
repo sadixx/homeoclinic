@@ -93,13 +93,15 @@ describe('M3-RWv3 rich PHASE A: unified complaint-section record — add new com
     await expect(caseRichPage.editor()).toBeDisplayed();
 
     // ===== STEP 1: Add new complaint -> a NUMBERED complaint section =======
-    // A fresh case opens with ONE default (Untitled) complaint section #1
-    // (joinComplaintsToSpine always emits a header per complaint). "Add new
-    // complaint" therefore APPENDS the next numbered section. Capture the
-    // baseline so numbering assertions are position-relative, not absolute.
+    // M3-RWv5 C: a fresh case opens with NO complaint header (no "Untitled
+    // complaint" sample; case-form-complaint-empty-prompt asks for the name).
+    // The first "Add new complaint" NAMES that leading section "1. <name>";
+    // later ones APPEND the next numbered section. Capture the baseline so
+    // numbering assertions stay position-relative, not absolute.
     const baseHeaders = await caseRichPage.complaintHeaders();
-    const baseCount = baseHeaders.length; // 1 (the default Untitled complaint)
-    expect(baseCount).toBeGreaterThanOrEqual(1);
+    const baseCount = baseHeaders.length; // 0 since RWv5 (was 1 "Untitled" before)
+    expect(baseCount).toBe(0);
+    expect(await caseRichPage.editorText()).not.toMatch(/untitled/i);
     // Type a complaint name, click "Add new complaint": a numbered h1
     // complaint header "<no>. Headache" appears PLUS its first dated entry
     // headed `Headache — <date>`.
@@ -392,8 +394,8 @@ describe('M3-RWv3 rich PHASE B: HEADLINE multi-complaint kill-restore (CASE-005 
     // Reopen the SAME visit -> EVERYTHING restored.
     await caseRichPage.openVisit(patientId, visitId);
 
-    // BOTH named complaint sections restored (the default Untitled #1 also
-    // survives, so there are at least 3 headers). Match by name, not by a
+    // BOTH named complaint sections restored (no default Untitled header
+    // since RWv5 C, so exactly the two named ones). Match by name, not by a
     // fixed absolute number.
     await browser.waitUntil(
       async () => {
