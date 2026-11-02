@@ -232,12 +232,32 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install Ubuntu system dependencies
+        # ubuntu-latest moved to Ubuntu 26.04, where the WebKit WebDriver
+        # package was renamed webkit2gtk-driver -> webkitgtk-webdriver.
+        # Install whichever name this image provides, then make sure the
+        # WebKitWebDriver binary is on PATH (the harness resolves it with
+        # `command -v WebKitWebDriver`).
         run: |
           sudo apt-get update
+          if apt-cache show webkitgtk-webdriver >/dev/null 2>&1; then
+            WEBDRIVER_PKG=webkitgtk-webdriver
+          else
+            WEBDRIVER_PKG=webkit2gtk-driver
+          fi
+          echo "Installing WebDriver package: $WEBDRIVER_PKG"
           sudo apt-get install -y \
             ${{ env.LINUX_TAURI_DEPS }} \
-            webkit2gtk-driver \
+            "$WEBDRIVER_PKG" \
             xvfb
+          if ! command -v WebKitWebDriver >/dev/null 2>&1; then
+            DRV="$(dpkg -L "$WEBDRIVER_PKG" | grep -E '/WebKitWebDriver$' | head -1)"
+            if [ -z "$DRV" ]; then
+              echo "::error::WebKitWebDriver not found in $WEBDRIVER_PKG"
+              exit 1
+            fi
+            sudo ln -sf "$DRV" /usr/local/bin/WebKitWebDriver
+          fi
+          echo "WebKitWebDriver: $(command -v WebKitWebDriver)"
 
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
