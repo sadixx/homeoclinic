@@ -77,6 +77,63 @@
 }
 
 /* ---------------------------------------------------------------------------
+   M3ux — inline row delete. Every DATA row's last cell (class added by a
+   ProseMirror node decoration, never saved) reserves a narrow right-edge gutter
+   holding a small round minus button (a contenteditable=false widget). The
+   button is always visible and focusable (E2E waitForClickable and keyboard
+   users need it), in a calm slate tone; it turns red when its row is hovered
+   or focused. Sizes in rem scale with the app zoom (root 14px):
+   1.75rem = 24.5px target, 1.15rem ≈ 16px glyph. Contrast on white:
+   slate-600 #475569 text 7.6:1, slate-500 #64748b ring 4.8:1, red-700 #b91c1c
+   6.5:1 (on red-50 6.0:1), blue-600 #2563eb focus ring 5.2:1 — all >= 3:1.
+   --------------------------------------------------------------------------- */
+.hc-case-editor td.hc-row-delete-cell {
+  padding-right: 2.5rem;
+}
+
+.hc-case-editor .hc-row-delete {
+  position: absolute;
+  top: 0.125rem;
+  right: 0.25rem;
+  user-select: none;
+}
+
+.hc-case-editor .hc-row-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid #64748b; /* slate-500 */
+  border-radius: 9999px;
+  background-color: #ffffff;
+  color: #475569; /* slate-600 */
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hc-case-editor tr:hover .hc-row-delete-btn,
+.hc-case-editor tr:focus-within .hc-row-delete-btn {
+  border-color: #b91c1c; /* red-700 */
+  background-color: #fef2f2; /* red-50 */
+  color: #b91c1c;
+}
+
+.hc-case-editor .hc-row-delete-btn:focus {
+  outline: none;
+}
+
+.hc-case-editor .hc-row-delete-btn:focus-visible {
+  outline: 2px solid #2563eb; /* blue-600 */
+  outline-offset: 1px;
+}
+
+/* ---------------------------------------------------------------------------
    M3-RWv4 §1 — complaint-section heading standout. A complaint renders ONCE as
    an `hcKind:"complaint"` h1 (data-hc-kind="complaint"); this scopes a BOLD +
    UNDERLINED standout look to it so the section it heads visibly dominates.

@@ -58,15 +58,16 @@ import {
   initialContent,
   insertComplaint,
   insertDatedEntry,
+  focusTableRow,
+  parkCaretForRowDelete,
   removeTableRowAt,
   selectionIsOnComplaintHeading,
   setEditorSpine,
   tableRowPos,
-  tableStructure,
   unlinkInvestigationRow,
   v3DocFromEditor,
   type ComplaintStructure,
-  type TableStructure,
+  type RowDeleteOptions,
 } from '@/case/caseRichEditor';
 import { isUserFacingError, run } from '@/shared/command';
 import { formatDate, formatDateTime, todayIsoDate } from '@/shared/datetime';
@@ -195,9 +196,8 @@ export function CaseForm({
     null,
   );
   const [linkOpenError, setLinkOpenError] = useState<string | null>(null);
-  // M3-RWv6 item 6: the inserted tables (doc order) for the per-row delete
-  // controls, and the pending row-delete confirmation.
-  const [tables, setTables] = useState<TableStructure[]>([]);
+  // M3-RWv6 item 6 / M3ux: the pending row-delete confirmation, set by the
+  // inline minus control on a table's data row.
   const [rowDeleteTarget, setRowDeleteTarget] = useState<{
     readonly tableNo: number;
     readonly rowIndex: number;
@@ -279,7 +279,6 @@ export function CaseForm({
     if (ed === null) return;
     setStructure(caseStructure(ed));
     setLinkRows(collectLinkRows(editorSpine(ed)));
-    setTables(tableStructure(ed));
     setListGuarded(selectionIsOnComplaintHeading(ed));
   }, []);
 
@@ -287,7 +286,7 @@ export function CaseForm({
 
   const editor = useEditor(
     {
-      extensions: caseEditorExtensions(),
+      extensions: caseEditorExtensions(rowDeleteOptions(setRowDeleteTarget)),
       content: doc !== null ? initialContent(doc) : '',
       editable: true,
       editorProps: {
@@ -338,7 +337,6 @@ export function CaseForm({
     if (editor !== null) {
       setStructure(caseStructure(editor));
       setLinkRows(collectLinkRows(editorSpine(editor)));
-      setTables(tableStructure(editor));
     }
   }, [editor]);
 
@@ -552,10 +550,31 @@ export function CaseForm({
     if (ed === null || target === null) return;
     setRowDeleteTarget(null);
     const pos = tableRowPos(ed, target.tableNo, target.rowIndex);
-    if (pos === null || !removeTableRowAt(ed, pos)) return;
+    if (pos === null) {
+      focusTableRow(ed, target.tableNo, target.rowIndex);
+      return;
+    }
+    // rowdelete-2: park the caret where the keyboard user lands afterwards
+    // (the next row moves up into this place, else the previous row, else the
+    // text after a removed table); the delete maps it. Then focus the editor
+    // so focus never falls to <body> when the dialog closes.
+    parkCaretForRowDelete(ed, target.tableNo, target.rowIndex);
+    const deleted = removeTableRowAt(ed, pos);
+    ed.view.focus();
+    if (!deleted) return;
     refreshStructure();
     void flushSave();
   }, [rowDeleteTarget, flushSave, refreshStructure]);
+
+  // rowdelete-2: cancel returns keyboard focus to the editor in the row the
+  // confirm was opened for, so a keyboard user is never left on <body>.
+  const onCancelRowDelete = useCallback((): void => {
+    const ed = editorRef.current;
+    const target = rowDeleteTarget;
+    setRowDeleteTarget(null);
+    if (ed === null || target === null) return;
+    focusTableRow(ed, target.tableNo, target.rowIndex);
+  }, [rowDeleteTarget]);
 
   // M3-RWv6 item 4: one click on a link row opens that report in the same
   // in-app preview as the Lab reports panel (typed command only, no path).
@@ -808,15 +827,6 @@ export function CaseForm({
             </p>
           ) : null}
 
-          {/* M3-RWv6 item 6: a delete control per DATA row of every inserted
-              table (header rows have none), as a React overlay keyed to the
-              live doc (NOT an editable doc node). Each opens a confirm. */}
-          <TableRowControls
-            tables={tables}
-            onDelete={(tableNo, rowIndex) =>
-              setRowDeleteTarget({ tableNo, rowIndex })
-            }
-          />
           {/* The single WYSIWYG notepad. A7 (M3-RWv4 §7): the editor is a
               BOUNDED, internally-scrolling region — `flex-1 min-h-0
               overflow-y-auto` inside the `flex h-full min-h-0 flex-col` content
@@ -1030,7 +1040,7 @@ export function CaseForm({
           cancelLabel={t('case.form.tableRow.delete.cancel')}
           cancelTestId="case-form-table-row-delete-cancel"
           confirmTestId="case-form-table-row-delete-confirm"
-          onCancel={() => setRowDeleteTarget(null)}
+          onCancel={onCancelRowDelete}
           onConfirm={onConfirmRowDelete}
         />
       ) : null}
@@ -1226,58 +1236,29 @@ function RemoveControls({
 }
 
 /**
- * M3-RWv6 item 6: one delete control per DATA row of every inserted table
- * (`case-form-table-row-delete-<t>-<r>`, t = 1-based doc-order table, r =
- * 1-based data row). The header row has no control. Grouped per table and
- * labelled with the table's section name and row number.
+ * M3ux: the inline row-delete control wiring. Each DATA row of every inserted
+ * table carries a minus button (a ProseMirror widget, never doc content) named
+ * "Delete row <r> of <table>"; activating it opens the row-delete confirm.
  */
-function TableRowControls({
-  tables,
-  onDelete,
-}: {
-  readonly tables: readonly TableStructure[];
-  readonly onDelete: (tableNo: number, rowIndex: number) => void;
-}): JSX.Element | null {
-  if (!tables.some((tb) => tb.dataRows > 0)) return null;
-  return (
-    <div
-      data-testid="case-form-table-row-controls"
-      className="mb-2 flex flex-none flex-col gap-1 text-sm"
-    >
-      {tables.map((tb, index) => {
-        const tableNo = index + 1;
-        if (tb.dataRows === 0) return null;
-        const label = sectionLabelFor(tb.kind);
-        return (
-          <div
-            key={`table-${tableNo}`}
-            role="group"
-            aria-label={`${t('case.form.tableRow.group')}: ${label}`}
-            className="flex flex-wrap items-center gap-2"
-          >
-            <span className="text-slate-700">{label}</span>
-            {Array.from({ length: tb.dataRows }, (_v, i) => {
-              const rowNo = i + 1;
-              return (
-                <button
-                  key={`row-${tableNo}-${rowNo}`}
-                  type="button"
-                  data-testid={`case-form-table-row-delete-${tableNo}-${rowNo}`}
-                  aria-label={`${t('case.form.tableRow.delete')} ${rowNo}: ${label}`}
-                  title={t('case.form.tableRow.delete')}
-                  onClick={() => onDelete(tableNo, rowNo)}
-                  className="rounded border border-slate-300 px-2 py-0.5 text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  {t('case.form.remove.icon')} {t('case.form.tableRow.row')}{' '}
-                  {rowNo}
-                </button>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
+function rowDeleteOptions(
+  onTarget: (target: { tableNo: number; rowIndex: number }) => void,
+): RowDeleteOptions {
+  return {
+    glyph: t('case.form.tableRow.minus'),
+    label: (rowNo, kind) => rowDeleteLabel(rowNo, kind),
+    title: (rowNo, kind) =>
+      t('case.form.tableRow.deleteTitle')
+        .replace('{label}', rowDeleteLabel(rowNo, kind))
+        .replace('{shortcut}', t('case.form.tableRow.deleteShortcut')),
+    onDelete: (tableNo, rowNo) => onTarget({ tableNo, rowIndex: rowNo }),
+  };
+}
+
+/** "Delete row <r> of <table>" for data row `rowNo` of a `kind` table. */
+function rowDeleteLabel(rowNo: number, kind: string | null): string {
+  return t('case.form.tableRow.deleteLabel')
+    .replace('{row}', String(rowNo))
+    .replace('{table}', sectionLabelFor(kind));
 }
 
 /**
