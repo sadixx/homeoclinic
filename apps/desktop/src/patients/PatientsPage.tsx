@@ -22,12 +22,18 @@ export interface PatientsPageProps {
   readonly initialPatientId?: string;
   /** Open on the list (default) or straight into the register form. */
   readonly initialView?: 'list' | 'new';
+  /** Start (open-or-create) a First visit and open the S08 case form. */
+  readonly onTakeCase?: (patientId: string) => void;
+  /** Start a Follow-up visit for a patient (backend resolves the prior visit). */
+  readonly onNewFollowup?: (patientId: string, prevVisitId?: string) => void;
 }
 
 /** The `/patients` container. */
 export function PatientsPage({
   initialPatientId,
   initialView = 'list',
+  onTakeCase,
+  onNewFollowup,
 }: PatientsPageProps): JSX.Element {
   const [view, setView] = useState<View>(() => {
     if (initialPatientId !== undefined) {
@@ -85,6 +91,8 @@ export function PatientsPage({
           onOpenPatient={openDashboard}
           onEdit={openEdit}
           onBack={openList}
+          {...(onTakeCase !== undefined ? { onTakeCase } : {})}
+          {...(onNewFollowup !== undefined ? { onNewFollowup } : {})}
         />
       );
   }

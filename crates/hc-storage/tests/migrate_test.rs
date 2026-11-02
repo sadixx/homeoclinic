@@ -139,3 +139,23 @@ fn nfr011_migrate_refuses_downgrade() {
         "expected SchemaTooNew, got {err:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// M3-RW Slice A1: migration 0011_case_template_journal bumps the schema to 11.
+// ---------------------------------------------------------------------------
+
+/// M3-RW A1 (R-DATA-002): the journal-template migration 0011 is wired into the
+/// forward-only runner, so `latest_version()` advances to 11 and a from-empty
+/// migrate lands at 11. RED until 0011 is appended to `migrations()`.
+#[test]
+fn m3rw_migration_0011_advances_user_version() {
+    assert_eq!(
+        migrate::latest_version(),
+        11,
+        "migration 0011_case_template_journal must bump latest_version 10 -> 11 (M3-RW A1)"
+    );
+
+    let (_dir, _path, pool) = fresh_unmigrated();
+    let to = migrate::run(&pool).expect("migrate from empty through 0011");
+    assert_eq!(to, 11, "a from-empty migrate must land at user_version 11");
+}

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-21T01:29:29.272Z",
+  "generatedAt": "2026-11-01T23:45:44.452Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -8,6 +8,20 @@
         "SET-004"
       ],
       "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/app/layout-rwv5-resize.e2e.ts",
+      "reqs": [
+        "NFR-030",
+        "SET-005",
+        "PAT-001",
+        "CASE-001"
+      ],
+      "tier": "stable",
       "area": "settings",
       "targets": [
         "linux"
@@ -52,12 +66,131 @@
       ]
     },
     {
+      "path": "tests/e2e/specs/case/case-investigations.e2e.ts",
+      "reqs": [
+        "PAT-009"
+      ],
+      "tier": "stable",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/case/case-load-gate.e2e.ts",
+      "reqs": [
+        "CASE-001",
+        "CASE-003",
+        "CASE-005"
+      ],
+      "tier": "stable",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/case/case-rich-editor.e2e.ts",
+      "reqs": [
+        "CASE-001",
+        "CASE-003",
+        "CASE-005",
+        "VIS-001",
+        "NFR-030",
+        "SET-005",
+        "PAT-009"
+      ],
+      "tier": "stable",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/case/case-rwv4-modalities-remove.e2e.ts",
+      "reqs": [
+        "CASE-001",
+        "CASE-003"
+      ],
+      "tier": "stable",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/case/case-rwv5-per-entry-tables.e2e.ts",
+      "reqs": [
+        "CASE-001",
+        "CASE-003",
+        "CASE-005",
+        "VIS-001"
+      ],
+      "tier": "stable",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/case/case-rwv6.e2e.ts",
+      "reqs": [
+        "CASE-001",
+        "CASE-003",
+        "VIS-001",
+        "PAT-005",
+        "PAT-009"
+      ],
+      "tier": "stable",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/case/real-picker-smoke.e2e.ts",
+      "reqs": [
+        "PAT-009"
+      ],
+      "tier": "smoke",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/home/today-overview.e2e.ts",
+      "reqs": [
+        "VIS-004",
+        "VIS-005"
+      ],
+      "tier": "stable",
+      "area": "home",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
       "path": "tests/e2e/specs/patients/dashboard-edit-recycle.e2e.ts",
       "reqs": [
         "PAT-005",
         "PAT-006",
         "PAT-008",
         "PAT-001"
+      ],
+      "tier": "stable",
+      "area": "patients",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/patients/patient-rwv5-marital-avatar.e2e.ts",
+      "reqs": [
+        "PAT-001",
+        "PAT-005",
+        "PAT-038",
+        "PSR-001"
       ],
       "tier": "stable",
       "area": "patients",
@@ -138,6 +271,43 @@
       "targets": [
         "linux",
         "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/setup/registration-council.e2e.ts",
+      "reqs": [
+        "SET-002"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/setup/setup-rwv6.e2e.ts",
+      "reqs": [
+        "SET-002",
+        "SET-003"
+      ],
+      "tier": "stable",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/visit/followup-richtext.e2e.ts",
+      "reqs": [
+        "VIS-001",
+        "VIS-002",
+        "VIS-003",
+        "CASE-005"
+      ],
+      "tier": "stable",
+      "area": "visit",
+      "targets": [
+        "linux"
       ]
     }
   ]

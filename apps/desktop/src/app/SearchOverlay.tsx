@@ -20,6 +20,7 @@ import { run } from '@/shared/command';
 import { formatDate } from '@/shared/datetime';
 import { formatMobile } from '@/shared/mobile';
 import { formatPaise } from '@/shared/money';
+import { PatientAvatar, avatarKindForSex } from '@/shared/PatientAvatar';
 import { t, type StringKey } from '@/shared/strings';
 
 /** Page size for the first page of results / recent list (PSR-005/007). */
@@ -315,6 +316,8 @@ function ResultRow({
 }): JSX.Element {
   const lastVisit = formatDate(row.lastVisitAt) ?? t('common.none');
   const dues = `${t('common.duesPrefix')}${formatPaise(row.duesPaise)}`;
+  // M3-RWv5 C2: default silhouette when a gender is set and no photo exists.
+  const avatarKind = avatarKindForSex(row.sex);
   return (
     <li
       role="option"
@@ -333,6 +336,8 @@ function ResultRow({
             alt=""
             className="h-full w-full object-cover"
           />
+        ) : avatarKind !== null ? (
+          <PatientAvatar kind={avatarKind} testId="search-row-photo-avatar" />
         ) : (
           row.name.charAt(0)
         )}

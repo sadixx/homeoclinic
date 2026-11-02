@@ -40,6 +40,14 @@ const {
   patientRecent,
   patientGetDashboard,
   patientTouchRecent,
+  caseVisitOpenOrCreate,
+  caseTemplateGetDefault,
+  caseTemplateList,
+  caseVisitAutosave,
+  caseSummaryRender,
+  caseTemplateSetVisibility,
+  visitHasSavedFirstCase,
+  todayGetOverview,
 } = vi.hoisted(() => ({
   setupGetState: vi.fn(),
   authGetLockState: vi.fn(),
@@ -57,6 +65,27 @@ const {
   patientRecent: vi.fn(),
   patientGetDashboard: vi.fn(),
   patientTouchRecent: vi.fn(),
+  // S08 case form + its entry wiring (route + Take-case + F5). CaseForm reads
+  // these on mount; open-or-create also backs the Take-case / F5 navigation.
+  caseVisitOpenOrCreate: vi.fn(),
+  caseTemplateGetDefault: vi.fn(),
+  caseTemplateList: vi.fn(),
+  caseVisitAutosave: vi.fn(),
+  caseSummaryRender: vi.fn(),
+  caseTemplateSetVisibility: vi.fn(),
+  // First-case gating read (Slice C5) the PatientDashboard fires on open; it
+  // decides whether the dashboard surfaces the dedicated Follow-up button.
+  visitHasSavedFirstCase: vi.fn(),
+  // S03 Today upgrade (R3): the TodayScreen now calls today_get_overview on
+  // mount, so every Today-routed AppShell render depends on it. Default to an
+  // all-empty overview so the shell renders Today's empty state.
+  todayGetOverview: vi.fn(async () => ({
+    dueToday: [],
+    overdue: [],
+    registeredToday: [],
+    backupWarning: null,
+    licenceReminder: null,
+  })),
 }));
 
 vi.mock('@/bindings', () => ({
@@ -95,10 +124,21 @@ vi.mock('@/bindings', () => ({
     patientRecent,
     patientGetDashboard,
     patientTouchRecent,
+    // S08 case form + entry wiring dependencies.
+    caseVisitOpenOrCreate,
+    caseTemplateGetDefault,
+    caseTemplateList,
+    caseVisitAutosave,
+    caseSummaryRender,
+    caseTemplateSetVisibility,
+    visitHasSavedFirstCase,
+    // S03 Today overview read (R3) the TodayScreen fires on mount.
+    todayGetOverview,
   },
 }));
 
 import { AppShell } from './AppShell';
+import en from '@/locales/en.json';
 
 /** A never-resolving promise to hold the boot reads "pending". */
 function pending<T>(): Promise<T> {
@@ -194,6 +234,42 @@ beforeEach(() => {
   });
   patientTouchRecent.mockReset();
   patientTouchRecent.mockResolvedValue(null);
+  // S08 case-form defaults: open-or-create resolves a fresh First visit, the
+  // default template is a minimal chronic schema, and the picker list is empty.
+  // These let the /patient/:id/case/:vid route render the real CaseForm and
+  // back the Take-case / F5 open-or-create navigation.
+  caseVisitOpenOrCreate.mockReset();
+  caseVisitOpenOrCreate.mockResolvedValue({
+    visitId: 'v-1',
+    templateId: 'chronic_detailed',
+    dataJson: '{}',
+    vitalsJson: '{}',
+    visitAt: '2026-10-21T10:42:00Z',
+  });
+  caseTemplateGetDefault.mockReset();
+  caseTemplateGetDefault.mockResolvedValue({
+    templateId: 'chronic_detailed',
+    name: 'Chronic (detailed)',
+    schemaJson: JSON.stringify({
+      version: 1,
+      sections: [
+        {
+          key: 'chief_complaints',
+          title: 'Chief complaints',
+          collapsible: true,
+          hideable: true,
+          repeatable: true,
+          fields: [{ key: 'location', label: 'Location', type: 'text' }],
+        },
+      ],
+    }),
+  });
+  caseTemplateList.mockReset();
+  caseTemplateList.mockResolvedValue({ templates: [] });
+  // Gate open by default (no saved first case): the dashboard shows an enabled
+  // New visit and no Follow-up button unless a test overrides this.
+  visitHasSavedFirstCase.mockReset();
+  visitHasSavedFirstCase.mockResolvedValue({ hasSavedFirstCase: false });
 });
 
 describe('AppShell', () => {
@@ -491,8 +567,16 @@ describe('AppShell', () => {
       fireEvent.change(screen.getByTestId('setup-doctor-regno'), {
         target: { value: 'REG-0001' },
       });
-      fireEvent.change(screen.getByTestId('setup-doctor-council'), {
-        target: { value: 'Test Council' },
+      // Chosen by option text so the flow does not depend on the council
+      // label format (M3-RWv6 item 1 changed it to "<State>: <Authority>").
+      const council = screen.getByTestId(
+        'setup-doctor-council',
+      ) as HTMLSelectElement;
+      const maharashtra = Array.from(council.options).find((o) =>
+        (o.textContent ?? '').startsWith('Maharashtra'),
+      );
+      fireEvent.change(council, {
+        target: { value: maharashtra?.value ?? '' },
       });
       await user.click(screen.getByTestId('setup-next'));
 
@@ -728,6 +812,296 @@ describe('AppShell', () => {
       ).toBeInTheDocument();
       // Opening a patient closes the overlay.
       expect(screen.queryByTestId('search-overlay')).not.toBeInTheDocument();
+    });
+  });
+
+  // S08 case-form wiring (M3 Slice B, R3): the shell must MOUNT the case route
+  // behind the completion guard so the form is reachable (no dead end,
+  // ADR-0002), the S07 dashboard "Take case" entry must open-or-create a visit
+  // and navigate into it, and F5 must start a new visit for the open patient.
+  // The case bindings are the faked dependencies; the real AppShell router runs.
+  describe('S08 case form route + Take-case + F5 (M3 Slice B)', () => {
+    /** Drive an in-app navigation the way a nav click / deep link would. */
+    async function navigateViaHash(hash: string): Promise<void> {
+      await act(async () => {
+        window.location.hash = hash;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      });
+    }
+
+    it('mounts /patient/:id/case/:vid and renders the case form', async () => {
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patient/p-123/case/v-1');
+
+      // The route exists -> the real CaseForm renders (no bounce to /today).
+      expect(await screen.findByTestId('case-form')).toBeInTheDocument();
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+    });
+
+    it('the dashboard Take-case entry opens-or-creates a visit and routes into the case form', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // Open the patient dashboard (S07) via the deep link.
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+
+      // The R3 Take-case action is present and enabled; clicking it opens-or-
+      // creates the visit and navigates into the case form.
+      await user.click(await screen.findByTestId('patient-dash-take-case'));
+
+      await waitFor(() =>
+        expect(caseVisitOpenOrCreate).toHaveBeenCalledWith({
+          patientId: 'p-123',
+          visitType: 'first',
+        }),
+      );
+      expect(await screen.findByTestId('case-form')).toBeInTheDocument();
+    });
+
+    it('F5 starts a new visit for the open patient', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // Open a patient so F5 knows whom to take the case for.
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+
+      await user.keyboard('{F5}');
+
+      await waitFor(() =>
+        expect(caseVisitOpenOrCreate).toHaveBeenCalledWith({
+          patientId: 'p-123',
+          visitType: 'first',
+        }),
+      );
+      expect(await screen.findByTestId('case-form')).toBeInTheDocument();
+    });
+
+    it('blocks the case route before setup completion (completion guard holds)', async () => {
+      setupGetState.mockResolvedValue({
+        completed: false,
+        currentStep: 1,
+        dataDir: '/tmp/hc',
+      });
+      authGetLockState.mockResolvedValue({
+        locked: false,
+        autolockMinutes: 15,
+      });
+
+      render(<AppShell />);
+      expect(await screen.findByTestId('setup-wizard')).toBeInTheDocument();
+
+      await navigateViaHash('#/patient/p-123/case/v-1');
+
+      // The guard must hold the fresh install on the wizard; the clinical form
+      // must not render before the licence/trial is activated.
+      await waitFor(() => {
+        expect(screen.getByTestId('setup-wizard')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('case-form')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
+    });
+  });
+
+  // HC-MVP1-M3ux — UX1 consistent back navigation. The case form (S08) and the
+  // follow-up visit (S09) currently render with NO onBack, so a doctor who
+  // opens a visit is stranded there (the user-reported frustration). The shell
+  // must wire a Back that returns to the patient dashboard (/patients?id=:id),
+  // NOT Today, and honour the convention-mandated global Alt+Left (00-
+  // conventions §3), which must never fire mid-IME-composition. Back never
+  // discards data — the clinical forms already autosave. These exercise the
+  // real AppShell router; the case/followup bindings are faked dependencies.
+  // They FAIL on current code (no onBack wiring, no Alt+Left handler).
+  describe('UX1 back navigation: case/follow-up -> dashboard + Alt+Left (HC-MVP1-M3ux)', () => {
+    /** Drive an in-app navigation the way a nav click / deep link would. */
+    async function navigateViaHash(hash: string): Promise<void> {
+      await act(async () => {
+        window.location.hash = hash;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      });
+    }
+
+    it('case route Back returns to the patient dashboard, not Today', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patient/p-123/case/v-1');
+      await screen.findByTestId('case-form');
+
+      // Back on the case form returns to the S07 dashboard for this patient.
+      await user.click(await screen.findByTestId('case-form-back'));
+
+      expect(
+        await screen.findByTestId('patient-dash-demographics'),
+      ).toBeInTheDocument();
+      // It must be the dashboard, not a bounce to Today or the case form.
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('case-form')).not.toBeInTheDocument();
+    });
+
+    it('follow-up route Back returns to the patient dashboard, not Today', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patient/p-123/visit/v-f1/followup?prev=v-prev');
+      await screen.findByTestId('followup-screen');
+
+      await user.click(await screen.findByTestId('followup-back'));
+
+      expect(
+        await screen.findByTestId('patient-dash-demographics'),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('today-screen')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('followup-screen')).not.toBeInTheDocument();
+    });
+
+    it('Alt+Left from the case form goes back one step (dashboard), not deeper', async () => {
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // Walk into the dashboard, then deeper into the case form, so a single
+      // Alt+Left (Back) should return to the dashboard — the parent step.
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+      await navigateViaHash('#/patient/p-123/case/v-1');
+      await screen.findByTestId('case-form');
+
+      await user.keyboard('{Alt>}{ArrowLeft}{/Alt}');
+
+      // Alt+Left (00-conventions §3) is Back: one step up to the dashboard.
+      expect(
+        await screen.findByTestId('patient-dash-demographics'),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('case-form')).not.toBeInTheDocument();
+    });
+
+    it('Alt+Left does not fire while an IME composition is active', async () => {
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+      await navigateViaHash('#/patient/p-123/case/v-1');
+      await screen.findByTestId('case-form');
+
+      // A keydown that is part of an IME composition must be ignored: the
+      // handler must not steal the key or navigate mid-word (00-conventions
+      // §3: shortcuts never fire while an IME composition is active).
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'ArrowLeft',
+            altKey: true,
+            isComposing: true,
+          }),
+        );
+      });
+
+      // Still on the case form; no Back happened.
+      expect(screen.getByTestId('case-form')).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('patient-dash-demographics'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  // D1 (user-reported dead click): the dashboard Follow-up click opened
+  // nothing. The dashboard fix fires onNewFollowup(patientId) unconditionally;
+  // AppShell.startFollowupForPatient must then open-or-create the follow-up and
+  // navigate into the JOURNAL CaseForm (visitType='follow_up'), i.e. the
+  // /patient/:id/case/:vid/followup route. And when the open REJECTS, the shell
+  // must SURFACE a non-crash, patient-data-free alert (R-UI-008) instead of the
+  // old silent catch {} — a failed open must be observable, not a dead click.
+  describe('D1 follow-up open path: navigate + surface error on reject', () => {
+    /** Drive an in-app navigation the way a nav click / deep link would. */
+    async function navigateViaHash(hash: string): Promise<void> {
+      await act(async () => {
+        window.location.hash = hash;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      });
+    }
+
+    it('opens-or-creates a follow-up and routes into the journal case form', async () => {
+      // Gate the first case so the dashboard surfaces the Follow-up button, and
+      // resolve the follow-up open to a fresh visit id.
+      visitHasSavedFirstCase.mockResolvedValue({ hasSavedFirstCase: true });
+      caseVisitOpenOrCreate.mockResolvedValue({
+        visitId: 'v-fu-1',
+        templateId: 'chronic_detailed',
+        dataJson: '{}',
+        vitalsJson: '{}',
+        visitAt: '2026-10-23T10:42:00Z',
+      });
+
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // Open the dashboard; the first case is saved so the Follow-up button
+      // shows even though the visit timeline is empty (the D1 stale state).
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+
+      await user.click(await screen.findByTestId('patient-dash-followup'));
+
+      // The backend resolves the prior visit itself, so the UI opens-or-creates
+      // a follow-up with the patient id alone (no prevVisitId threaded).
+      await waitFor(() =>
+        expect(caseVisitOpenOrCreate).toHaveBeenCalledWith({
+          patientId: 'p-123',
+          visitType: 'follow_up',
+        }),
+      );
+      // CaseRoute mounts in follow-up mode (the /followup route), proving the
+      // click is no longer a silent no-op.
+      expect(await screen.findByTestId('case-form')).toBeInTheDocument();
+      expect(window.location.hash).toContain('/followup');
+    });
+
+    it('surfaces a non-crash error (not a silent catch) when the follow-up open rejects', async () => {
+      visitHasSavedFirstCase.mockResolvedValue({ hasSavedFirstCase: true });
+      // The open rejects like a backend/transport failure.
+      caseVisitOpenOrCreate.mockRejectedValue(new Error('open failed'));
+      const errSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+
+      await user.click(await screen.findByTestId('patient-dash-followup'));
+
+      // A visible, non-crash alert appears (observable, not a dead click).
+      const alert = await screen.findByTestId('app-open-error');
+      expect(alert).toHaveAttribute('role', 'alert');
+      expect(alert).toHaveTextContent(en['app.case.openFailed']);
+      // No case form mounted, and the shell did not crash.
+      expect(screen.queryByTestId('case-form')).not.toBeInTheDocument();
+      expect(screen.getByTestId('app-shell')).toBeInTheDocument();
+      // One fixed console.error line with NO patient id / SQL / path / stack.
+      expect(errSpy).toHaveBeenCalledWith('[AppShell] follow-up open failed');
+      const logged = errSpy.mock.calls.flat().join(' ');
+      expect(logged).not.toContain('p-123');
+
+      // Dismissible by the doctor.
+      await user.click(screen.getByTestId('app-open-error-dismiss'));
+      await waitFor(() =>
+        expect(screen.queryByTestId('app-open-error')).not.toBeInTheDocument(),
+      );
+
+      errSpy.mockRestore();
     });
   });
 });

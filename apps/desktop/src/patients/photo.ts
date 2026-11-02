@@ -143,7 +143,10 @@ export async function captureWebcamPhoto(): Promise<WebcamCaptureResult> {
     // Start playback but do NOT await it (play() can hang on WebKitGTK); wait
     // for the first decoded frame instead.
     void video.play().catch(() => undefined);
-    if (video.readyState < 2 /* HAVE_CURRENT_DATA */ || video.videoWidth === 0) {
+    if (
+      video.readyState < 2 /* HAVE_CURRENT_DATA */ ||
+      video.videoWidth === 0
+    ) {
       await new Promise<void>((resolve) => {
         let settled = false;
         const done = (): void => {

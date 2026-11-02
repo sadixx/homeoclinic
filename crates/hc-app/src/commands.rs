@@ -5,9 +5,11 @@
 //! `tauri-specta` → `bindings.ts` → UI wrapper) end to end.
 
 pub mod app_info;
+pub mod attachment;
 pub mod auth;
 pub mod backup;
 pub mod health;
 pub mod licence;
 pub mod patient;
 pub mod setup;
+pub mod visit;

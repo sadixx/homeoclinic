@@ -62,6 +62,39 @@ pub fn migrations() -> &'static [Migration] {
             target: 7,
             sql: include_str!("migrations/0007_patient_recent.sql"),
         },
+        // HC-MVP1-058: case_template table + the 3 default case templates
+        // (Chronic detailed/Acute quick/Child) whose schema_json encodes the
+        // CASE-001 sections/fields (CASE-001..004). Additive; no existing FTS
+        // trigger impact.
+        Migration {
+            target: 8,
+            sql: include_str!("migrations/0008_case_template.sql"),
+        },
+        // HC-MVP1-068..072: visit table + visit_fts (external-content FTS5) +
+        // same-transaction sync triggers (VIS-001..005, R-DATA-006). B-tree
+        // indexes for the per-patient timeline + the Today follow-up scan.
+        Migration {
+            target: 9,
+            sql: include_str!("migrations/0009_visit.sql"),
+        },
+        // HC-MVP1-M3ux3 / PAT-009: attachment table for visit lab/ultrasound/CT
+        // report uploads (metadata only; blobs stay encrypted in the M1-024
+        // AttachmentStore). Additive; forward-only superset of §3 (ADR 0017).
+        Migration {
+            target: 10,
+            sql: include_str!("migrations/0010_attachment.sql"),
+        },
+        // M3-RW Slice A1: migrate the 3 seeded case_template schema_json rows to
+        // the doctor-journal side-section schema (ADR 0018) — physical_generals
+        // gains Constitution/Diet/Sun-aggravation(yes/no)/Notes; family_history
+        // becomes Maternal/Paternal; investigations becomes Suggested/Submitted;
+        // chief_complaints/hpi/personal_history/examination are removed (the
+        // journal body replaces them). UPDATE-only; does not touch any
+        // visit.data_json row. Forward-only (R-DATA-002).
+        Migration {
+            target: 11,
+            sql: include_str!("migrations/0011_case_template_journal.sql"),
+        },
     ]
 }
 

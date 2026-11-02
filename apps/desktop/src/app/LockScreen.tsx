@@ -150,7 +150,7 @@ export function LockScreen({ onUnlocked }: LockScreenProps): JSX.Element {
           data-testid="lock-recovery-card"
           role="dialog"
           aria-label={t('lock.recovery.title')}
-          className="flex w-[420px] flex-col gap-3 rounded-lg border border-slate-200 bg-white p-8 shadow"
+          className="flex w-full max-w-[26.25rem] flex-col gap-3 rounded-lg border border-slate-200 bg-white p-8 shadow"
         >
           <h2 className="text-lg font-semibold text-slate-900">
             {t('lock.recovery.title')}
@@ -243,7 +243,7 @@ export function LockScreen({ onUnlocked }: LockScreenProps): JSX.Element {
         data-testid="lock-card"
         role="dialog"
         aria-label={t('lock.title')}
-        className="flex w-[420px] flex-col items-center gap-4 rounded-lg border border-slate-200 bg-white p-8 shadow"
+        className="flex w-full max-w-[26.25rem] flex-col items-center gap-4 rounded-lg border border-slate-200 bg-white p-8 shadow"
       >
         <span className="text-lg font-semibold text-slate-900">
           {t('app.name')}

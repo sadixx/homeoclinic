@@ -141,6 +141,79 @@ export const commands = {
 	patientListQuery: (req: ListQueryRequest) => typedError<ListQueryResponse, UserFacingError>(__TAURI_INVOKE("patient_list_query", { req })),
 	/**  Export the current filtered, sorted list as a CSV (HC-MVP1-052, PSR-011). */
 	patientListExportCsv: (req: ListExportCsvRequest) => typedError<ExportResponse, UserFacingError>(__TAURI_INVOKE("patient_list_export_csv", { req })),
+	/**  Get the default case template (CASE-004/001). */
+	caseTemplateGetDefault: () => typedError<DefaultTemplateResponse, UserFacingError>(__TAURI_INVOKE("case_template_get_default")),
+	/**  List all case templates (CASE-004). */
+	caseTemplateList: () => typedError<TemplateListResponse, UserFacingError>(__TAURI_INVOKE("case_template_list")),
+	/**
+	 *  Hide or show a case-template section for the doctor (CASE-002). The choice
+	 *  persists as their template; one txn + one audit row.
+	 */
+	caseTemplateSetVisibility: (req: SetVisibilityRequest) => typedError<OkResponse, UserFacingError>(__TAURI_INVOKE("case_template_set_visibility", { req })),
+	/**  Open or create the detailed case visit for a patient (VIS-001/CASE-001). */
+	caseVisitOpenOrCreate: (req: OpenOrCreateRequest) => typedError<OpenOrCreateResponse, UserFacingError>(__TAURI_INVOKE("case_visit_open_or_create", { req })),
+	/**  Autosave the case form + vitals, recomputing BMI (CASE-005). */
+	caseVisitAutosave: (req: CaseAutosaveRequest) => typedError<AutosaveResponse, UserFacingError>(__TAURI_INVOKE("case_visit_autosave", { req })),
+	/**  Render the read-only case summary HTML (CASE-009). */
+	caseSummaryRender: (req: SummaryRenderRequest) => typedError<SummaryRenderResponse, UserFacingError>(__TAURI_INVOKE("case_summary_render", { req })),
+	/**  Create a follow-up visit, pre-loading previous complaints (VIS-002). */
+	visitCreateFollowup: (req: CreateFollowupRequest) => typedError<CreateFollowupResponse, UserFacingError>(__TAURI_INVOKE("visit_create_followup", { req })),
+	/**  Autosave the follow-up fields (VIS-002/003). */
+	visitAutosave: (req: FollowupAutosaveRequest) => typedError<AutosaveResponse, UserFacingError>(__TAURI_INVOKE("visit_autosave", { req })),
+	/**  Set the next follow-up date on the visit + patient (VIS-004). */
+	visitSetNextFollowup: (req: SetNextFollowupRequest) => typedError<OkResponse, UserFacingError>(__TAURI_INVOKE("visit_set_next_followup", { req })),
+	/**
+	 *  Whether a saved first case exists, for first-case gating (M3-RW A5). The UI
+	 *  greys out "New visit / first case" once this is true. Read-only.
+	 */
+	visitHasSavedFirstCase: (req: HasSavedFirstCaseRequest) => typedError<HasSavedFirstCaseResponse, UserFacingError>(__TAURI_INVOKE("visit_has_saved_first_case", { req })),
+	/**  The Today overview: due / overdue / registered-today (VIS-005). */
+	todayGetOverview: (req: TodayOverviewRequest) => typedError<TodayOverviewResponse, UserFacingError>(__TAURI_INVOKE("today_get_overview", { req })),
+	/**  Send-to-repertory STUB (CASE-006, R7) — flagged unavailable, no dead end. */
+	rubricSearchPrefill: (req: RubricSearchPrefillRequest) => typedError<RubricSearchPrefillResponse, UserFacingError>(__TAURI_INVOKE("rubric_search_prefill", { req })),
+	/**  Attach a PDF/image report to a visit (PAT-009). */
+	visitAttachReport: (req: AttachReportRequest) => typedError<AttachReportResponse, UserFacingError>(__TAURI_INVOKE("visit_attach_report", { req })),
+	/**  List a visit's attachments (PAT-009). */
+	visitListAttachments: (req: ListAttachmentsRequest) => typedError<ListAttachmentsResponse, UserFacingError>(__TAURI_INVOKE("visit_list_attachments", { req })),
+	/**
+	 *  List ALL of a patient's attachments across visits (M3-RWv4 §5.4) — the
+	 *  shared two-way store behind the Lab reports & Scans dashboard panel and the
+	 *  Submitted pick-existing list. Read-only (`with_pool`), bounded (R-DATA-007).
+	 */
+	patientListAttachments: (req: PatientListAttachmentsRequest) => typedError<ListAttachmentsResponse, UserFacingError>(__TAURI_INVOKE("patient_list_attachments", { req })),
+	/**  Open (decrypt) an attachment for in-app preview (PAT-009, ADR 0017). */
+	visitOpenAttachment: (req: OpenAttachmentRequest) => typedError<OpenAttachmentResponse, UserFacingError>(__TAURI_INVOKE("visit_open_attachment", { req })),
+	/**  Delete an attachment row + its encrypted blob (PAT-009). */
+	visitDeleteAttachment: (req: DeleteAttachmentRequest) => typedError<DeleteAttachmentResponse, UserFacingError>(__TAURI_INVOKE("visit_delete_attachment", { req })),
+	/**
+	 *  Open the OS file-open dialog filtered to PDF/image and return the chosen
+	 *  path (PAT-009). Lets the UI obtain a `source_path` without constructing a
+	 *  filesystem path (architecture rule).
+	 * 
+	 *  Uses `tauri-plugin-dialog`'s native picker, filtered to the supported report
+	 *  extensions, gated by the `dialog:allow-open` capability only (no fs/shell/
+	 *  opener scope). The dialog ONLY returns a chosen path; it grants no
+	 *  filesystem read — `visit_attach_report` reads the bytes itself. Interactive,
+	 *  so E2E/UI-tested, not cargo-tested. The chosen path is never logged
+	 *  (R-PRIV-001).
+	 * 
+	 *  Determinism seam (DEV/E2E ONLY, feature `e2e-test-keys` — ADR 0017): the
+	 *  native GTK file chooser cannot be driven by webdriver, so under the
+	 *  E2E-only build feature this command FIRST consults the `HC_E2E_REPORT_FILE`
+	 *  env var; if it is set to a path that exists, that path is returned as the
+	 *  picked file and the native dialog is skipped. This mirrors the webcam
+	 *  precedent (`window.__HC_E2E_CAMERA__` in `apps/desktop/src/patients/photo.ts`)
+	 *  and the `e2e-test-keys` gating of `patient_import_fixture`. The seam is
+	 *  compiled OUT of the release/public build, which always opens the native
+	 *  picker only — behaviour unchanged for real doctors.
+	 * 
+	 *  Threading (M3-RWv5): this MUST be an async command. A sync command runs
+	 *  inline on the GTK main thread, and a `blocking_pick_file()` there parks the
+	 *  main loop while the dialog build waits for that same loop (deadlock; GNOME
+	 *  then offers "Force Quit"). The non-blocking `pick_file(callback)` is bridged
+	 *  through a tokio oneshot and awaited on the async runtime instead.
+	 */
+	visitPickReportFile: () => typedError<PickReportFileResponse, UserFacingError>(__TAURI_INVOKE("visit_pick_report_file")),
 };
 
 /* Types */
@@ -158,6 +231,69 @@ export type AppInfo = {
 	version: string,
 	/**  Build profile the binary was compiled in. */
 	build_profile: BuildProfile,
+};
+
+/**
+ *  `visit_attach_report` request. `source_path` is the absolute path the OS
+ *  file-open dialog returned (via `visit_pick_report_file`); the UI never
+ *  constructs it (architecture rule).
+ */
+export type AttachReportRequest = {
+	/**  The visit the report is attached to. */
+	visitId: string,
+	/**  Absolute path of the chosen file (from the typed file-open command). */
+	sourcePath: string,
+	/**  Optional doctor caption. */
+	caption: string | null,
+	/**
+	 *  Optional display-ONLY label (M3-RWv4 §5.5). When `Some`, the stored
+	 *  `original_name` becomes this label (sanitised: path separators / control
+	 *  chars stripped) instead of the raw file base name; when `None`, today's
+	 *  behaviour (the file base name) is kept. Display label ONLY — the on-disk
+	 *  blob + `blob_id` are unchanged (R-PRIV-007) and the label is NEVER
+	 *  logged / never in the audit diff (R-PRIV-001).
+	 */
+	displayLabel: string | null,
+};
+
+/**  `visit_attach_report` response. */
+export type AttachReportResponse = {
+	/**  The new attachment-row id (UUIDv7). */
+	attachmentId: string,
+	/**  Canonical mime of the stored report. */
+	mime: string,
+	/**  SHA-256 of the plaintext, lowercase hex. */
+	sha256: string,
+	/**  The chosen file's base name (display). */
+	originalName: string,
+	/**  Plaintext byte length. */
+	byteSize: number,
+};
+
+/**  One attachment summary row for the Investigations list. */
+export type AttachmentSummary = {
+	/**  Attachment-row id. */
+	attachmentId: string,
+	/**  Owning patient id (M3-RWv4 §9: lets the patient-level list key/group). */
+	patientId: string,
+	/**  Owning visit id, or `None` for a patient-level attachment (M3-RWv4 §9). */
+	visitId: string | null,
+	/**  Canonical mime (drives the type badge). */
+	mime: string,
+	/**  Optional doctor caption. */
+	caption: string | null,
+	/**  The chosen file's base name (display). */
+	originalName: string | null,
+	/**  Plaintext byte length. */
+	byteSize: number,
+	/**  RFC3339 creation instant. */
+	createdAt: string,
+};
+
+/**  Autosave acknowledgement (CASE-005 / VIS-002) — the "Saved" timestamp. */
+export type AutosaveResponse = {
+	/**  RFC3339 instant the save committed at. */
+	savedAt: string,
 };
 
 /**
@@ -214,6 +350,16 @@ export type BuildProfile =
 /**  Compiled in release mode (an optimised, shipped build). */
 "release";
 
+/**  `case_visit_autosave` request (CASE-005). */
+export type CaseAutosaveRequest = {
+	/**  Visit to update. */
+	visitId: string,
+	/**  Case-form answers JSON. */
+	dataJson: string,
+	/**  Vitals JSON (weight/height drive the recomputed BMI). */
+	vitalsJson: string,
+};
+
 /**
  *  Duplicate-check input (`patient_check_duplicate`, PAT-004). At least a name;
  *  mobile and/or dob narrow the match. Never blocks.
@@ -237,6 +383,29 @@ export type CheckDuplicateResponse = {
 export type CompleteSetupResponse = {
 	/**  Route to open after setup (`"/today"`). */
 	homeRoute: string,
+};
+
+/**  `visit_create_followup` request (VIS-002). */
+export type CreateFollowupRequest = {
+	/**  Patient the follow-up belongs to. */
+	patientId: string,
+	/**  The previous visit whose complaints pre-load. */
+	prevVisitId: string,
+};
+
+/**  `visit_create_followup` response (VIS-002). */
+export type CreateFollowupResponse = {
+	/**  The new follow-up visit id. */
+	visitId: string,
+	/**  RFC3339 visit instant. */
+	visitAt: string,
+	/**  The previous visit's complaints, pre-loaded with status to be set. */
+	prevComplaints: PrevComplaint[],
+	/**
+	 *  The previously scheduled next follow-up date for the header (VIS-004),
+	 *  or `None`. Additive read field (M3-RW A4).
+	 */
+	nextFollowupOn: string | null,
 };
 
 /**
@@ -290,6 +459,28 @@ export type CreatePatientResponse = {
 	code: string,
 };
 
+/**  `case_template_get_default` response — the default template (CASE-004). */
+export type DefaultTemplateResponse = {
+	/**  Template id (the fixed default id). */
+	templateId: string,
+	/**  Display name. */
+	name: string,
+	/**  The JSON schema (sections[] -> fields[]). */
+	schemaJson: string,
+};
+
+/**  `visit_delete_attachment` request. */
+export type DeleteAttachmentRequest = {
+	/**  The attachment to delete (row + encrypted blob). */
+	attachmentId: string,
+};
+
+/**  `visit_delete_attachment` response. */
+export type DeleteAttachmentResponse = {
+	/**  Whether the delete succeeded. */
+	ok: boolean,
+};
+
 /**  Demographics block (PAT-005). */
 export type Demographics = {
 	/**  Patient code. */
@@ -308,6 +499,11 @@ export type Demographics = {
 	referredBy: string | null,
 	/**  Opaque photo ref, or `None`. */
 	photoPath: string | null,
+	/**
+	 *  Stored marital status, verbatim (legacy values such as `other` are
+	 *  kept so the edit form can show them and never wipe them), or `None`.
+	 */
+	maritalStatus: string | null,
 };
 
 /**  One candidate duplicate (PAT-004). */
@@ -412,6 +608,24 @@ export type FamilyMember = {
 	relation: string,
 };
 
+/**  `visit_autosave` request (VIS-002/003) — the follow-up fields. */
+export type FollowupAutosaveRequest = {
+	/**  Visit to update. */
+	visitId: string,
+	/**  Visit type. */
+	type: string,
+	/**  Per-complaint status JSON (Better/Same/Worse/New/Resolved). */
+	complaintStatusJson: string,
+	/**  Per-complaint improvement % JSON (D1). */
+	improvementPctJson: string,
+	/**  Remedy-response quick-pick value (VIS-003), or `None`. */
+	remedyResponse: string | null,
+	/**  Vitals JSON. */
+	vitalsJson: string,
+	/**  Free-text observations. */
+	observations: string,
+};
+
 /**  Global font size (SET-005, DEFERRED/P1 — minimal persist only). */
 export type FontSize = 
 /**  14px base. */
@@ -425,6 +639,21 @@ export type FontSize =
 export type GetDashboardRequest = {
 	/**  The patient to load. */
 	patientId: string,
+};
+
+/**  `visit_has_saved_first_case` request (M3-RW A5) — first-case gating signal. */
+export type HasSavedFirstCaseRequest = {
+	/**  The patient whose first-case state is queried. */
+	patientId: string,
+};
+
+/**  `visit_has_saved_first_case` response (M3-RW A5). */
+export type HasSavedFirstCaseResponse = {
+	/**
+	 *  True once a non-deleted `first`-type visit exists, so the UI can grey
+	 *  out starting another first case.
+	 */
+	hasSavedFirstCase: boolean,
 };
 
 /**
@@ -486,6 +715,18 @@ export type LinkFamilyResponse = {
 	familyLinkId: string,
 };
 
+/**  `visit_list_attachments` request. */
+export type ListAttachmentsRequest = {
+	/**  The visit whose attachments are listed. */
+	visitId: string,
+};
+
+/**  `visit_list_attachments` response. */
+export type ListAttachmentsResponse = {
+	/**  The visit's attachments, oldest first. */
+	attachments: AttachmentSummary[],
+};
+
 /**
  *  CSV-export input (`patient_list_export_csv`, PSR-011): the same filter + sort
  *  as the on-screen list.
@@ -536,10 +777,64 @@ export type NextCodeResponse = {
 	code: string,
 };
 
+/**  `visit_set_next_followup` response (VIS-004). */
+export type OkResponse = {
+	/**  Whether the update succeeded. */
+	ok: boolean,
+};
+
+/**  `visit_open_attachment` request. */
+export type OpenAttachmentRequest = {
+	/**  The attachment to open. */
+	attachmentId: string,
+};
+
 /**
- *  The single patient dashboard payload (PAT-005). For R2 the visits list is
- *  empty, `last_prescription` is `None` and `dues_paise` is 0 (visits/Rx/billing
- *  are R3/R4/R5, R-DEL-002); demographics, alerts and family are REAL.
+ *  `visit_open_attachment` response — decrypted bytes for in-app preview. The
+ *  UI renders an image via a `data:<mime>;base64,...` URL (CSP allows
+ *  `img-src data:`) and offers a save/open affordance for PDFs. No plaintext
+ *  temp file is written to disk (ADR 0017).
+ */
+export type OpenAttachmentResponse = {
+	/**  Canonical mime of the decrypted report. */
+	mime: string,
+	/**  The chosen file's base name (display). */
+	originalName: string | null,
+	/**  Base64-encoded decrypted bytes for in-app preview. */
+	dataBase64: string,
+};
+
+/**  `case_visit_open_or_create` request (VIS-001). */
+export type OpenOrCreateRequest = {
+	/**  Patient the visit belongs to. */
+	patientId: string,
+	/**  Visit type: `first | follow_up | acute | tele`. */
+	visitType: string,
+};
+
+/**  `case_visit_open_or_create` response (VIS-001). */
+export type OpenOrCreateResponse = {
+	/**  The open or newly created visit id. */
+	visitId: string,
+	/**  The default template id the case form renders. */
+	templateId: string,
+	/**  Current case-form answers JSON (empty object on a fresh visit). */
+	dataJson: string,
+	/**  Current vitals JSON (empty object on a fresh visit). */
+	vitalsJson: string,
+	/**  RFC3339 visit instant. */
+	visitAt: string,
+	/**
+	 *  The scheduled next follow-up date for the header (VIS-004), or `None`
+	 *  when none is set. Additive read field (M3-RW A4).
+	 */
+	nextFollowupOn: string | null,
+};
+
+/**
+ *  The single patient dashboard payload (PAT-005): demographics, alerts,
+ *  family, the visit timeline and the last prescription (an R4 preview) are
+ *  REAL; `dues_paise` is 0 (billing is R5, R-DEL-002).
  */
 export type PatientDashboard = {
 	/**  Real demographics. */
@@ -550,9 +845,9 @@ export type PatientDashboard = {
 	alerts: string | null,
 	/**  Outstanding dues, integer paise. ALWAYS 0 for R2 (billing is R5). */
 	duesPaise: number,
-	/**  Visit timeline (newest first). ALWAYS empty for R2. */
+	/**  Visit timeline (newest first), non-deleted visits, bounded. */
 	visits: VisitSummary[],
-	/**  Most recent prescription. ALWAYS `None` for R2. */
+	/**  Latest recorded prescription (R4 preview), or `None`. */
 	lastPrescription: RxSummary | null,
 	/**  Linked family (REAL, PAT-006). */
 	family: FamilyMember[],
@@ -602,6 +897,16 @@ export type PatientFilter = {
 	casenoteText: string | null,
 };
 
+/**
+ *  `patient_list_attachments` request (M3-RWv4 §5.4 / §9). Lists ALL of a
+ *  patient's attachments across visits — the shared two-way store behind the
+ *  Lab reports & Scans panel and the Submitted pick-existing list.
+ */
+export type PatientListAttachmentsRequest = {
+	/**  The patient whose attachments (across visits) are listed. */
+	patientId: string,
+};
+
 /**  The sort spec (field + direction) for the list (PSR-008). */
 export type PatientSort = {
 	/**  The column to sort by. */
@@ -619,6 +924,27 @@ export type PermanentDeleteRequest = {
 	patientId: string,
 	/**  The app PIN, re-verified before the hard delete (PAT-008, R-DATA-003). */
 	pin: string,
+};
+
+/**
+ *  `visit_pick_report_file` response — the chosen absolute path, or `None` if
+ *  the user cancelled. Lets the UI obtain a `source_path` without ever
+ *  constructing a filesystem path (architecture rule). The dialog only returns
+ *  a path; it grants no filesystem read (the backend reads the bytes).
+ */
+export type PickReportFileResponse = {
+	/**  The chosen absolute path, or `None` on cancel. */
+	sourcePath: string | null,
+};
+
+/**  One pre-loaded previous complaint (VIS-002). */
+export type PrevComplaint = {
+	/**  Complaint key (section/complaint identifier). */
+	key: string,
+	/**  Complaint text (sensation / summary). */
+	text: string,
+	/**  Complaint location, or empty if none. */
+	location: string,
 };
 
 /**  Recent-list input (`patient_recent`, PSR-007). */
@@ -710,9 +1036,30 @@ export type Retention = {
 	monthly: number,
 };
 
-/**  Last-prescription card (PAT-005). R4+; `None` for R2. */
+/**  `rubric_search_prefill` request (CASE-006). Carried for a stable binding. */
+export type RubricSearchPrefillRequest = {
+	/**  The visit the symptom text came from. */
+	visitId: string,
+	/**  The selected symptom text to pre-fill the rubric search with. */
+	sourceText: string,
+};
+
+/**
+ *  `rubric_search_prefill` response (CASE-006, R7 stub). `available = false`
+ *  until the repertory engine lands (R7); registered now so the UI binds a
+ *  stable command and sees no dead end (R-DEL-002).
+ */
+export type RubricSearchPrefillResponse = {
+	/**  Always `false` this slice — the feature is not built yet (R7). */
+	available: boolean,
+};
+
+/**
+ *  Last-prescription card (PAT-005). Until the R4 Rx engine, a PREVIEW built
+ *  from the newest visit whose case document holds a prescription table.
+ */
 export type RxSummary = {
-	/**  Prescription id. */
+	/**  Prescription id. R4 preview: the id of the visit it was read from. */
 	prescriptionId: string,
 	/**  RFC3339 printed instant, or `None`. */
 	printedAt: string | null,
@@ -855,6 +1202,14 @@ export type SetFontSizeRequest = {
 	size: FontSize,
 };
 
+/**  `visit_set_next_followup` request (VIS-004). */
+export type SetNextFollowupRequest = {
+	/**  Visit whose next follow-up is set. */
+	visitId: string,
+	/**  Next follow-up date (RFC3339 date), or `None` to clear. */
+	nextFollowupOn: string | null,
+};
+
 /**
  *  PIN set input (SET-004). `pin` must be 4–6 numeric digits and equal
  *  `confirm_pin`.
@@ -872,6 +1227,17 @@ export type SetPinRequest = {
 export type SetPinResponse = {
 	/**  Grouped recovery code to show once and print; never shown again. */
 	recoveryCode: string,
+};
+
+/**
+ *  `case_template_set_visibility` request (CASE-002) — hide/show one section
+ *  for the doctor (persists as their template).
+ */
+export type SetVisibilityRequest = {
+	/**  The template section key to toggle (e.g. `"mental_generals"`). */
+	sectionKey: string,
+	/**  `true` hides the section for this doctor; `false` shows it again. */
+	hidden: boolean,
 };
 
 /**  Wizard progress snapshot (`setup_get_state`). */
@@ -920,6 +1286,90 @@ export type StartTrialResponse = {
 	trialValidUntil: string,
 	/**  Whole days remaining in the trial (30 at start). */
 	trialDaysRemaining: number,
+};
+
+/**  `case_summary_render` request (CASE-009). */
+export type SummaryRenderRequest = {
+	/**  Visit to render. */
+	visitId: string,
+};
+
+/**  `case_summary_render` response (CASE-009) — read-only printable HTML. */
+export type SummaryRenderResponse = {
+	/**  The rendered, non-empty case-summary HTML. */
+	html: string,
+};
+
+/**  `case_template_list` response (CASE-004). */
+export type TemplateListResponse = {
+	/**  All templates in presentation order. */
+	templates: TemplateSummary[],
+};
+
+/**  One template summary row (`case_template_list`). */
+export type TemplateSummary = {
+	/**  Template id. */
+	id: string,
+	/**  Display name. */
+	name: string,
+	/**  Whether this is the default template. */
+	isDefault: boolean,
+};
+
+/**  `today_get_overview` request (VIS-005). */
+export type TodayOverviewRequest = {
+	/**  The "today" date (RFC3339 date or instant) the UI anchors on. */
+	today: string,
+};
+
+/**  `today_get_overview` response (VIS-005) — the default home screen. */
+export type TodayOverviewResponse = {
+	/**  Patients due for follow-up today. */
+	dueToday: TodayPatientRow[],
+	/**  Patients whose follow-up is overdue. */
+	overdue: TodayPatientRow[],
+	/**  Visits registered today. */
+	registeredToday: TodayVisitRow[],
+	/**  Backup-stale warning banner text, or `None` (no patient data). */
+	backupWarning: string | null,
+	/**  Licence-reminder banner text, or `None`. */
+	licenceReminder: string | null,
+};
+
+/**  A Today-list patient row (due-today / overdue). */
+export type TodayPatientRow = {
+	/**  Patient id. */
+	patientId: string,
+	/**  Patient code. */
+	code: string,
+	/**  Display name. */
+	name: string,
+	/**  Age label (e.g. `"34 y"`), derived from dob/age_years. */
+	ageLabel: string,
+	/**  Sex, or `None`. */
+	sex: string | null,
+	/**  Opaque photo attachment ref, or `None`. */
+	photoPath: string | null,
+	/**  Next-follow-up date (RFC3339 date), or `None`. */
+	nextFollowupOn: string | null,
+	/**  Outstanding dues in paise (0 at R3 — billing not built, R-DEL-002). */
+	duesPaise: number,
+};
+
+/**  A Today-list registered-visit row (today's registered visits). */
+export type TodayVisitRow = {
+	/**  Patient id. */
+	patientId: string,
+	/**  Patient code. */
+	code: string,
+	/**  Patient display name. */
+	name: string,
+	/**  Opaque photo attachment ref, or `None`. */
+	photoPath: string | null,
+	/**  RFC3339 visit instant. */
+	visitAt: string,
+	/**  Visit type. */
+	type: string,
 };
 
 /**
@@ -1021,15 +1471,18 @@ export type VerifyBackupResponse = {
 	decryptOk: boolean,
 };
 
-/**  A visit timeline entry (PAT-005). R3+; EMPTY list for R2. */
+/**  A visit timeline entry (PAT-005): one saved visit of the patient. */
 export type VisitSummary = {
 	/**  Visit id. */
 	visitId: string,
 	/**  RFC3339 visit instant. */
 	visitAt: string,
-	/**  Visit kind label. */
+	/**
+	 *  Visit type code (`first | follow_up | acute | tele`); the UI shows a
+	 *  readable label.
+	 */
 	kind: string,
-	/**  Headline remedy label, or `None`. */
+	/**  Headline remedy label, or `None` (the Rx engine is R4). */
 	headlineRemedyLabel: string | null,
 };
 

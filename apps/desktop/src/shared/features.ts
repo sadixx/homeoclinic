@@ -45,6 +45,14 @@ export interface Features {
    * (S20 / LIC-061). Hidden until R8; the trial-only path is the default.
    */
   readonly licenceImport: boolean;
+  /**
+   * The S08 first (detailed) case form (CASE-001..006, CASE-009, VIS-001).
+   * Turns ON at M3 Slice B (R3): the `/patient/:patientId/case/:visitId`
+   * route, the S07 dashboard "New visit / Take case" entry and the F5
+   * new-visit shortcut all become reachable. Before R3 the case form had no
+   * route and no dashboard entry (no dead end, ADR-0002).
+   */
+  readonly case: boolean;
 }
 
 // `__FEATURES__` is a Vite compile-time constant (see vite.config.ts `define`

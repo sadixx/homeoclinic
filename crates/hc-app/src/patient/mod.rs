@@ -23,6 +23,8 @@ use hc_storage::Pool;
 use crate::clock::Clock;
 use crate::error::AppError;
 
+mod rx_preview;
+
 // ---------------------------------------------------------------------------
 // Request / response types (camelCase; specta::Type; i64 paise = Number).
 // Secrets (pin) are request-only and never echoed or logged (R-PRIV-001).
@@ -225,9 +227,12 @@ pub struct Demographics {
     pub referred_by: Option<String>,
     /// Opaque photo ref, or `None`.
     pub photo_path: Option<String>,
+    /// Stored marital status, verbatim (legacy values such as `other` are
+    /// kept so the edit form can show them and never wipe them), or `None`.
+    pub marital_status: Option<String>,
 }
 
-/// A visit timeline entry (PAT-005). R3+; EMPTY list for R2.
+/// A visit timeline entry (PAT-005): one saved visit of the patient.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VisitSummary {
@@ -235,17 +240,19 @@ pub struct VisitSummary {
     pub visit_id: String,
     /// RFC3339 visit instant.
     pub visit_at: String,
-    /// Visit kind label.
+    /// Visit type code (`first | follow_up | acute | tele`); the UI shows a
+    /// readable label.
     pub kind: String,
-    /// Headline remedy label, or `None`.
+    /// Headline remedy label, or `None` (the Rx engine is R4).
     pub headline_remedy_label: Option<String>,
 }
 
-/// Last-prescription card (PAT-005). R4+; `None` for R2.
+/// Last-prescription card (PAT-005). Until the R4 Rx engine, a PREVIEW built
+/// from the newest visit whose case document holds a prescription table.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RxSummary {
-    /// Prescription id.
+    /// Prescription id. R4 preview: the id of the visit it was read from.
     pub prescription_id: String,
     /// RFC3339 printed instant, or `None`.
     pub printed_at: Option<String>,
@@ -265,9 +272,9 @@ pub struct FamilyMember {
     pub relation: String,
 }
 
-/// The single patient dashboard payload (PAT-005). For R2 the visits list is
-/// empty, `last_prescription` is `None` and `dues_paise` is 0 (visits/Rx/billing
-/// are R3/R4/R5, R-DEL-002); demographics, alerts and family are REAL.
+/// The single patient dashboard payload (PAT-005): demographics, alerts,
+/// family, the visit timeline and the last prescription (an R4 preview) are
+/// REAL; `dues_paise` is 0 (billing is R5, R-DEL-002).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PatientDashboard {
@@ -280,9 +287,9 @@ pub struct PatientDashboard {
     /// Outstanding dues, integer paise. ALWAYS 0 for R2 (billing is R5).
     #[specta(type = specta_typescript::Number)]
     pub dues_paise: i64,
-    /// Visit timeline (newest first). ALWAYS empty for R2.
+    /// Visit timeline (newest first), non-deleted visits, bounded.
     pub visits: Vec<VisitSummary>,
-    /// Most recent prescription. ALWAYS `None` for R2.
+    /// Latest recorded prescription (R4 preview), or `None`.
     pub last_prescription: Option<RxSummary>,
     /// Linked family (REAL, PAT-006).
     pub family: Vec<FamilyMember>,
@@ -760,30 +767,62 @@ impl<'a> PatientService<'a> {
     }
 
     /// Load the single-patient dashboard (PAT-005): REAL demographics + alerts +
-    /// family; EMPTY visits, no last Rx, `dues_paise = 0` for R2 (R-DEL-002,
-    /// visits/Rx/billing are R3/R4/R5 and not built yet — honest empty, no
-    /// fabricated data and no dead end).
+    /// family, the visit timeline newest first and the last prescription
+    /// (M3-RWv6 item 9). The prescription is an R4 PREVIEW read from the newest
+    /// visit whose `case-rich` document holds a prescription table (the last
+    /// such table in that document). `dues_paise = 0` (billing is R5,
+    /// R-DEL-002). `data_json` is read only, never rewritten.
     pub fn get_dashboard(
         &self,
         pool: &Pool,
         req: GetDashboardRequest,
     ) -> Result<PatientDashboard, AppError> {
-        let (row, family) = pool.with_reader(|c| {
+        let (row, family, timeline) = pool.with_reader(|c| {
             let row = repo::get_patient(c, &req.patient_id)?;
             let family = repo::list_family(c, &req.patient_id)?;
-            Ok((row, family))
+            let timeline = hc_storage::visit::list_visits_for_patient(
+                c,
+                &req.patient_id,
+                hc_storage::visit::PATIENT_TIMELINE_LIMIT,
+            )?;
+            Ok((row, family, timeline))
         })?;
         let row = row.ok_or(AppError::NotFound)?;
 
+        // Newest visit (timeline order) whose document has a prescription.
+        let last_prescription = timeline.iter().find_map(|v| {
+            let preview = rx_preview::latest_prescription_preview(v.data_json.as_deref()?)?;
+            Some(RxSummary {
+                prescription_id: v.id.clone(),
+                printed_at: None,
+                items_preview: preview,
+            })
+        });
+        let visits = timeline
+            .into_iter()
+            .map(|v| VisitSummary {
+                visit_id: v.id,
+                visit_at: v.visit_at,
+                kind: v.visit_type,
+                headline_remedy_label: None,
+            })
+            .collect();
+
+        // Age is DERIVED from DOB (preferred) anchored to the app clock, so it
+        // auto-updates on read and stays deterministic (A3/ADR 0018). Falls
+        // back to the stored `age_years` when DOB is absent. The date part of
+        // the clock instant is the `today` the pure helper needs (R-ARCH-002).
+        let today = date_part(&self.clock.now_rfc3339());
         let demographics = Demographics {
             code: row.code,
             name: row.name,
-            age_label: age_label(row.dob.as_deref(), row.age_years),
+            age_label: hc_domain::age::age_label(row.dob.as_deref(), row.age_years, &today),
             sex: row.sex,
             mobile: row.mobile,
             city: row.city,
             referred_by: row.referred_by,
             photo_path: row.photo_path,
+            marital_status: row.marital_status,
         };
         let family = family
             .into_iter()
@@ -808,10 +847,10 @@ impl<'a> PatientService<'a> {
             demographics,
             allergies: row.allergies,
             alerts: row.alerts,
-            // Honest-empty R2 fields (R-DEL-002): no fabricated visits/Rx/dues.
+            // Billing is R5 (R-DEL-002): no fabricated dues.
             dues_paise: 0,
-            visits: Vec::new(),
-            last_prescription: None,
+            visits,
+            last_prescription,
             family,
         })
     }
@@ -847,10 +886,11 @@ impl<'a> PatientService<'a> {
         // Enrich each hit (which carries only id/code/name/rank) with the row
         // columns the S04 row shows. A hit whose row vanished (e.g. just
         // soft-deleted) is dropped rather than shown with blanks.
+        let today = date_part(&self.clock.now_rfc3339());
         let mut results = Vec::with_capacity(page.hits.len());
         for hit in &page.hits {
             if let Some(row) = pool.with_reader(|c| repo::get_list_row(c, &hit.patient_id))? {
-                results.push(search_row_from(&row, match_type_for_rank(hit.rank)));
+                results.push(search_row_from(&row, match_type_for_rank(hit.rank), &today));
             }
         }
 
@@ -870,11 +910,12 @@ impl<'a> PatientService<'a> {
     ) -> Result<RecentResponse, AppError> {
         let limit = req.limit.max(0) as usize;
         let ids = pool.with_reader(|c| repo::list_recent_ids(c, limit))?;
+        let today = date_part(&self.clock.now_rfc3339());
         let mut results = Vec::with_capacity(ids.len());
         for id in &ids {
             if let Some(row) = pool.with_reader(|c| repo::get_list_row(c, id))? {
                 // Recent rows are not ranked search hits, so no match tag.
-                results.push(search_row_from(&row, String::new()));
+                results.push(search_row_from(&row, String::new(), &today));
             }
         }
         Ok(RecentResponse { results })
@@ -910,9 +951,10 @@ impl<'a> PatientService<'a> {
             None
         };
 
+        let today = date_part(&self.clock.now_rfc3339());
         let out = rows
             .iter()
-            .map(|r| search_row_from(r, String::new()))
+            .map(|r| search_row_from(r, String::new(), &today))
             .collect();
         Ok(ListQueryResponse {
             rows: out,
@@ -937,7 +979,7 @@ impl<'a> PatientService<'a> {
         let rows =
             pool.with_reader(|c| repo::list_query(c, &filter, field, dir, None, CSV_EXPORT_CAP))?;
 
-        let csv = render_patient_csv(&rows);
+        let csv = render_patient_csv(&rows, &date_part(&self.clock.now_rfc3339()));
         let dir_path = self.data_dir.join("exports");
         std::fs::create_dir_all(&dir_path).map_err(|e| AppError::Storage(Box::new(e)))?;
         let path = dir_path.join("patient-list.csv");
@@ -1222,31 +1264,6 @@ fn tags_json(tags: &Option<Vec<String>>) -> Option<String> {
         .and_then(|t| serde_json::to_string(t).ok())
 }
 
-/// Human age label for the dashboard: `"{n}y"` from DOB (preferred) else the
-/// entered age, or an empty string when neither is known.
-fn age_label(dob: Option<&str>, age_years: Option<i64>) -> String {
-    if let Some(dob) = dob {
-        if let Ok(d) = time::Date::parse(
-            dob,
-            time::macros::format_description!("[year]-[month]-[day]"),
-        ) {
-            let today = time::OffsetDateTime::now_utc().date();
-            let mut years = today.year() - d.year();
-            // Subtract one if this year's birthday has not occurred yet.
-            if (today.month() as u8, today.day()) < (d.month() as u8, d.day()) {
-                years -= 1;
-            }
-            if years >= 0 {
-                return format!("{years}y");
-            }
-        }
-    }
-    match age_years {
-        Some(a) => format!("{a}y"),
-        None => String::new(),
-    }
-}
-
 /// Add `days` to an RFC3339 (`Z`-suffixed) instant and re-format with the `Z`
 /// suffix. On an unparseable input the input is returned unchanged so the
 /// caller never panics (R-RUST-002); valid service inputs always parse.
@@ -1356,8 +1373,9 @@ fn search_to_storage_err(e: hc_search::SearchError) -> hc_storage::StorageError 
 
 /// Human age label (`"{n}y"`) from DOB preferred, else the entered age, else
 /// empty. Shares the dashboard's rule so the search/list row reads the same.
-fn age_label_for(row: &repo::PatientListRow) -> String {
-    age_label(row.dob.as_deref(), row.age_years)
+/// `today` anchors DOB derivation to the app clock (A3), not the wall clock.
+fn age_label_for(row: &repo::PatientListRow, today: &str) -> String {
+    hc_domain::age::age_label(row.dob.as_deref(), row.age_years, today)
 }
 
 /// Map the search engine's rank bucket to the S04 match-type tag (PSR-004).
@@ -1376,13 +1394,14 @@ fn match_type_for_rank(rank: i64) -> String {
 
 /// Build a [`SearchRow`] from a storage [`repo::PatientListRow`] + a match tag.
 /// `dues_paise` is always 0 at R2 (billing is R5, R-DEL-002). Mobile is the
-/// FULL number in MVP1 (no masking, PSR-005 open-Q).
-fn search_row_from(row: &repo::PatientListRow, match_type: String) -> SearchRow {
+/// FULL number in MVP1 (no masking, PSR-005 open-Q). `today` anchors the age
+/// label to the app clock (A3).
+fn search_row_from(row: &repo::PatientListRow, match_type: String, today: &str) -> SearchRow {
     SearchRow {
         patient_id: row.patient_id.clone(),
         code: row.code.clone(),
         name: row.name.clone(),
-        age_label: age_label_for(row),
+        age_label: age_label_for(row, today),
         sex: row.sex.clone(),
         mobile: row.mobile.clone(),
         city: row.city.clone(),
@@ -1547,11 +1566,11 @@ fn decode_list_cursor(token: Option<&str>) -> Result<Option<repo::ListCursor>, A
 /// Render the filtered list as CSV (PSR-011). A header row plus one data row per
 /// patient. Fields are RFC-4180 quoted when they contain a comma, quote or
 /// newline. `dues` is 0 at R2 (billing is R5, R-DEL-002).
-fn render_patient_csv(rows: &[repo::PatientListRow]) -> String {
+fn render_patient_csv(rows: &[repo::PatientListRow], today: &str) -> String {
     let mut out = String::new();
     out.push_str("code,name,sex,age,mobile,city,last_visit,next_followup,dues\n");
     for r in rows {
-        let age = age_label_for(r);
+        let age = age_label_for(r, today);
         let fields = [
             r.code.clone(),
             r.name.clone(),

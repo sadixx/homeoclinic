@@ -5,5 +5,8 @@
 //! wall-clock or Tauri dependency (R-ARCH-002). Invariants live in the value
 //! types defined here (R-RUST-007). It depends on no other workspace crate.
 
+pub mod age;
 pub mod app_info;
+pub mod attachment;
 pub mod error;
+pub mod vitals;

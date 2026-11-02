@@ -12,8 +12,10 @@
 //! `KeyProvider` seam; the real DEK/KEK hierarchy (HC-MVP1-021) wires in later.
 
 pub mod attachment;
+pub mod attachment_repo;
 pub mod audit;
 pub mod backup;
+pub mod case_template;
 pub mod clock;
 pub mod error;
 pub mod key;
@@ -23,6 +25,7 @@ pub mod migrate;
 pub mod patient;
 pub mod pool;
 pub mod profile;
+pub mod visit;
 pub(crate) mod wrap;
 
 #[cfg(any(test, feature = "testing"))]

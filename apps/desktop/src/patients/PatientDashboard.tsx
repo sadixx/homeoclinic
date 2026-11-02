@@ -5,9 +5,11 @@
 // SQL or raw filesystem paths). Every control / asserted value carries its
 // spec data-testid (R-UI-003); all visible text comes from en.json (R-UI-007).
 //
-// R2 slice (R-DEL-002): the visit timeline is HONEST-EMPTY (0 visits), the
-// last-prescription card shows its honest-empty note, the dues badge shows
-// Rs 0 (billing is R5), and the four consultation quick buttons (New visit /
+// The visit timeline lists the saved visits newest first with a readable
+// type, the last visit date is shown above it, and the last-prescription card
+// shows the latest recorded prescription labelled as an R4 PREVIEW (M3-RWv6
+// item 9; honest-empty text when none). The dues badge shows Rs 0 (billing is
+// R5, R-DEL-002), and the four consultation quick buttons (New visit /
 // Repertorise / Prescribe / Bill) are HIDDEN — not disabled — so there is no
 // dead end (ADR-0002 point 5). Demographics, alerts, family, recycle-bin
 // (soft-delete + restore) and export (PDF/JSON) are REAL.
@@ -16,13 +18,31 @@ import { useCallback, useEffect, useState } from 'react';
 
 import {
   commands,
+  type AttachmentSummary,
   type PatientDashboard as PatientDashboardData,
 } from '@/bindings';
 import { run } from '@/shared/command';
 import { formatDate } from '@/shared/datetime';
+import { features } from '@/shared/features';
 import { formatMobile } from '@/shared/mobile';
 import { formatPaise } from '@/shared/money';
+import { PatientAvatar, avatarKindForSex } from '@/shared/PatientAvatar';
 import { t } from '@/shared/strings';
+import type { StringKey } from '@/shared/strings';
+
+/** Readable label key per stored visit type code (never show the code). */
+const VISIT_TYPE_LABEL: Readonly<Record<string, StringKey>> = {
+  first: 'followup.type.first',
+  follow_up: 'followup.type.followup',
+  acute: 'followup.type.acute',
+  tele: 'followup.type.tele',
+};
+
+/** The readable label of a visit type code. */
+function visitTypeLabel(kind: string): string {
+  const key = VISIT_TYPE_LABEL[kind];
+  return key === undefined ? t('patient.dash.visits.otherType') : t(key);
+}
 
 export interface PatientDashboardProps {
   /** The patient to show. */
@@ -33,6 +53,22 @@ export interface PatientDashboardProps {
   readonly onEdit?: (patientId: string) => void;
   /** Go back to the list (S05). */
   readonly onBack?: () => void;
+  /**
+   * Start a new First visit / take the case for this patient (S08 entry
+   * point). Shipped at R3 (CASE / VIS-001): replaces the R2 hidden-buttons
+   * dead end with a real, enabled action.
+   */
+  readonly onTakeCase?: (patientId: string) => void;
+  /**
+   * Start a Follow-up visit for this patient (ADR 0018 #2: opens the journal
+   * CaseForm in follow-up mode). The backend resolves the prior visit itself
+   * (crates/hc-app visit::open_or_create -> latest_visit_for_patient +
+   * seed_followup_data_json; VIS-002), so the UI does NOT need to pass one.
+   * `prevVisitId` is therefore OPTIONAL and vestigial — a follow-up fires with
+   * the patient id alone, even when the dashboard's visit list is empty/stale
+   * right after the first case is saved (D1 fix). Shipped at R3.
+   */
+  readonly onNewFollowup?: (patientId: string, prevVisitId?: string) => void;
   /** Render already in the recycle bin (deep-link into a soft-deleted row). */
   readonly initiallyDeleted?: boolean;
 }
@@ -43,6 +79,8 @@ export function PatientDashboard({
   onOpenPatient,
   onEdit,
   onBack,
+  onTakeCase,
+  onNewFollowup,
   initiallyDeleted = false,
 }: PatientDashboardProps): JSX.Element {
   const [data, setData] = useState<PatientDashboardData | null>(null);
@@ -50,6 +88,11 @@ export function PatientDashboard({
   const [deleted, setDeleted] = useState(initiallyDeleted);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  // First-case gating (Slice C5, ADR 0018): once a saved `first` visit exists
+  // for this patient, starting another first case is greyed and a Follow-up is
+  // offered instead. The signal comes from the typed Slice A command, never a
+  // client-side guess.
+  const [hasSavedFirstCase, setHasSavedFirstCase] = useState(false);
 
   // Load the full patient in one call and record the open in the recent list
   // (PSR-007). A fresh load whenever the patient id changes (family switch).
@@ -77,6 +120,29 @@ export function PatientDashboard({
       cancelled = true;
     };
   }, [patientId, initiallyDeleted]);
+
+  // First-case gating (Slice C5, ADR 0018): ask the typed Slice A command
+  // whether a saved `first` visit already exists for this patient. A failed or
+  // absent read leaves the gate OPEN (New visit enabled) so a genuine first
+  // case is never blocked by a transport blip (no dead end). No patient data
+  // is read into logs (R-PRIV-001).
+  useEffect(() => {
+    let cancelled = false;
+    setHasSavedFirstCase(false);
+    const cmd = commands.visitHasSavedFirstCase;
+    if (typeof cmd !== 'function') return undefined;
+    void (async (): Promise<void> => {
+      try {
+        const res = await run(cmd({ patientId }));
+        if (!cancelled) setHasSavedFirstCase(res.hasSavedFirstCase);
+      } catch {
+        /* leave the gate open on failure — never block a real first case */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId]);
 
   const onConfirmDelete = useCallback(async (): Promise<void> => {
     if (busy) return;
@@ -142,6 +208,8 @@ export function PatientDashboard({
   }
 
   const demo = data.demographics;
+  // M3-RWv5 C2: default silhouette when a gender is set and no photo exists.
+  const avatarKind = avatarKindForSex(demo.sex);
   // Pre-composed so the confirm dialog renders an identifier, not a JSX literal
   // (R-UI-007 / jsx-no-literals); the names come from the loaded record.
   const deleteTarget = `${demo.name} (${demo.code})`;
@@ -204,6 +272,11 @@ export function PatientDashboard({
                 src={demo.photoPath}
                 alt={demo.name}
                 className="h-full w-full object-cover"
+              />
+            ) : avatarKind !== null ? (
+              <PatientAvatar
+                kind={avatarKind}
+                testId="patient-dash-photo-avatar"
               />
             ) : (
               <span>{t('patient.dash.photo.none')}</span>
@@ -285,16 +358,100 @@ export function PatientDashboard({
         </div>
       </header>
 
-      {/* NOTE: the four consultation quick buttons (New visit / Repertorise /
-          Prescribe / Bill) are intentionally NOT rendered at R2 — their screens
-          do not exist yet, so showing them would be a dead end (ADR-0002). */}
+      {/* Consultation entry (S08). At R3 the case form ships, so the "New
+          visit / Take case" action is REAL and enabled — flipping the R2
+          dead-end (buttons hidden, ADR-0002) into a working entry point. It is
+          compile-time gated on features.case so a pre-R3 build still hides it,
+          and suppressed while the record is in the recycle bin. Repertorise /
+          Prescribe / Bill stay hidden until their screens ship (R5+). */}
+      {features.case && !deleted ? (
+        <div
+          data-testid="patient-dash-consult"
+          className="flex flex-wrap items-center gap-2"
+        >
+          <h2 className="sr-only">{t('patient.dash.consult.title')}</h2>
+          <button
+            type="button"
+            data-testid="patient-dash-new-visit"
+            disabled={hasSavedFirstCase}
+            aria-disabled={hasSavedFirstCase ? true : undefined}
+            title={
+              hasSavedFirstCase
+                ? t('patient.dash.newVisit.gatedHint')
+                : undefined
+            }
+            onClick={() => {
+              // Once the first case is saved (ADR 0018), starting another first
+              // case is greyed — the doctor uses Follow-up instead.
+              if (hasSavedFirstCase) return;
+              // A patient with a prior visit routes to a Follow-up (S09); with
+              // no prior visit, start a First case (S08). The follow-up does
+              // NOT need a prevVisitId — the backend resolves the prior visit
+              // itself (open_or_create -> latest_visit_for_patient), so the
+              // click fires even when `data.visits` is empty/stale (D1 fix).
+              const hasPrior = data.visits.length > 0;
+              if (hasPrior && onNewFollowup !== undefined) {
+                onNewFollowup(patientId);
+              } else {
+                onTakeCase?.(patientId);
+              }
+            }}
+            className={[
+              'rounded px-3 py-1.5 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700',
+              hasSavedFirstCase
+                ? 'cursor-not-allowed bg-slate-200 text-slate-500'
+                : 'bg-blue-600 text-white hover:bg-blue-700',
+            ].join(' ')}
+          >
+            {t('patient.dash.newVisit')}
+          </button>
+          {/* When the first case is gated, offer Follow-up instead so there is
+              no dead end (ADR 0018: "offer Follow-up instead"). */}
+          {hasSavedFirstCase ? (
+            <button
+              type="button"
+              data-testid="patient-dash-followup"
+              onClick={() => {
+                // D1 fix: fire the follow-up UNCONDITIONALLY — do NOT gate on
+                // `data.visits`. Right after the first case is saved the visit
+                // list is empty/stale, so the old `prev !== undefined` guard
+                // made this click a silent no-op (CaseRoute never mounted). The
+                // backend resolves the prior visit itself (open_or_create ->
+                // latest_visit_for_patient + seed_followup_data_json, VIS-002),
+                // so the patient id alone is enough; prevVisitId is vestigial.
+                onNewFollowup?.(patientId);
+              }}
+              className="rounded bg-blue-600 px-3 py-1.5 font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700"
+            >
+              {t('patient.dash.followup')}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            data-testid="patient-dash-take-case"
+            onClick={() => onTakeCase?.(patientId)}
+            className="rounded border border-slate-300 px-3 py-1.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            {t('patient.dash.takeCase')}
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
-        {/* Visit timeline — HONEST-EMPTY at R2 */}
+        {/* Visit timeline, newest first (M3-RWv6 item 9). */}
         <div>
           <h2 className="mb-1 text-xs font-semibold uppercase text-slate-500">
             {t('patient.dash.visits.title')}
           </h2>
+          {data.visits[0] !== undefined ? (
+            <p
+              data-testid="patient-dash-last-visit"
+              className="mb-1 text-sm text-slate-700"
+            >
+              {t('patient.dash.lastVisit')}{' '}
+              {formatDate(data.visits[0].visitAt) ?? t('common.none')}
+            </p>
+          ) : null}
           <div
             data-testid="patient-dash-timeline"
             className="rounded border border-slate-200"
@@ -312,7 +469,9 @@ export function PatientDashboard({
                     className="flex items-center justify-between border-b border-slate-100 px-3 py-2 last:border-0"
                   >
                     <span>{formatDate(v.visitAt) ?? t('common.none')}</span>
-                    <span className="text-slate-600">{v.kind}</span>
+                    <span className="text-slate-600">
+                      {visitTypeLabel(v.kind)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -321,7 +480,7 @@ export function PatientDashboard({
         </div>
 
         <div className="flex flex-col gap-4">
-          {/* Last prescription — honest-empty at R2 */}
+          {/* Last prescription: the latest recorded one, an R4 preview. */}
           <div>
             <h2 className="mb-1 text-xs font-semibold uppercase text-slate-500">
               {t('patient.dash.lastRx.title')}
@@ -330,9 +489,25 @@ export function PatientDashboard({
               data-testid="patient-dash-last-rx"
               className="rounded border border-slate-200 p-3 text-sm text-slate-500"
             >
-              {data.lastPrescription === null
-                ? t('patient.dash.lastRx.none')
-                : data.lastPrescription.itemsPreview}
+              {data.lastPrescription === null ? (
+                t('patient.dash.lastRx.none')
+              ) : (
+                <>
+                  <p
+                    data-testid="patient-dash-last-rx-items"
+                    className="text-slate-900"
+                  >
+                    {data.lastPrescription.itemsPreview}
+                  </p>
+                  <p
+                    data-testid="patient-dash-last-rx-preview"
+                    role="note"
+                    className="mt-1 rounded bg-amber-50 px-2 py-1 text-sm text-amber-800"
+                  >
+                    {t('patient.dash.lastRx.previewNote')}
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -376,6 +551,12 @@ export function PatientDashboard({
         </div>
       </div>
 
+      {/* M3-RWv4 §5.4 (leader decision): "Lab reports & Scans" is a PANEL on the
+          S07 dashboard (not a new route). Lists the patient's attachments across
+          visits via the shared two-way store (patient_list_attachments) with
+          open/preview and a delete-everywhere behind a confirm. */}
+      <LabReportsPanel patientId={patientId} />
+
       {/* Move-to-bin confirm dialog, names the patient (PAT-008, §4) */}
       {confirmingDelete ? (
         <div
@@ -408,6 +589,276 @@ export function PatientDashboard({
               >
                 {t('patient.dash.delete.confirm')}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** Whether a mime is an image (drives the type badge + preview mode). */
+function isImageMime(mime: string): boolean {
+  return mime.startsWith('image/');
+}
+
+/**
+ * M3-RWv4 §5.4 — the "Lab reports & Scans" panel (leader decision: a PANEL on
+ * the S07 dashboard, NOT a new route). Lists ALL of the patient's attachments
+ * across visits via the shared two-way store `patient_list_attachments`, with
+ * open/preview and a delete-everywhere behind a confirm (visit_delete_attachment
+ * removes the row + blob everywhere). Calls ONLY typed bindings; the display
+ * label (not the opaque blob id) is shown. No patient data is logged
+ * (R-PRIV-001).
+ */
+function LabReportsPanel({
+  patientId,
+}: {
+  readonly patientId: string;
+}): JSX.Element {
+  const [attachments, setAttachments] = useState<AttachmentSummary[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    url: string;
+    name: string;
+    isImage: boolean;
+  } | null>(null);
+
+  const reload = useCallback(async (): Promise<void> => {
+    const res = await run(commands.patientListAttachments({ patientId }));
+    setAttachments(res.attachments);
+    setLoaded(true);
+  }, [patientId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoaded(false);
+    setError(false);
+    void (async (): Promise<void> => {
+      try {
+        const res = await run(commands.patientListAttachments({ patientId }));
+        if (!cancelled) {
+          setAttachments(res.attachments);
+          setLoaded(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setLoaded(true);
+          setError(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId]);
+
+  const onOpen = useCallback(async (attachmentId: string): Promise<void> => {
+    try {
+      const res = await run(commands.visitOpenAttachment({ attachmentId }));
+      setPreview({
+        url: `data:${res.mime};base64,${res.dataBase64}`,
+        name: res.originalName ?? '',
+        isImage: isImageMime(res.mime),
+      });
+    } catch {
+      setError(true);
+    }
+  }, []);
+
+  const onConfirmDelete = useCallback(async (): Promise<void> => {
+    if (confirmId === null) return;
+    const id = confirmId;
+    setConfirmId(null);
+    try {
+      await run(commands.visitDeleteAttachment({ attachmentId: id }));
+      await reload();
+    } catch {
+      setError(true);
+    }
+  }, [confirmId, reload]);
+
+  return (
+    <section
+      data-testid="patient-dash-lab-reports-panel"
+      aria-label={t('patient.dash.labReports.title')}
+      className="rounded border border-slate-200 p-3"
+    >
+      <h2 className="mb-1 text-xs font-semibold uppercase text-slate-500">
+        {t('patient.dash.labReports.title')}
+      </h2>
+      <p className="mb-2 text-xs text-slate-500">
+        {t('patient.dash.labReports.hint')}
+      </p>
+
+      {!loaded ? (
+        <p
+          data-testid="patient-dash-lab-reports-loading"
+          aria-busy="true"
+          className="text-sm text-slate-500"
+        >
+          {t('patient.dash.labReports.loading')}
+        </p>
+      ) : null}
+
+      {loaded && error ? (
+        <p
+          role="alert"
+          data-testid="patient-dash-lab-reports-error"
+          className="text-sm text-red-700"
+        >
+          {t('patient.dash.labReports.error')}
+        </p>
+      ) : null}
+
+      {loaded && !error && attachments.length === 0 ? (
+        <p
+          data-testid="patient-dash-lab-reports-empty"
+          className="text-sm text-slate-500"
+        >
+          {t('patient.dash.labReports.empty')}
+        </p>
+      ) : null}
+
+      {attachments.length > 0 ? (
+        <ul
+          data-testid="patient-dash-lab-reports-list"
+          className="flex flex-col gap-2"
+        >
+          {attachments.map((a, index) => {
+            const n = index + 1;
+            const image = isImageMime(a.mime);
+            return (
+              <li
+                key={a.attachmentId}
+                data-testid={`patient-dash-lab-reports-item-${n}`}
+                className="flex items-center justify-between gap-3 rounded border border-slate-200 px-3 py-2"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    data-testid={`patient-dash-lab-reports-badge-${n}`}
+                    className={[
+                      'flex-none rounded px-1.5 py-0.5 text-[0.7rem] font-semibold uppercase',
+                      image
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-rose-100 text-rose-800',
+                    ].join(' ')}
+                  >
+                    {image
+                      ? t('patient.dash.labReports.badge.image')
+                      : t('patient.dash.labReports.badge.pdf')}
+                  </span>
+                  <span className="min-w-0 truncate font-medium">
+                    {a.originalName ?? a.caption ?? ''}
+                  </span>
+                </div>
+                <div className="flex flex-none items-center gap-2">
+                  <button
+                    type="button"
+                    data-testid={`patient-dash-lab-reports-open-${n}`}
+                    onClick={() => void onOpen(a.attachmentId)}
+                    className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    {t('patient.dash.labReports.open')}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`patient-dash-lab-reports-delete-${n}`}
+                    onClick={() => setConfirmId(a.attachmentId)}
+                    className="rounded border border-slate-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    {t('patient.dash.labReports.delete')}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      {confirmId !== null ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('patient.dash.labReports.delete.title')}
+          data-testid="patient-dash-lab-reports-delete-dialog"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setConfirmId(null);
+          }}
+        >
+          <div className="w-[26rem] rounded border border-slate-300 bg-white p-4 shadow-lg">
+            <h3 className="mb-1 text-sm font-semibold">
+              {t('patient.dash.labReports.delete.title')}
+            </h3>
+            <p className="mb-3 text-xs text-slate-600">
+              {t('patient.dash.labReports.delete.body')}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                data-testid="patient-dash-lab-reports-delete-cancel"
+                onClick={() => setConfirmId(null)}
+                className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {t('patient.dash.labReports.delete.cancel')}
+              </button>
+              <button
+                type="button"
+                data-testid="patient-dash-lab-reports-delete-confirm"
+                onClick={() => void onConfirmDelete()}
+                className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-red-700"
+              >
+                {t('patient.dash.labReports.delete.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {preview !== null ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={preview.name}
+          data-testid="patient-dash-lab-reports-preview"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setPreview(null);
+          }}
+        >
+          <div className="flex max-h-[85vh] w-[48rem] flex-col rounded border border-slate-300 bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
+              <h3 className="truncate text-sm font-semibold">{preview.name}</h3>
+              <button
+                type="button"
+                data-testid="patient-dash-lab-reports-preview-close"
+                onClick={() => setPreview(null)}
+                className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {t('patient.dash.labReports.preview.close')}
+              </button>
+            </div>
+            <div className="overflow-auto p-4">
+              {preview.isImage ? (
+                <img
+                  data-testid="patient-dash-lab-reports-preview-image"
+                  src={preview.url}
+                  alt={preview.name}
+                  className="mx-auto max-h-[70vh] max-w-full"
+                />
+              ) : (
+                <a
+                  data-testid="patient-dash-lab-reports-preview-download"
+                  href={preview.url}
+                  download={preview.name}
+                  className="inline-block rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-700"
+                >
+                  {t('patient.dash.labReports.preview.download')}
+                </a>
+              )}
             </div>
           </div>
         </div>

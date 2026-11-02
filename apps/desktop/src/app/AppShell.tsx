@@ -26,7 +26,8 @@
 // uncertain fails safe to /lock (handoff 46). The resolved autolockMinutes is
 // threaded into ShellFrame's idle timer (replacing the hardcoded fallback when
 // a value is present). UI -> typed commands only.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   HashRouter,
   Navigate,
@@ -34,21 +35,27 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useParams,
   useSearchParams,
 } from 'react-router-dom';
 
+import { AppBar } from '@/app/AppBar';
 import { LockScreen } from '@/app/LockScreen';
 import { SearchOverlay } from '@/app/SearchOverlay';
 import { SideNav, type NavRoute } from '@/app/SideNav';
 import { StatusBar } from '@/app/StatusBar';
 import { TopBar } from '@/app/TopBar';
+import { useZoom } from '@/app/useZoom';
 import { BackupScreen } from '@/backup/BackupScreen';
 import { commands } from '@/bindings';
+import { CaseForm } from '@/case/CaseForm';
 import { TodayScreen } from '@/home/TodayScreen';
 import { PatientsPage } from '@/patients/PatientsPage';
 import { SetupWizard } from '@/setup/SetupWizard';
 import { run } from '@/shared/command';
 import { features } from '@/shared/features';
+import { t } from '@/shared/strings';
+import { FollowupVisit } from '@/visit/FollowupVisit';
 
 /**
  * Default idle auto-lock timeout in minutes (SET-004). The shell runs the idle
@@ -57,6 +64,13 @@ import { features } from '@/shared/features';
  * default so it can run without a binding call (keeping it unit-testable).
  */
 const DEFAULT_AUTOLOCK_MINUTES = 15;
+
+/**
+ * The `:root` (html) font-size baseline in px (SET-005 / 00-conventions §1,
+ * src/index.css). The zoom scale multiplies this to drive the document-root
+ * font-size so all rem-based text and layout scale together (C8 fix).
+ */
+const ZOOM_ROOT_BASELINE_PX = 14;
 
 /** The launch route chosen by the boot-gate. */
 type BootRoute = '/setup' | '/lock' | '/today';
@@ -186,6 +200,38 @@ function ShellFrame({
   const openSearch = useCallback(() => setSearchOpen(true), []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
 
+  // Failed-open surface (D1 / R-UI-008): opening a case or follow-up can fail
+  // (backend reject or transport blip). Previously the two start paths swallowed
+  // the error in a silent `catch {}`, so a failed open looked identical to a
+  // dead click. We instead surface a short, non-crash, patient-data-free alert
+  // the doctor can see and dismiss (no stack, no SQL, no PII — R-UI-008,
+  // R-PRIV-001), and log one fixed line to the console for observability.
+  const [openError, setOpenError] = useState<string | null>(null);
+  const dismissOpenError = useCallback(() => setOpenError(null), []);
+
+  // Content zoom (Slice C3): a clamped, persisted scale the shared app-bar and
+  // the Ctrl+= / Ctrl+- / Ctrl+0 shortcuts drive. The scale is driven onto the
+  // DOCUMENT ROOT (`:root` html) font-size below; because every unit of text
+  // and spacing in the app is a rem/px Tailwind utility anchored to the root
+  // font-size (14px baseline, src/index.css), scaling the root scales text AND
+  // layout together. Applying it to a mid-tree div was the C8 no-op bug.
+  const zoom = useZoom();
+
+  // C8 fix: apply the zoom scale to the document-root font-size so all
+  // rem-based text and layout scale. The 14px baseline comes from `:root` in
+  // src/index.css; `14 * scale` px keeps rem anchored to the scaled root. On
+  // reset the scale returns to 1.0 (14px); on unmount the inline override is
+  // cleared so the CSS baseline resumes. No network call, no patient data.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.fontSize = `${ZOOM_ROOT_BASELINE_PX * zoom.scale}px`;
+    return () => {
+      // Clear the inline override on unmount so the CSS `:root` baseline (14px)
+      // resumes rather than a stale scaled value lingering on the element.
+      root.style.fontSize = '';
+    };
+  }, [zoom.scale]);
+
   const goToLock = useCallback(() => navigate('/lock'), [navigate]);
   const onNavigate = useCallback(
     (route: NavRoute) => navigate(route),
@@ -206,6 +252,200 @@ function ShellFrame({
   const openNewPatient = useCallback((): void => {
     navigate('/patients?view=new');
   }, [navigate]);
+
+  // Navigate to the S08 case form for an already-resolved visit (CASE / S08).
+  // The deep-linkable URL carries both ids so the form is reachable directly
+  // and the completion guard still wraps it (it is a shell route).
+  const openCaseVisit = useCallback(
+    (patientId: string, visitId: string): void => {
+      navigate(
+        `/patient/${encodeURIComponent(patientId)}/case/${encodeURIComponent(
+          visitId,
+        )}`,
+      );
+    },
+    [navigate],
+  );
+
+  // Navigate to the JOURNAL case form in FOLLOW-UP mode (ADR 0018 #2 /
+  // S09-delta): a follow-up REUSES the journal CaseForm (box pre-opens with the
+  // prior visit's content, insert buttons read "Update vitals"/"Update
+  // prescription", "Add entry" appends a new dated entry). The `/followup`
+  // suffix on the deep-linkable case URL is the visit-kind marker CaseRoute
+  // reads to render CaseForm with visitType='follow_up'; the retired structured
+  // S09 screen is no longer on the nav path. The common Back/Alt+Left parent-
+  // chain regexes still match (`/patient/:id/case/`), and CaseForm autosaves.
+  const openCaseFollowup = useCallback(
+    (patientId: string, visitId: string): void => {
+      navigate(
+        `/patient/${encodeURIComponent(patientId)}/case/${encodeURIComponent(
+          visitId,
+        )}/followup`,
+      );
+    },
+    [navigate],
+  );
+
+  // Start (open-or-create) a First visit for a patient and route into the
+  // case form (S08 entry points: dashboard "New visit / Take case" and F5).
+  // Only the generated binding is called; the resolved `visit_id` becomes the
+  // route param so the URL is deep-linkable and CaseForm restores the same
+  // open visit (VIS-001, CASE-005).
+  const startCaseForPatient = useCallback(
+    async (patientId: string): Promise<void> => {
+      try {
+        const open = await run(
+          commands.caseVisitOpenOrCreate({ patientId, visitType: 'first' }),
+        );
+        openCaseVisit(patientId, open.visitId);
+      } catch {
+        // A failed open must be OBSERVABLE, not a dead click (R-UI-008). Surface
+        // a short, non-crash alert and log one fixed line. No patient id, SQL,
+        // file path or stack is read into the message or the log (R-PRIV-001).
+        setOpenError(t('app.case.openFailed'));
+        console.error('[AppShell] case open failed');
+      }
+    },
+    [openCaseVisit],
+  );
+
+  // Start (open-or-create) a Follow-up visit and route into the JOURNAL case
+  // form in follow-up mode (ADR 0018 #2). The backend seeds the new follow-up
+  // visit's journal from the prior visit (box pre-opens with prior content; the
+  // prior complaints pre-load, VIS-002), so the UI only needs to open-or-create
+  // the follow-up and route into CaseForm with visitType='follow_up'. The
+  // dashboard's `onNewFollowup(patientId)` no longer needs to pass a prior
+  // visit id (prevVisitId is vestigial) — the backend resolves the prior visit
+  // itself — and the UI does not thread it through the URL. Only the generated
+  // binding is called; the resolved `visit_id` becomes the route param
+  // (deep-linkable, VIS-001/002).
+  const startFollowupForPatient = useCallback(
+    async (patientId: string): Promise<void> => {
+      try {
+        const open = await run(
+          commands.caseVisitOpenOrCreate({
+            patientId,
+            visitType: 'follow_up',
+          }),
+        );
+        openCaseFollowup(patientId, open.visitId);
+      } catch {
+        // A failed follow-up open must be OBSERVABLE (R-UI-008): surface a short
+        // non-crash alert and log one fixed line, with NO patient id / SQL /
+        // path / stack in either (R-PRIV-001).
+        setOpenError(t('app.case.openFailed'));
+        console.error('[AppShell] follow-up open failed');
+      }
+    },
+    [openCaseFollowup],
+  );
+
+  // The patient currently in focus (if any), parsed from the active route so
+  // F5 "new visit for the open patient" (S08 keyboard) knows whom to open. It
+  // is set by the /patients?id=<id> dashboard deep-link and by the case route
+  // (first and follow-up both live under /patient/:id/case/, ADR 0018 #2).
+  const openPatientId = useMemo((): string | null => {
+    const caseMatch = /^\/patient\/([^/]+)\/case\//.exec(location.pathname);
+    if (caseMatch && caseMatch[1] !== undefined) {
+      return decodeURIComponent(caseMatch[1]);
+    }
+    if (location.pathname === '/patients') {
+      const params = new URLSearchParams(location.search);
+      const id = params.get('id');
+      if (id !== null && id !== '') return id;
+    }
+    return null;
+  }, [location.pathname, location.search]);
+
+  // Global Alt+Left = Back (00-conventions §3): walk one step up the logical
+  // parent chain —
+  //   case/follow-up -> that patient's dashboard (/patients?id=:id)
+  //   dashboard (/patients?id=:id) -> patient list (/patients)
+  //   list / anything else -> Today (/today)
+  // It never fires mid-IME-composition and never steals a keystroke typed
+  // inside a text field (input / textarea / contenteditable), so typing a
+  // left-arrow in a clinical note is untouched. Back never discards data — the
+  // clinical forms autosave (CASE-005).
+  const goBack = useCallback((): void => {
+    const path = location.pathname;
+    const caseMatch = /^\/patient\/([^/]+)\/case\//.exec(path);
+    if (caseMatch && caseMatch[1] !== undefined) {
+      navigate(`/patients?id=${encodeURIComponent(caseMatch[1])}`);
+      return;
+    }
+    if (path === '/patients') {
+      const params = new URLSearchParams(location.search);
+      const id = params.get('id');
+      if (id !== null && id !== '') {
+        // On a patient dashboard -> the patient list.
+        navigate('/patients');
+        return;
+      }
+    }
+    // The list, Today or any other shell screen -> Today (the top).
+    navigate('/today');
+  }, [location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'ArrowLeft' || !e.altKey || e.isComposing) return;
+      // Do not hijack a left-arrow a doctor is typing inside a text control.
+      const el = e.target as HTMLElement | null;
+      if (el !== null) {
+        const tag = el.tagName;
+        if (
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          tag === 'SELECT' ||
+          el.isContentEditable
+        ) {
+          return;
+        }
+      }
+      e.preventDefault();
+      goBack();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [goBack]);
+
+  // Zoom keyboard shortcuts (Slice C3; 00-conventions §3): Ctrl+= / Ctrl++
+  // zoom in, Ctrl+- zoom out, Ctrl+0 reset. They scale the whole content root
+  // (text + layout). Ignored mid-IME-composition so they never fire while a
+  // doctor is composing text. `=`/`+` share a key, and NumpadAdd/Subtract are
+  // accepted too, so the shortcut works across keyboard layouts.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.isComposing) return;
+      const key = e.key;
+      if (key === '=' || key === '+' || key === 'Add') {
+        e.preventDefault();
+        zoom.zoomIn();
+      } else if (key === '-' || key === '_' || key === 'Subtract') {
+        e.preventDefault();
+        zoom.zoomOut();
+      } else if (key === '0') {
+        e.preventDefault();
+        zoom.reset();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [zoom]);
+
+  // F5: new visit for the open patient (S08 keyboard). Feature-gated with the
+  // case flag (R-DEL-002); never fires during IME composition (00-conventions).
+  useEffect(() => {
+    if (!features.case) return undefined;
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'F5' || e.isComposing) return;
+      if (openPatientId === null) return;
+      e.preventDefault();
+      void startCaseForPatient(openPatientId);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [openPatientId, startCaseForPatient]);
 
   // Idle auto-lock (SET-004): after the configured idle timeout with no user
   // activity, lock the app. Any clinical edit is already autosaved (CASE-005),
@@ -253,26 +493,103 @@ function ShellFrame({
           ? '/backup'
           : undefined;
 
+  // The content root carries the zoom VARIABLE only (`--hc-font-scale`), so any
+  // layout math that reads the scale still works. The actual text/layout
+  // scaling is driven onto the DOCUMENT ROOT font-size by the zoom effect above
+  // (C8 fix) — setting font-size on this mid-tree div was a no-op for every
+  // rem-based utility, which was the bug. Typed through CSSProperties: a CSS
+  // custom property is not in the lib DOM type, so the object is cast once here.
+  const contentStyle = {
+    '--hc-font-scale': String(zoom.scale),
+  } as CSSProperties;
+
   return (
     <div
       data-testid="app-shell"
-      className="flex h-screen flex-col bg-white text-[14px]"
+      className="flex h-screen min-w-0 flex-col bg-white text-[1rem]"
     >
       <TopBar onLock={goToLock} onOpenSearch={openSearch} />
+      {/* Shared app-bar (Slice C2/C3): the ONE consistent place for the common
+          Back and the zoom controls, so every screen shares the same slot. */}
+      <AppBar
+        onBack={goBack}
+        onZoomIn={zoom.zoomIn}
+        onZoomOut={zoom.zoomOut}
+        onZoomReset={zoom.reset}
+      />
+      {/* Failed-open alert (R-UI-008): a non-crash, patient-data-free banner so
+          a failed case/follow-up open is observable, not a dead click. Role
+          `alert` + text (never colour alone); dismissible by the doctor. */}
+      {openError !== null ? (
+        <div
+          role="alert"
+          data-testid="app-open-error"
+          className="flex items-center justify-between gap-4 border-b border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800"
+        >
+          <span>{openError}</span>
+          <button
+            type="button"
+            data-testid="app-open-error-dismiss"
+            onClick={dismissOpenError}
+            className="rounded border border-red-300 px-2 py-0.5 text-xs hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600"
+          >
+            {t('common.dismiss')}
+          </button>
+        </div>
+      ) : null}
       <div className="flex min-h-0 flex-1">
         <SideNav activeRoute={activeRoute} onNavigate={onNavigate} />
         <main
           className="min-w-0 flex-1 overflow-auto"
           data-testid="content-area"
+          style={contentStyle}
         >
           <Routes>
             <Route path="/" element={<Navigate to="/today" replace />} />
             <Route
               path="/today"
-              element={<TodayScreen onNewPatient={openNewPatient} />}
+              element={
+                <TodayScreen
+                  onNewPatient={openNewPatient}
+                  onOpenPatient={openPatient}
+                  onOpenBackup={goToBackup}
+                />
+              }
             />
             {features.patients ? (
-              <Route path="/patients" element={<PatientsRoute />} />
+              <Route
+                path="/patients"
+                element={
+                  <PatientsRoute
+                    onTakeCase={startCaseForPatient}
+                    onNewFollowup={startFollowupForPatient}
+                  />
+                }
+              />
+            ) : null}
+            {features.case ? (
+              <Route
+                path="/patient/:patientId/case/:visitId"
+                element={<CaseRoute onBack={openPatient} />}
+              />
+            ) : null}
+            {features.case ? (
+              <Route
+                path="/patient/:patientId/case/:visitId/followup"
+                element={
+                  <CaseRoute onBack={openPatient} visitType="follow_up" />
+                }
+              />
+            ) : null}
+            {features.case ? (
+              // Legacy structured S09 route (retired from the NAV PATH by ADR
+              // 0018 #2 — the dashboard follow-up now opens the journal CaseForm
+              // above). Kept as a dormant, deep-link-only surface so an existing
+              // bookmark/URL still resolves; nothing in the app navigates here.
+              <Route
+                path="/patient/:patientId/visit/:visitId/followup"
+                element={<FollowupRoute onBack={openPatient} />}
+              />
             ) : null}
             {features.backup ? (
               <Route path="/backup" element={<BackupScreen />} />
@@ -305,7 +622,13 @@ function ShellFrame({
  * forces a fresh PatientsPage when the deep-linked id changes (a new search
  * Enter must re-open the dashboard even from within /patients).
  */
-function PatientsRoute(): JSX.Element {
+function PatientsRoute({
+  onTakeCase,
+  onNewFollowup,
+}: {
+  readonly onTakeCase: (patientId: string) => void;
+  readonly onNewFollowup: (patientId: string, prevVisitId?: string) => void;
+}): JSX.Element {
   const [params] = useSearchParams();
   const id = params.get('id') ?? undefined;
   const view = params.get('view') === 'new' ? 'new' : 'list';
@@ -314,10 +637,133 @@ function PatientsRoute(): JSX.Element {
   // PatientsPage when the deep-linked id changes (a new search Enter re-opens
   // the dashboard even from within /patients).
   return id !== undefined ? (
-    <PatientsPage key={id} initialPatientId={id} />
+    <PatientsPage
+      key={id}
+      initialPatientId={id}
+      onTakeCase={onTakeCase}
+      onNewFollowup={onNewFollowup}
+    />
   ) : (
-    <PatientsPage key={view} initialView={view} />
+    <PatientsPage
+      key={view}
+      initialView={view}
+      onTakeCase={onTakeCase}
+      onNewFollowup={onNewFollowup}
+    />
   );
+}
+
+/**
+ * `/patient/:patientId/case/:visitId` route (S08) and its follow-up variant
+ * `/patient/:patientId/case/:visitId/followup` (S09, ADR 0018 #2). Loads the
+ * patient once to derive the two props the schema-driven case form needs beyond
+ * its ids — the patient's sex (drives the menstrual/obstetric conditional
+ * section) and whole-year age (drives the child-development section)
+ * (CASE-001). Both come from the typed `patient_get_dashboard` payload; the UI
+ * never reads SQL. `visitType` selects first vs follow-up journal mode: in
+ * follow-up mode the inserted-table buttons read "Update vitals"/"Update
+ * prescription" and the box opens with the backend-seeded prior content
+ * (VIS-002). The case form itself opens-or-restores the visit's journal
+ * (CASE-005).
+ */
+function CaseRoute({
+  onBack,
+  visitType = 'first',
+}: {
+  readonly onBack: (patientId: string) => void;
+  readonly visitType?: 'first' | 'follow_up';
+}): JSX.Element {
+  const params = useParams<{ patientId: string; visitId: string }>();
+  const patientId = params.patientId ?? '';
+  const visitId = params.visitId ?? '';
+  const [sex, setSex] = useState<'male' | 'female'>('male');
+  const [ageYears, setAgeYears] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async (): Promise<void> => {
+      try {
+        const dash = await run(commands.patientGetDashboard({ patientId }));
+        if (cancelled) return;
+        setSex(sexOf(dash.demographics.sex));
+        setAgeYears(ageYearsOf(dash.demographics.ageLabel));
+      } catch {
+        /* fall back to the safe defaults; the form still renders (no dead end) */
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId]);
+
+  if (!loaded) {
+    return (
+      <section
+        data-testid="case-route-loading"
+        aria-busy="true"
+        className="p-6 text-sm text-slate-500"
+      >
+        <div className="h-24 w-full animate-pulse rounded bg-slate-100" />
+      </section>
+    );
+  }
+
+  return (
+    <CaseForm
+      patientId={patientId}
+      visitId={visitId}
+      visitType={visitType}
+      sex={sex}
+      ageYears={ageYears}
+      onBack={() => onBack(patientId)}
+    />
+  );
+}
+
+/**
+ * Legacy `/patient/:patientId/visit/:visitId/followup` route — the retired
+ * structured S09 screen (ADR 0018 #2 replaces it with the journal CaseModel).
+ * This route is NO LONGER on the nav path: nothing in the app navigates here
+ * (the dashboard follow-up and F5 open the journal CaseForm in follow-up mode).
+ * It is retained only as a dormant, deep-link-only surface so an existing
+ * bookmark/URL still resolves instead of redirecting to Today. The previous
+ * visit whose complaints pre-load (VIS-002) is carried in the `?prev=` hash
+ * query. UI -> typed commands only.
+ */
+function FollowupRoute({
+  onBack,
+}: {
+  readonly onBack: (patientId: string) => void;
+}): JSX.Element {
+  const params = useParams<{ patientId: string; visitId: string }>();
+  const [query] = useSearchParams();
+  const patientId = params.patientId ?? '';
+  const visitId = params.visitId ?? '';
+  const prevVisitId = query.get('prev') ?? '';
+  return (
+    <FollowupVisit
+      patientId={patientId}
+      visitId={visitId}
+      prevVisitId={prevVisitId}
+      onBack={() => onBack(patientId)}
+    />
+  );
+}
+
+/** Map the free-form demographics sex to the case form's binary conditional. */
+function sexOf(sex: string | null): 'male' | 'female' {
+  if (sex === null) return 'male';
+  const s = sex.trim().toLowerCase();
+  return s.startsWith('f') ? 'female' : 'male';
+}
+
+/** Parse whole years from an age label like `34y` / `34 y` / `6m` (-> 0). */
+function ageYearsOf(ageLabel: string): number {
+  const match = /^\s*(\d+)\s*y/i.exec(ageLabel);
+  return match && match[1] !== undefined ? Number(match[1]) : 0;
 }
 
 /** `/lock` route: unlock returns to Today (or the previous screen). */

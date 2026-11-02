@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "key": "chief_complaints",
+      "title": "Chief complaints",
+      "collapsible": true,
+      "hideable": true,
+      "repeatable": true,
+      "fields": [
+        { "key": "location", "label": "Location", "type": "text" },
+        { "key": "sensation", "label": "Sensation", "type": "long-text" },
+        { "key": "agg", "label": "Aggravation", "type": "long-text" },
+        { "key": "amel", "label": "Amelioration", "type": "long-text" },
+        { "key": "concomitants", "label": "Concomitants", "type": "long-text" },
+        { "key": "duration", "label": "Duration", "type": "text" },
+        { "key": "onset", "label": "Onset", "type": "text" }
+      ]
+    },
+    {
+      "key": "examination",
+      "title": "Examination findings",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "bp", "label": "BP", "type": "text" },
+        { "key": "pulse", "label": "Pulse", "type": "number" },
+        { "key": "weight_kg", "label": "Weight (kg)", "type": "number" },
+        { "key": "height_cm", "label": "Height (cm)", "type": "number" },
+        { "key": "bmi", "label": "BMI", "type": "number", "computed": "bmi(weight_kg,height_cm)" },
+        { "key": "temp", "label": "Temperature", "type": "number" },
+        { "key": "spo2", "label": "SpO2", "type": "number" },
+        { "key": "pain_scale", "label": "Pain scale", "type": "scale0-10" }
+      ]
+    },
+    {
+      "key": "provisional_diagnosis",
+      "title": "Provisional diagnosis",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "dx", "label": "Provisional diagnosis", "type": "long-text" }
+      ]
+    },
+    {
+      "key": "analysis",
+      "title": "Doctor's analysis / notes",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "notes", "label": "Analysis / notes", "type": "long-text" }
+      ]
+    }
+  ]
+}

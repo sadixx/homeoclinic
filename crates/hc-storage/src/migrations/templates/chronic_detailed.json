@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "key": "chief_complaints",
+      "title": "Chief complaints",
+      "collapsible": true,
+      "hideable": true,
+      "repeatable": true,
+      "fields": [
+        { "key": "location", "label": "Location", "type": "text" },
+        { "key": "sensation", "label": "Sensation", "type": "long-text" },
+        { "key": "agg", "label": "Aggravation", "type": "long-text" },
+        { "key": "amel", "label": "Amelioration", "type": "long-text" },
+        { "key": "concomitants", "label": "Concomitants", "type": "long-text" },
+        { "key": "duration", "label": "Duration", "type": "text" },
+        { "key": "onset", "label": "Onset", "type": "text" }
+      ]
+    },
+    {
+      "key": "hpi",
+      "title": "History of present illness",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "narrative", "label": "History of present illness", "type": "long-text" }
+      ]
+    },
+    {
+      "key": "past_history",
+      "title": "Past history",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "narrative", "label": "Past history", "type": "long-text" }
+      ]
+    },
+    {
+      "key": "family_history",
+      "title": "Family history",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "narrative", "label": "Family history", "type": "long-text" }
+      ]
+    },
+    {
+      "key": "personal_history",
+      "title": "Personal history",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "narrative", "label": "Personal history", "type": "long-text" }
+      ]
+    },
+    {
+      "key": "physical_generals",
+      "title": "Physical generals",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "appetite", "label": "Appetite", "type": "text" },
+        {
+          "key": "thirst",
+          "label": "Thirst",
+          "type": "single-choice",
+          "allowFreeText": true,
+          "options": ["Thirstless", "Small sips", "Large quantities"]
+        },
+        { "key": "cravings", "label": "Cravings", "type": "long-text" },
+        { "key": "aversions", "label": "Aversions", "type": "long-text" },
+        { "key": "stool", "label": "Stool", "type": "text" },
+        { "key": "urine", "label": "Urine", "type": "text" },
+        { "key": "sweat", "label": "Sweat", "type": "text" },
+        { "key": "sleep", "label": "Sleep", "type": "text" },
+        { "key": "dreams", "label": "Dreams", "type": "long-text" },
+        {
+          "key": "thermal",
+          "label": "Thermal state",
+          "type": "single-choice",
+          "allowFreeText": true,
+          "options": ["Chilly", "Hot", "Ambithermal"]
+        }
+      ]
+    },
+    {
+      "key": "mental_generals",
+      "title": "Mental generals",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "narrative", "label": "Mental generals", "type": "long-text" }
+      ]
+    },
+    {
+      "key": "menstrual_obstetric",
+      "title": "Menstrual / obstetric history",
+      "collapsible": true,
+      "hideable": true,
+      "showIf": { "sex": "female" },
+      "fields": [
+        { "key": "menses", "label": "Menses", "type": "long-text" },
+        { "key": "obstetric", "label": "Obstetric history", "type": "long-text" },
+        { "key": "leucorrhoea", "label": "Leucorrhoea", "type": "text" }
+      ]
+    },
+    {
+      "key": "child_development",
+      "title": "Child development",
+      "collapsible": true,
+      "hideable": true,
+      "showIf": { "ageYearsLt": 14 },
+      "fields": [
+        { "key": "milestones", "label": "Developmental milestones", "type": "long-text" },
+        { "key": "birth_history", "label": "Birth history", "type": "long-text" },
+        { "key": "vaccination", "label": "Vaccination", "type": "text" },
+        { "key": "schooling", "label": "Schooling / behaviour", "type": "long-text" }
+      ]
+    },
+    {
+      "key": "examination",
+      "title": "Examination findings",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "bp", "label": "BP", "type": "text" },
+        { "key": "pulse", "label": "Pulse", "type": "number" },
+        { "key": "weight_kg", "label": "Weight (kg)", "type": "number" },
+        { "key": "height_cm", "label": "Height (cm)", "type": "number" },
+        { "key": "bmi", "label": "BMI", "type": "number", "computed": "bmi(weight_kg,height_cm)" },
+        { "key": "temp", "label": "Temperature", "type": "number" },
+        { "key": "spo2", "label": "SpO2", "type": "number" },
+        { "key": "pain_scale", "label": "Pain scale", "type": "scale0-10" }
+      ]
+    },
+    {
+      "key": "investigations",
+      "title": "Investigations",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "narrative", "label": "Investigations", "type": "long-text" }
+      ]
+    },
+    {
+      "key": "provisional_diagnosis",
+      "title": "Provisional diagnosis",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "dx", "label": "Provisional diagnosis", "type": "long-text" }
+      ]
+    },
+    {
+      "key": "analysis",
+      "title": "Doctor's analysis / notes",
+      "collapsible": true,
+      "hideable": true,
+      "fields": [
+        { "key": "notes", "label": "Analysis / notes", "type": "long-text" }
+      ]
+    }
+  ]
+}

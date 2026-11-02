@@ -158,3 +158,126 @@ pub fn seeded_data_dir() -> (tempfile::TempDir, Pool, (String, String)) {
 
     (dir, pool, (doctor_id, clinic_id))
 }
+
+// ---------------------------------------------------------------------------
+// HC-MVP1-068..072 M3-A visit + case-template test seams.
+// ---------------------------------------------------------------------------
+
+use crate::visit::{self, VisitRow};
+
+/// Seed ONE minimal synthetic patient into a migrated `pool` and return its id
+/// (R-TEST-004: synthetic only). Inserts the required NOT NULL search columns
+/// directly (the FTS triggers fire in-txn); the visit tests only need a live
+/// patient row to hang visits off, not the full registration path.
+pub fn seed_patient(pool: &Pool, code: &str, name: &str) -> String {
+    let id = uuid::Uuid::now_v7().to_string();
+    let id_ret = id.clone();
+    let now = "2026-10-20T00:00:00Z";
+    pool.with_writer(|c| {
+        let tx = c.transaction()?;
+        tx.execute(
+            "INSERT INTO patient \
+               (id, code, name, name_norm, name_phonetic, code_digits, \
+                created_at, updated_at, row_version) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, 0)",
+            rusqlite::params![
+                id,
+                code,
+                name,
+                name.to_lowercase(),
+                name.to_lowercase(),
+                code.chars()
+                    .filter(|c| c.is_ascii_digit())
+                    .collect::<String>(),
+                now,
+            ],
+        )?;
+        tx.commit()?;
+        Ok(())
+    })
+    .expect("seed synthetic patient");
+    id_ret
+}
+
+/// Seed ONE synthetic patient with explicit `dob` and/or `age_years` and return
+/// its id (R-TEST-004: synthetic only). Used by the M3-RW A3 read tests that
+/// assert the patient read derives age from DOB when present and falls back to
+/// the stored `age_years` when DOB is NULL — so the caller must be able to store
+/// a genuinely-null DOB (which the create path's DOB estimation would not give).
+/// Inserts the required NOT NULL search columns directly; the FTS triggers fire
+/// in-txn.
+pub fn seed_patient_demographics(
+    pool: &Pool,
+    code: &str,
+    name: &str,
+    dob: Option<&str>,
+    age_years: Option<i64>,
+) -> String {
+    let id = uuid::Uuid::now_v7().to_string();
+    let id_ret = id.clone();
+    let now = "2026-10-20T00:00:00Z";
+    pool.with_writer(|c| {
+        let tx = c.transaction()?;
+        tx.execute(
+            "INSERT INTO patient \
+               (id, code, name, name_norm, name_phonetic, code_digits, \
+                dob, age_years, \
+                created_at, updated_at, row_version) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, 0)",
+            rusqlite::params![
+                id,
+                code,
+                name,
+                name.to_lowercase(),
+                name.to_lowercase(),
+                code.chars()
+                    .filter(|c| c.is_ascii_digit())
+                    .collect::<String>(),
+                dob,
+                age_years,
+                now,
+            ],
+        )?;
+        tx.commit()?;
+        Ok(())
+    })
+    .expect("seed synthetic patient with demographics");
+    id_ret
+}
+
+/// Insert a synthetic visit for `patient_id` through the REAL [`visit`] repo +
+/// denormalise path, so Today tests seed due/overdue/registered rows the same
+/// way production writes them (R-TEST-003). Sets `visit_at`, optional
+/// `next_followup_on` (on the visit AND the patient, matching the service's
+/// `visit_set_next_followup`), and bumps the patient's denormalised counters.
+/// Returns the new visit id. Synthetic data only (R-TEST-004).
+pub fn insert_visit_for(
+    pool: &Pool,
+    patient_id: &str,
+    visit_at: &str,
+    next_followup_on: Option<&str>,
+) -> String {
+    let visit_id = uuid::Uuid::now_v7().to_string();
+    let id_ret = visit_id.clone();
+    pool.with_writer(|c| {
+        let tx = c.transaction()?;
+        let row = VisitRow {
+            id: visit_id.clone(),
+            patient_id: patient_id.to_string(),
+            visit_at: visit_at.to_string(),
+            visit_type: "follow_up".to_string(),
+            next_followup_on: next_followup_on.map(|s| s.to_string()),
+            observations: Some("synthetic visit".to_string()),
+            ..Default::default()
+        };
+        visit::insert_visit(&tx, &row, visit_at)?;
+        visit::denormalise_patient_after_visit(&tx, patient_id, visit_at, visit_at, true)?;
+        if next_followup_on.is_some() {
+            visit::set_patient_next_followup(&tx, patient_id, next_followup_on, visit_at)?;
+        }
+        tx.commit()?;
+        Ok(())
+    })
+    .expect("seed synthetic visit");
+    id_ret
+}

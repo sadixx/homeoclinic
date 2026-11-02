@@ -8,6 +8,7 @@
 //! [`tauri_specta::Builder`] so the Tauri shell and the bindings-export test
 //! share one source of truth for the command list.
 
+pub mod attachment;
 pub mod auth;
 pub mod backup;
 pub mod clock;
@@ -18,6 +19,7 @@ pub mod logging;
 pub mod patient;
 pub mod setup;
 pub mod state;
+pub mod visit;
 
 use tauri_specta::{collect_commands, Builder};
 
@@ -83,7 +85,33 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::patient::patient_recent,
                 commands::patient::patient_touch_recent,
                 commands::patient::patient_list_query,
-                commands::patient::patient_list_export_csv
+                commands::patient::patient_list_export_csv,
+                // Case-template + visit + Today use-case commands (HC-MVP1-058/
+                // 061/062/063/064/068..072, S08/S09/S03).
+                commands::visit::case_template_get_default,
+                commands::visit::case_template_list,
+                // Per-doctor hide-sections persistence (CASE-002, S08).
+                commands::visit::case_template_set_visibility,
+                commands::visit::case_visit_open_or_create,
+                commands::visit::case_visit_autosave,
+                commands::visit::case_summary_render,
+                commands::visit::visit_create_followup,
+                commands::visit::visit_autosave,
+                commands::visit::visit_set_next_followup,
+                commands::visit::visit_has_saved_first_case,
+                commands::visit::today_get_overview,
+                // Send-to-repertory STUB (CASE-006, R7) — flagged unavailable,
+                // registered for a stable binding (no dead end, R-DEL-002).
+                commands::visit::rubric_search_prefill,
+                // Visit lab-report attachments (PAT-009, HC-MVP1-M3ux3, S08
+                // Investigations). Reuse the M1-024 encrypted AttachmentStore;
+                // typed file-open + encrypted store + one txn/one audit row.
+                commands::attachment::visit_attach_report,
+                commands::attachment::visit_list_attachments,
+                commands::attachment::patient_list_attachments,
+                commands::attachment::visit_open_attachment,
+                commands::attachment::visit_delete_attachment,
+                commands::attachment::visit_pick_report_file
             ]
         };
         (with_e2e) => {
@@ -127,6 +155,27 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::patient::patient_touch_recent,
                 commands::patient::patient_list_query,
                 commands::patient::patient_list_export_csv,
+                // Case-template + visit + Today use-case commands (M3-A).
+                commands::visit::case_template_get_default,
+                commands::visit::case_template_list,
+                // Per-doctor hide-sections persistence (CASE-002, S08).
+                commands::visit::case_template_set_visibility,
+                commands::visit::case_visit_open_or_create,
+                commands::visit::case_visit_autosave,
+                commands::visit::case_summary_render,
+                commands::visit::visit_create_followup,
+                commands::visit::visit_autosave,
+                commands::visit::visit_set_next_followup,
+                commands::visit::visit_has_saved_first_case,
+                commands::visit::today_get_overview,
+                commands::visit::rubric_search_prefill,
+                // Visit lab-report attachments (PAT-009, M3ux3).
+                commands::attachment::visit_attach_report,
+                commands::attachment::visit_list_attachments,
+                commands::attachment::patient_list_attachments,
+                commands::attachment::visit_open_attachment,
+                commands::attachment::visit_delete_attachment,
+                commands::attachment::visit_pick_report_file,
                 // DEV/E2E ONLY (feature e2e-test-keys): synthetic fixture
                 // import through the real create path (OPTION A seeding).
                 commands::patient::patient_import_fixture
