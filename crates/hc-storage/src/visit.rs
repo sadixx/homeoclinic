@@ -398,6 +398,50 @@ pub fn registered_today(
     Ok(rows)
 }
 
+/// Upper bound on the visits one patient-dashboard read returns (R-DATA-007).
+/// Far above a real patient's lifetime visit count; keeps the read bounded.
+pub const PATIENT_TIMELINE_LIMIT: i64 = 500;
+
+/// One patient-timeline row for the dashboard (PAT-005, M3-RWv6 item 9).
+/// `data_json` is carried opaque; the service reads what it needs from it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VisitTimelineRow {
+    /// Visit id.
+    pub id: String,
+    /// RFC3339 UTC visit instant.
+    pub visit_at: String,
+    /// Visit type: `first | follow_up | acute | tele`.
+    pub visit_type: String,
+    /// Case document JSON, or `None`.
+    pub data_json: Option<String>,
+}
+
+/// The patient's non-deleted visits, NEWEST FIRST (`visit_at DESC, id DESC`),
+/// bounded by `limit` (R-DATA-007). One parameterised read (R-SEC-001) over
+/// the `visit(patient_id, visit_at DESC)` index (R-DATA-008).
+pub fn list_visits_for_patient(
+    conn: &Connection,
+    patient_id: &str,
+    limit: i64,
+) -> Result<Vec<VisitTimelineRow>, StorageError> {
+    let mut stmt = conn.prepare(
+        "SELECT id, visit_at, type, data_json FROM visit \
+         WHERE patient_id = ?1 AND deleted_at IS NULL \
+         ORDER BY visit_at DESC, id DESC LIMIT ?2",
+    )?;
+    let rows = stmt
+        .query_map(params![patient_id, limit], |r| {
+            Ok(VisitTimelineRow {
+                id: r.get(0)?,
+                visit_at: r.get(1)?,
+                visit_type: r.get(2)?,
+                data_json: r.get(3)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
 /// Count `visit_fts` rows matching `query` within one connection (test seam for
 /// R-DATA-006 "findable immediately"). Bounded by the FTS match itself.
 pub fn fts_match_count(conn: &Connection, query: &str) -> Result<i64, StorageError> {

@@ -100,9 +100,18 @@ describe('CaseForm b15-r1-f1: naming the leading complaint refreshes structure',
       expect(region.querySelector('.ProseMirror')).not.toBeNull(),
     );
 
-    // Fresh case: the prompt is shown and no complaint can be removed yet.
+    // Fresh case: the prompt is shown and no NAMED complaint can be removed
+    // yet. The loaded spine keeps one unnamed placeholder complaint, so at most
+    // one unlabelled remove control may exist (same contract as the E2E
+    // case-rwv5-per-entry-tables C step). M3-RWv6 flake fix: the old "0
+    // controls" check only held because findByTestId resolved while the form
+    // was still backed by the pre-load EMPTY editor.
     expect(screen.getByTestId('case-form-complaint-empty-prompt')).toBeTruthy();
-    expect(complaintRemoveControls()).toHaveLength(0);
+    const before = complaintRemoveControls();
+    expect(before.length).toBeLessThanOrEqual(1);
+    for (const b of before) {
+      expect(b.getAttribute('aria-label') ?? '').not.toMatch(/Headache/);
+    }
 
     fireEvent.change(screen.getByTestId('case-form-complaint-title'), {
       target: { value: 'Headache' },

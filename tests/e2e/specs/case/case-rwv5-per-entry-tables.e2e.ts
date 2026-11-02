@@ -85,8 +85,8 @@ async function recordOnce(kind: Kind, pass: 1 | 2): Promise<void> {
     case 'physical_generals':
       await caseRichPage.recordGenerals(
         pass === 1
-          ? { appetite: 'Good', thirst: 'Thirstless', thermal: 'Chilly', notes: 'Craves salt' }
-          : { appetite: 'Poor', thirst: 'Large quantities', thermal: 'Hot', notes: 'Averse to fat' },
+          ? { appetite: 'Good', thirst: 'Thirstless', thermal: 'Chilly', constitution: 'Lean' }
+          : { appetite: 'Poor', thirst: 'Large quantities', thermal: 'Hot', constitution: 'Stocky' },
       );
       return;
     case 'investigations':

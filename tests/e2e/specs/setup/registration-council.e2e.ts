@@ -32,41 +32,41 @@ import { shellPage } from '../../pages/shell.page.js';
 import { relaunchInto } from '../../helpers/launch.js';
 
 const PIN = '4321';
-const MAHARASHTRA = 'Maharashtra — Maharashtra Council of Homoeopathy';
+const MAHARASHTRA = 'Maharashtra: Maharashtra Council of Homoeopathy';
 const OTHER_VALUE = '__other__';
 // Synthetic, no real person or institution (Sikkim has no board per source).
 const OTHER_TEXT = 'Test Council for Sikkim';
 
 const VERIFIED = [
-  'Andhra Pradesh — Andhra Boards for Ayurveda and Homoeopathy',
-  'Arunachal Pradesh — Arunachal Pradesh Homoeopathy Council',
-  'Assam — Board of Homoeopathic System of Medicine, Assam',
-  'Bihar — Bihar Homoeopathic Board of Medicine',
-  'Chandigarh (UT) — Council of Homoeopathic System of Medicine, Chandigarh',
-  'Chhattisgarh — State Council of Homoeopathy, Chhattisgarh',
-  'Delhi — Board of Homoeopathic System of Medicine, Delhi',
-  'Goa — Goa Board of Indian System of Medicine & Homoeopathy',
-  'Gujarat — Council of Homoeopathic System of Medicine, Gujarat State',
-  'Haryana — Council of Homoeopathic System of Medicine, Haryana',
-  'Jammu & Kashmir — Jammu & Kashmir Board of Homoeopathic System of Medicine',
-  'Jharkhand — Jharkhand State AYUSH Medical Council',
-  'Karnataka — Karnataka Board of Homoeopathic System of Medicine',
-  'Kerala — Kerala State Medical Council',
-  'Madhya Pradesh — State Council of Homoeopathy, Madhya Pradesh',
+  'Andhra Pradesh: Andhra Boards for Ayurveda and Homoeopathy',
+  'Arunachal Pradesh: Arunachal Pradesh Homoeopathy Council',
+  'Assam: Board of Homoeopathic System of Medicine, Assam',
+  'Bihar: Bihar Homoeopathic Board of Medicine',
+  'Chandigarh (UT): Council of Homoeopathic System of Medicine, Chandigarh',
+  'Chhattisgarh: State Council of Homoeopathy, Chhattisgarh',
+  'Delhi: Board of Homoeopathic System of Medicine, Delhi',
+  'Goa: Goa Board of Indian System of Medicine & Homoeopathy',
+  'Gujarat: Council of Homoeopathic System of Medicine, Gujarat State',
+  'Haryana: Council of Homoeopathic System of Medicine, Haryana',
+  'Jammu & Kashmir: Jammu & Kashmir Board of Homoeopathic System of Medicine',
+  'Jharkhand: Jharkhand State AYUSH Medical Council',
+  'Karnataka: Karnataka Board of Homoeopathic System of Medicine',
+  'Kerala: Kerala State Medical Council',
+  'Madhya Pradesh: State Council of Homoeopathy, Madhya Pradesh',
   MAHARASHTRA,
-  'Meghalaya — Board of Homoeopathic Medicine, Meghalaya',
-  'Nagaland — Board of Homoeopathic System of Medicine, Nagaland',
-  'Odisha — Directorate of AYUSH, Odisha (registering authority)',
-  'Punjab — Council of Homoeopathic System of Medicine, Punjab',
-  'Rajasthan — Rajasthan Board of Homoeopathic Chikitsa Board',
-  'Tamil Nadu — Tamil Nadu Homoeopathic Medical Council',
-  'Telangana — Boards of Indian Medicines, Telangana',
-  'Tripura — Council of Homoeopathic Medicine, Tripura',
-  'Uttar Pradesh — Homoeopathic Medicine Board, Uttar Pradesh',
-  'Uttarakhand — Homoeopathic Medicine Board, Uttarakhand',
-  'West Bengal — Council of Homoeopathic Medicine, West Bengal',
-  'National — National Commission for Homoeopathy (National Register)',
-  'National (legacy) — Central Council of Homoeopathy (pre-2020)',
+  'Meghalaya: Board of Homoeopathic Medicine, Meghalaya',
+  'Nagaland: Board of Homoeopathic System of Medicine, Nagaland',
+  'Odisha: Directorate of AYUSH, Odisha (registering authority)',
+  'Punjab: Council of Homoeopathic System of Medicine, Punjab',
+  'Rajasthan: Rajasthan Board of Homoeopathic Chikitsa Board',
+  'Tamil Nadu: Tamil Nadu Homoeopathic Medical Council',
+  'Telangana: Boards of Indian Medicines, Telangana',
+  'Tripura: Council of Homoeopathic Medicine, Tripura',
+  'Uttar Pradesh: Homoeopathic Medicine Board, Uttar Pradesh',
+  'Uttarakhand: Homoeopathic Medicine Board, Uttarakhand',
+  'West Bengal: Council of Homoeopathic Medicine, West Bengal',
+  'National: National Commission for Homoeopathy (National Register)',
+  'National (legacy): Central Council of Homoeopathy (pre-2020)',
 ];
 
 /** Steps 2-4 with synthetic data, then Finish -> Today on this launch. */
@@ -96,6 +96,8 @@ describe('M3set registration council PHASE A: verified dropdown, pick Maharashtr
       'Other (type manually)',
     ]);
     expect(options.some((o) => o.startsWith('Himachal Pradesh'))).toBe(false);
+    // M3-RWv6 item 1: '<State>: <Authority>', no em dash in any option.
+    expect(options.filter((o) => o.includes('\u2014'))).toEqual([]);
     // Nothing chosen yet: the Other box is not shown.
     await expect(setupPage.councilOther).not.toBeExisting();
 

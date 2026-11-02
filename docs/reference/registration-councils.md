@@ -21,8 +21,9 @@ Odisha and Rajasthan are worded exactly as the Ministry reported them.
 
 ## List
 
-Each label has the form `<State> — <Authority>`. The options appear in this
-order, followed by "Other (type manually)".
+Each label has the form `<State>: <Authority>`, for example
+`Maharashtra: Maharashtra Council of Homoeopathy`. Labels contain no em or en
+dash. The options appear in this order, followed by "Other (type manually)".
 
 | # | State / scope | Authority |
 |---|---|---|
@@ -80,5 +81,8 @@ Other and type the council name:
 
 No schema, migration or binding change. The doctor profile's existing
 `regCouncil` string stores the chosen label as shown, or the trimmed text
-typed for Other. A stored value that is not in the list re-opens as Other,
-with the text kept.
+typed for Other. A value saved before M3-RWv6 in the old form
+`<State> \u2014 <Authority>` (state, space, em dash, space, authority) re-opens as
+the same listed option, shown and saved again under its current
+`<State>: <Authority>` label. Any other stored value that is not in the list
+re-opens as Other, with the text kept.

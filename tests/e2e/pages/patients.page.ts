@@ -105,6 +105,46 @@ export class PatientsPage {
     return byTestId("patient-dash-timeline");
   }
 
+  // ---- M3-RWv6 item 9: visits newest first + last prescription ----------
+  /** Rendered visit rows, top to bottom: [date text, type text]. */
+  async dashVisitRows(): Promise<{ date: string; type: string }[]> {
+    return browser.execute(() =>
+      Array.from(
+        document.querySelectorAll('[data-testid="patient-dash-visit-row"]'),
+      ).map((li) => {
+        const spans = li.querySelectorAll("span");
+        return {
+          date: (spans[0]?.textContent ?? "").trim(),
+          type: (spans[1]?.textContent ?? "").trim(),
+        };
+      }),
+    );
+  }
+
+  /** Text of an optional dashboard element, or null when it is absent. */
+  async dashTextOrNull(testId: string): Promise<string | null> {
+    const el = byTestId(testId);
+    if (!(await el.isExisting())) return null;
+    return (await el.getText()).trim();
+  }
+
+  /** Attributes of an open preview: title name + href/src of its content. */
+  async previewInfo(
+    testId: string,
+  ): Promise<{ name: string; href: string | null; download: string | null; src: string | null }> {
+    return browser.execute((id: string) => {
+      const root = document.querySelector(`[data-testid="${id}"]`);
+      const a = root?.querySelector(`[data-testid="${id}-download"]`) ?? null;
+      const img = root?.querySelector(`[data-testid="${id}-image"]`) ?? null;
+      return {
+        name: (root?.getAttribute("aria-label") ?? root?.querySelector("h2,h3")?.textContent ?? "").trim(),
+        href: a?.getAttribute("href") ?? null,
+        download: a?.getAttribute("download") ?? null,
+        src: img?.getAttribute("src") ?? null,
+      };
+    }, testId);
+  }
+
   get dashEdit(): ChainablePromiseElement {
     return byTestId("patient-dash-edit");
   }

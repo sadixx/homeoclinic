@@ -61,9 +61,15 @@ beforeEach(() => {
 // value directly, so it works for the registration-council <select> (value is
 // one of the listed labels).
 function fillCouncil(): void {
-  fireEvent.change(screen.getByTestId('setup-doctor-council'), {
-    target: { value: 'Maharashtra — Maharashtra Council of Homoeopathy' },
-  });
+  // Selected by option text so these flow tests do not depend on the label
+  // format (the label format is asserted by the council tests below).
+  const control = screen.getByTestId(
+    'setup-doctor-council',
+  ) as HTMLSelectElement;
+  const option = Array.from(control.options).find((o) =>
+    (o.textContent ?? '').startsWith('Maharashtra'),
+  );
+  fireEvent.change(control, { target: { value: option?.value ?? '' } });
 }
 
 describe('SetupWizard (S01)', () => {
@@ -229,35 +235,35 @@ describe('SetupWizard (S01)', () => {
 // ---------------------------------------------------------------------------
 
 const VERIFIED_COUNCILS: readonly string[] = [
-  'Andhra Pradesh — Andhra Boards for Ayurveda and Homoeopathy',
-  'Arunachal Pradesh — Arunachal Pradesh Homoeopathy Council',
-  'Assam — Board of Homoeopathic System of Medicine, Assam',
-  'Bihar — Bihar Homoeopathic Board of Medicine',
-  'Chandigarh (UT) — Council of Homoeopathic System of Medicine, Chandigarh',
-  'Chhattisgarh — State Council of Homoeopathy, Chhattisgarh',
-  'Delhi — Board of Homoeopathic System of Medicine, Delhi',
-  'Goa — Goa Board of Indian System of Medicine & Homoeopathy',
-  'Gujarat — Council of Homoeopathic System of Medicine, Gujarat State',
-  'Haryana — Council of Homoeopathic System of Medicine, Haryana',
-  'Jammu & Kashmir — Jammu & Kashmir Board of Homoeopathic System of Medicine',
-  'Jharkhand — Jharkhand State AYUSH Medical Council',
-  'Karnataka — Karnataka Board of Homoeopathic System of Medicine',
-  'Kerala — Kerala State Medical Council',
-  'Madhya Pradesh — State Council of Homoeopathy, Madhya Pradesh',
-  'Maharashtra — Maharashtra Council of Homoeopathy',
-  'Meghalaya — Board of Homoeopathic Medicine, Meghalaya',
-  'Nagaland — Board of Homoeopathic System of Medicine, Nagaland',
-  'Odisha — Directorate of AYUSH, Odisha (registering authority)',
-  'Punjab — Council of Homoeopathic System of Medicine, Punjab',
-  'Rajasthan — Rajasthan Board of Homoeopathic Chikitsa Board',
-  'Tamil Nadu — Tamil Nadu Homoeopathic Medical Council',
-  'Telangana — Boards of Indian Medicines, Telangana',
-  'Tripura — Council of Homoeopathic Medicine, Tripura',
-  'Uttar Pradesh — Homoeopathic Medicine Board, Uttar Pradesh',
-  'Uttarakhand — Homoeopathic Medicine Board, Uttarakhand',
-  'West Bengal — Council of Homoeopathic Medicine, West Bengal',
-  'National — National Commission for Homoeopathy (National Register)',
-  'National (legacy) — Central Council of Homoeopathy (pre-2020)',
+  'Andhra Pradesh: Andhra Boards for Ayurveda and Homoeopathy',
+  'Arunachal Pradesh: Arunachal Pradesh Homoeopathy Council',
+  'Assam: Board of Homoeopathic System of Medicine, Assam',
+  'Bihar: Bihar Homoeopathic Board of Medicine',
+  'Chandigarh (UT): Council of Homoeopathic System of Medicine, Chandigarh',
+  'Chhattisgarh: State Council of Homoeopathy, Chhattisgarh',
+  'Delhi: Board of Homoeopathic System of Medicine, Delhi',
+  'Goa: Goa Board of Indian System of Medicine & Homoeopathy',
+  'Gujarat: Council of Homoeopathic System of Medicine, Gujarat State',
+  'Haryana: Council of Homoeopathic System of Medicine, Haryana',
+  'Jammu & Kashmir: Jammu & Kashmir Board of Homoeopathic System of Medicine',
+  'Jharkhand: Jharkhand State AYUSH Medical Council',
+  'Karnataka: Karnataka Board of Homoeopathic System of Medicine',
+  'Kerala: Kerala State Medical Council',
+  'Madhya Pradesh: State Council of Homoeopathy, Madhya Pradesh',
+  'Maharashtra: Maharashtra Council of Homoeopathy',
+  'Meghalaya: Board of Homoeopathic Medicine, Meghalaya',
+  'Nagaland: Board of Homoeopathic System of Medicine, Nagaland',
+  'Odisha: Directorate of AYUSH, Odisha (registering authority)',
+  'Punjab: Council of Homoeopathic System of Medicine, Punjab',
+  'Rajasthan: Rajasthan Board of Homoeopathic Chikitsa Board',
+  'Tamil Nadu: Tamil Nadu Homoeopathic Medical Council',
+  'Telangana: Boards of Indian Medicines, Telangana',
+  'Tripura: Council of Homoeopathic Medicine, Tripura',
+  'Uttar Pradesh: Homoeopathic Medicine Board, Uttar Pradesh',
+  'Uttarakhand: Homoeopathic Medicine Board, Uttarakhand',
+  'West Bengal: Council of Homoeopathic Medicine, West Bengal',
+  'National: National Commission for Homoeopathy (National Register)',
+  'National (legacy): Central Council of Homoeopathy (pre-2020)',
 ];
 const OTHER_LABEL = 'Other (type manually)';
 const SYNTHETIC_OTHER = 'Test Council for Sikkim';
@@ -297,12 +303,10 @@ describe('SetupWizard registration council dropdown (HC-MVP1-M3set)', () => {
     const labels = listedOptionLabels(control);
     expect(labels).toHaveLength(30);
     expect(labels).toEqual([...VERIFIED_COUNCILS, OTHER_LABEL]);
+    expect(labels).toContain('Maharashtra: Maharashtra Council of Homoeopathy');
+    expect(labels).toContain('Kerala: Kerala State Medical Council');
     expect(labels).toContain(
-      'Maharashtra — Maharashtra Council of Homoeopathy',
-    );
-    expect(labels).toContain('Kerala — Kerala State Medical Council');
-    expect(labels).toContain(
-      'Odisha — Directorate of AYUSH, Odisha (registering authority)',
+      'Odisha: Directorate of AYUSH, Odisha (registering authority)',
     );
     expect(labels.at(-1)).toBe(OTHER_LABEL);
     // Not confirmed by the source: must not be offered.
@@ -329,8 +333,8 @@ describe('SetupWizard registration council dropdown (HC-MVP1-M3set)', () => {
   });
 
   it.each([
-    'Odisha — Directorate of AYUSH, Odisha (registering authority)',
-    'National — National Commission for Homoeopathy (National Register)',
+    'Odisha: Directorate of AYUSH, Odisha (registering authority)',
+    'National: National Commission for Homoeopathy (National Register)',
   ])(
     'stores the chosen listed label verbatim in the doctor profile: %s',
     async (label) => {
@@ -419,13 +423,13 @@ describe('SetupWizard registration council dropdown (HC-MVP1-M3set)', () => {
       screen.getByTestId('setup-doctor-council-other'),
       SYNTHETIC_OTHER,
     );
-    await user.selectOptions(control, 'Kerala — Kerala State Medical Council');
+    await user.selectOptions(control, 'Kerala: Kerala State Medical Council');
     expect(
       screen.queryByTestId('setup-doctor-council-other'),
     ).not.toBeInTheDocument();
     await user.click(screen.getByTestId('setup-next'));
 
-    expect(savedCouncil()).toBe('Kerala — Kerala State Medical Council');
+    expect(savedCouncil()).toBe('Kerala: Kerala State Medical Council');
   });
 
   // Re-open path. The wizard has no profile pre-fill (SetupState carries no
@@ -467,7 +471,7 @@ describe('SetupWizard registration council dropdown (HC-MVP1-M3set)', () => {
     expect(control).toHaveRole('combobox');
     await user.selectOptions(
       control,
-      'Maharashtra — Maharashtra Council of Homoeopathy',
+      'Maharashtra: Maharashtra Council of Homoeopathy',
     );
     await user.click(screen.getByTestId('setup-next'));
     await screen.findByTestId('setup-clinic-name');
@@ -475,7 +479,7 @@ describe('SetupWizard registration council dropdown (HC-MVP1-M3set)', () => {
     await user.click(screen.getByTestId('setup-back'));
 
     expect(councilControl()).toHaveDisplayValue(
-      'Maharashtra — Maharashtra Council of Homoeopathy',
+      'Maharashtra: Maharashtra Council of Homoeopathy',
     );
     expect(
       screen.queryByTestId('setup-doctor-council-other'),

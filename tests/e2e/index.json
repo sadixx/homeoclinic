@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-01T16:55:42.719Z",
+  "generatedAt": "2026-11-01T23:45:44.452Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -77,6 +77,19 @@
       ]
     },
     {
+      "path": "tests/e2e/specs/case/case-load-gate.e2e.ts",
+      "reqs": [
+        "CASE-001",
+        "CASE-003",
+        "CASE-005"
+      ],
+      "tier": "stable",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
       "path": "tests/e2e/specs/case/case-rich-editor.e2e.ts",
       "reqs": [
         "CASE-001",
@@ -112,6 +125,21 @@
         "CASE-003",
         "CASE-005",
         "VIS-001"
+      ],
+      "tier": "stable",
+      "area": "case",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/case/case-rwv6.e2e.ts",
+      "reqs": [
+        "CASE-001",
+        "CASE-003",
+        "VIS-001",
+        "PAT-005",
+        "PAT-009"
       ],
       "tier": "stable",
       "area": "case",
@@ -251,6 +279,18 @@
         "SET-002"
       ],
       "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/setup/setup-rwv6.e2e.ts",
+      "reqs": [
+        "SET-002",
+        "SET-003"
+      ],
+      "tier": "stable",
       "area": "settings",
       "targets": [
         "linux"

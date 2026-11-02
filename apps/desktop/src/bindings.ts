@@ -832,9 +832,9 @@ export type OpenOrCreateResponse = {
 };
 
 /**
- *  The single patient dashboard payload (PAT-005). For R2 the visits list is
- *  empty, `last_prescription` is `None` and `dues_paise` is 0 (visits/Rx/billing
- *  are R3/R4/R5, R-DEL-002); demographics, alerts and family are REAL.
+ *  The single patient dashboard payload (PAT-005): demographics, alerts,
+ *  family, the visit timeline and the last prescription (an R4 preview) are
+ *  REAL; `dues_paise` is 0 (billing is R5, R-DEL-002).
  */
 export type PatientDashboard = {
 	/**  Real demographics. */
@@ -845,9 +845,9 @@ export type PatientDashboard = {
 	alerts: string | null,
 	/**  Outstanding dues, integer paise. ALWAYS 0 for R2 (billing is R5). */
 	duesPaise: number,
-	/**  Visit timeline (newest first). ALWAYS empty for R2. */
+	/**  Visit timeline (newest first), non-deleted visits, bounded. */
 	visits: VisitSummary[],
-	/**  Most recent prescription. ALWAYS `None` for R2. */
+	/**  Latest recorded prescription (R4 preview), or `None`. */
 	lastPrescription: RxSummary | null,
 	/**  Linked family (REAL, PAT-006). */
 	family: FamilyMember[],
@@ -1054,9 +1054,12 @@ export type RubricSearchPrefillResponse = {
 	available: boolean,
 };
 
-/**  Last-prescription card (PAT-005). R4+; `None` for R2. */
+/**
+ *  Last-prescription card (PAT-005). Until the R4 Rx engine, a PREVIEW built
+ *  from the newest visit whose case document holds a prescription table.
+ */
 export type RxSummary = {
-	/**  Prescription id. */
+	/**  Prescription id. R4 preview: the id of the visit it was read from. */
 	prescriptionId: string,
 	/**  RFC3339 printed instant, or `None`. */
 	printedAt: string | null,
@@ -1468,15 +1471,18 @@ export type VerifyBackupResponse = {
 	decryptOk: boolean,
 };
 
-/**  A visit timeline entry (PAT-005). R3+; EMPTY list for R2. */
+/**  A visit timeline entry (PAT-005): one saved visit of the patient. */
 export type VisitSummary = {
 	/**  Visit id. */
 	visitId: string,
 	/**  RFC3339 visit instant. */
 	visitAt: string,
-	/**  Visit kind label. */
+	/**
+	 *  Visit type code (`first | follow_up | acute | tele`); the UI shows a
+	 *  readable label.
+	 */
 	kind: string,
-	/**  Headline remedy label, or `None`. */
+	/**  Headline remedy label, or `None` (the Rx engine is R4). */
 	headlineRemedyLabel: string | null,
 };
 

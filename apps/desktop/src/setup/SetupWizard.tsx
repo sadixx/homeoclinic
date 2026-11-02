@@ -28,6 +28,13 @@ import { parseRupeesToPaise } from '@/shared/money';
 import { t } from '@/shared/strings';
 
 import {
+  ClinicTimingsInput,
+  timingsBoxesFor,
+  validateTimings,
+} from './ClinicTimingsInput';
+import type { TimingsBoxes } from './ClinicTimingsInput';
+import type { ClinicSession } from './clinicTimings';
+import {
   REGISTRATION_COUNCIL_LABELS,
   councilSelectionFor,
 } from './registrationCouncils';
@@ -113,9 +120,17 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
   // Step 2 — clinic.
   const [clinicName, setClinicName] = useState('');
   const [clinicAddress, setClinicAddress] = useState('');
-  const [clinicPhone, setClinicPhone] = useState('');
+  // The clinic phone is not asked separately (M3-RWv6 item 2): the Step-1
+  // phone is saved as both the doctor and the clinic phone.
   const [clinicGstin, setClinicGstin] = useState('');
-  const [clinicTimings, setClinicTimings] = useState('');
+  // Clinic timings (M3-RWv6 item 3): Morning / Evening clock boxes, seeded
+  // from the stored string (a legacy free-text value stays readable as text).
+  // The wizard has no stored profile to pre-fill yet, so the seed is empty.
+  const [clinicTimings, setClinicTimings] = useState<TimingsBoxes>(() =>
+    timingsBoxesFor(''),
+  );
+  const [timingsSession, setTimingsSession] =
+    useState<ClinicSession>('morning');
   const [feeFirst, setFeeFirst] = useState('');
   const [feeFollowup, setFeeFollowup] = useState('');
 
@@ -217,12 +232,21 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
       if (firstBad) setErrors({ [firstBad[0]]: firstBad[2] });
       return false;
     }
+    const timings = validateTimings(clinicTimings);
+    if (Object.keys(timings.errors).length > 0) {
+      setErrors({ ...timings.errors });
+      // Bring the session holding the first error forward so it is seen.
+      if (timings.firstErrorSession !== null)
+        setTimingsSession(timings.firstErrorSession);
+      return false;
+    }
     await run(
       commands.setupSaveClinicProfile({
         name: clinicName.trim(),
         address: clinicAddress.trim(),
-        phone: clinicPhone.trim() === '' ? null : clinicPhone.trim(),
-        timings: clinicTimings.trim() === '' ? null : clinicTimings.trim(),
+        // Asked once on Step 1 and saved as the clinic phone too.
+        phone: docPhone.trim() === '' ? null : docPhone.trim(),
+        timings: timings.value,
         feeFirstPaise,
         feeFollowupPaise,
         gstin: clinicGstin.trim() === '' ? null : clinicGstin.trim(),
@@ -232,7 +256,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
   }, [
     clinicName,
     clinicAddress,
-    clinicPhone,
+    docPhone,
     clinicTimings,
     clinicGstin,
     feeFirst,
@@ -608,26 +632,18 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
               { required: true, inputMode: 'numeric' },
             )}
             {field(
-              'setup-clinic-phone',
-              t('setup.clinic.phone'),
-              clinicPhone,
-              setClinicPhone,
-              {
-                inputMode: 'numeric',
-              },
-            )}
-            {field(
               'setup-clinic-gstin',
               t('setup.clinic.gstin'),
               clinicGstin,
               setClinicGstin,
             )}
-            {field(
-              'setup-clinic-timings',
-              t('setup.clinic.timings'),
-              clinicTimings,
-              setClinicTimings,
-            )}
+            <ClinicTimingsInput
+              value={clinicTimings}
+              onChange={setClinicTimings}
+              activeSession={timingsSession}
+              onActiveSessionChange={setTimingsSession}
+              errors={errors}
+            />
           </>
         ) : null}
 

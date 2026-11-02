@@ -41,6 +41,7 @@ import {
   removeComplaint,
   removeEntry,
   sanitizeDisplayLabel,
+  sectionLabelFor,
   serializeRich,
   type ProseMirrorNode,
   type RichTableType,
@@ -57,15 +58,20 @@ import {
   initialContent,
   insertComplaint,
   insertDatedEntry,
+  removeTableRowAt,
   selectionIsOnComplaintHeading,
   setEditorSpine,
+  tableRowPos,
+  tableStructure,
   unlinkInvestigationRow,
   v3DocFromEditor,
   type ComplaintStructure,
+  type TableStructure,
 } from '@/case/caseRichEditor';
 import { isUserFacingError, run } from '@/shared/command';
 import { formatDate, formatDateTime, todayIsoDate } from '@/shared/datetime';
 import { t } from '@/shared/strings';
+import type { StringKey } from '@/shared/strings';
 
 // The legacy v2->* upcast now lives in caseRich (parseCaseDoc). It is re-exported
 // here for continuity with callers/tests that imported it alongside the
@@ -184,6 +190,18 @@ export function CaseForm({
   const [linkRows, setLinkRows] = useState<
     { attachmentId: string; label: string }[]
   >([]);
+  // M3-RWv6 item 4: the report opened in one click from its link row.
+  const [linkPreview, setLinkPreview] = useState<AttachmentPreview | null>(
+    null,
+  );
+  const [linkOpenError, setLinkOpenError] = useState<string | null>(null);
+  // M3-RWv6 item 6: the inserted tables (doc order) for the per-row delete
+  // controls, and the pending row-delete confirmation.
+  const [tables, setTables] = useState<TableStructure[]>([]);
+  const [rowDeleteTarget, setRowDeleteTarget] = useState<{
+    readonly tableNo: number;
+    readonly rowIndex: number;
+  } | null>(null);
   // DEFECT 1 (M3-RWv4 build-12): is the caret on a complaint heading? When true
   // the bullet/ordered toolbar buttons are disabled (and the toggles no-op) so a
   // complaint heading can NEVER be wrapped into a list item and lost.
@@ -261,6 +279,7 @@ export function CaseForm({
     if (ed === null) return;
     setStructure(caseStructure(ed));
     setLinkRows(collectLinkRows(editorSpine(ed)));
+    setTables(tableStructure(ed));
     setListGuarded(selectionIsOnComplaintHeading(ed));
   }, []);
 
@@ -302,7 +321,16 @@ export function CaseForm({
     },
     [doc !== null],
   );
-  editorRef.current = editor;
+  // M3-RWv6 flake fix: useEditor swaps the pre-load (empty) instance for the
+  // loaded one in a passive effect AFTER the commit that first sees `doc`. If
+  // the scheduler yields in between, that commit would show a live form backed
+  // by the EMPTY editor, so a click/blur there would save an empty case over
+  // the real one. Remember the pre-load instance and treat it as not ready.
+  const preloadEditorRef = useRef<Editor | null>(null);
+  if (doc === null) preloadEditorRef.current = editor;
+  const editorStale =
+    doc !== null && editor !== null && editor === preloadEditorRef.current;
+  editorRef.current = editorStale ? null : editor;
 
   // Populate the remove-control structure once the editor mounts (onCreate may
   // fire before editorRef is assigned on the first render).
@@ -310,6 +338,7 @@ export function CaseForm({
     if (editor !== null) {
       setStructure(caseStructure(editor));
       setLinkRows(collectLinkRows(editorSpine(editor)));
+      setTables(tableStructure(editor));
     }
   }, [editor]);
 
@@ -514,6 +543,39 @@ export function CaseForm({
     void flushSave();
   }, [unlinkTarget, flushSave, refreshStructure]);
 
+  // M3-RWv6 item 6: confirmed delete of one data row of an inserted table, as
+  // ONE editor transaction at the row's REAL ProseMirror position. Deleting the
+  // last data row removes the table with its section heading and rule.
+  const onConfirmRowDelete = useCallback((): void => {
+    const ed = editorRef.current;
+    const target = rowDeleteTarget;
+    if (ed === null || target === null) return;
+    setRowDeleteTarget(null);
+    const pos = tableRowPos(ed, target.tableNo, target.rowIndex);
+    if (pos === null || !removeTableRowAt(ed, pos)) return;
+    refreshStructure();
+    void flushSave();
+  }, [rowDeleteTarget, flushSave, refreshStructure]);
+
+  // M3-RWv6 item 4: one click on a link row opens that report in the same
+  // in-app preview as the Lab reports panel (typed command only, no path).
+  const onOpenLinkedReport = useCallback(
+    async (attachmentId: string): Promise<void> => {
+      setLinkOpenError(null);
+      try {
+        const res = await run(commands.visitOpenAttachment({ attachmentId }));
+        setLinkPreview({
+          url: `data:${res.mime};base64,${res.dataBase64}`,
+          name: res.originalName ?? '',
+          isImage: isImageMime(res.mime),
+        });
+      } catch (e) {
+        setLinkOpenError(attachmentErrorMessage(e));
+      }
+    },
+    [],
+  );
+
   // D5 (M3-RWv4 §5.2a/§5.5): a Submitted UPLOAD — pick a file, attach it with a
   // composed display-ONLY label `<investigation>-<date>` (patient name is set
   // backend-side so the UI does not shuttle PII; the label is sanitised and
@@ -585,7 +647,8 @@ export function CaseForm({
     );
   }
 
-  if (doc === null) {
+  // Keep the loading state until the editor holding the loaded case exists.
+  if (doc === null || editorStale) {
     return (
       <section
         data-testid="case-form-loading"
@@ -708,22 +771,52 @@ export function CaseForm({
                 return (
                   <li
                     key={`${lr.attachmentId}-${n}`}
-                    className="flex items-center justify-between gap-2 rounded border border-slate-200 px-2 py-1 text-xs"
+                    className="flex items-center justify-between gap-2 rounded border border-slate-200 px-2 py-1 text-sm"
                   >
                     <span className="min-w-0 truncate">{lr.label}</span>
-                    <button
-                      type="button"
-                      data-testid={`case-form-investigation-unlink-${n}`}
-                      onClick={() => setUnlinkTarget(lr.attachmentId)}
-                      className="flex-none rounded border border-slate-300 px-2 py-0.5 text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    >
-                      {t('case.form.investigations.unlink')}
-                    </button>
+                    <span className="flex flex-none items-center gap-2">
+                      <button
+                        type="button"
+                        data-testid={`case-form-investigation-open-${n}`}
+                        aria-label={`${t('case.form.investigations.open')}: ${lr.label}`}
+                        onClick={() => void onOpenLinkedReport(lr.attachmentId)}
+                        className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      >
+                        {t('case.form.investigations.open')}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`case-form-investigation-unlink-${n}`}
+                        onClick={() => setUnlinkTarget(lr.attachmentId)}
+                        className="rounded border border-slate-300 px-2 py-0.5 text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      >
+                        {t('case.form.investigations.unlink')}
+                      </button>
+                    </span>
                   </li>
                 );
               })}
             </ul>
           ) : null}
+          {linkOpenError !== null ? (
+            <p
+              role="alert"
+              data-testid="case-form-investigation-open-error"
+              className="mb-2 text-sm text-red-700"
+            >
+              {linkOpenError}
+            </p>
+          ) : null}
+
+          {/* M3-RWv6 item 6: a delete control per DATA row of every inserted
+              table (header rows have none), as a React overlay keyed to the
+              live doc (NOT an editable doc node). Each opens a confirm. */}
+          <TableRowControls
+            tables={tables}
+            onDelete={(tableNo, rowIndex) =>
+              setRowDeleteTarget({ tableNo, rowIndex })
+            }
+          />
           {/* The single WYSIWYG notepad. A7 (M3-RWv4 §7): the editor is a
               BOUNDED, internally-scrolling region — `flex-1 min-h-0
               overflow-y-auto` inside the `flex h-full min-h-0 flex-col` content
@@ -927,6 +1020,30 @@ export function CaseForm({
         />
       ) : null}
 
+      {/* M3-RWv6 item 6: the row-delete confirm. Escape cancels. */}
+      {rowDeleteTarget !== null ? (
+        <ConfirmDialog
+          testId="case-form-table-row-delete-dialog"
+          title={t('case.form.tableRow.delete.title')}
+          body={t('case.form.tableRow.delete.body')}
+          confirmLabel={t('case.form.tableRow.delete.confirm')}
+          cancelLabel={t('case.form.tableRow.delete.cancel')}
+          cancelTestId="case-form-table-row-delete-cancel"
+          confirmTestId="case-form-table-row-delete-confirm"
+          onCancel={() => setRowDeleteTarget(null)}
+          onConfirm={onConfirmRowDelete}
+        />
+      ) : null}
+
+      {/* M3-RWv6 item 4: preview of a report opened from its link row. */}
+      {linkPreview !== null ? (
+        <AttachmentPreviewDialog
+          testId="case-form-investigation-preview"
+          preview={linkPreview}
+          onClose={() => setLinkPreview(null)}
+        />
+      ) : null}
+
       {/* D5 (M3-RWv4 §5.6): the UNLINK confirm dialog — removes the link row
           only; the attachment file is NOT deleted. */}
       {unlinkTarget !== null ? (
@@ -1102,6 +1219,61 @@ function RemoveControls({
           >
             {t('case.form.remove.icon')} {n}
           </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * M3-RWv6 item 6: one delete control per DATA row of every inserted table
+ * (`case-form-table-row-delete-<t>-<r>`, t = 1-based doc-order table, r =
+ * 1-based data row). The header row has no control. Grouped per table and
+ * labelled with the table's section name and row number.
+ */
+function TableRowControls({
+  tables,
+  onDelete,
+}: {
+  readonly tables: readonly TableStructure[];
+  readonly onDelete: (tableNo: number, rowIndex: number) => void;
+}): JSX.Element | null {
+  if (!tables.some((tb) => tb.dataRows > 0)) return null;
+  return (
+    <div
+      data-testid="case-form-table-row-controls"
+      className="mb-2 flex flex-none flex-col gap-1 text-sm"
+    >
+      {tables.map((tb, index) => {
+        const tableNo = index + 1;
+        if (tb.dataRows === 0) return null;
+        const label = sectionLabelFor(tb.kind);
+        return (
+          <div
+            key={`table-${tableNo}`}
+            role="group"
+            aria-label={`${t('case.form.tableRow.group')}: ${label}`}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span className="text-slate-700">{label}</span>
+            {Array.from({ length: tb.dataRows }, (_v, i) => {
+              const rowNo = i + 1;
+              return (
+                <button
+                  key={`row-${tableNo}-${rowNo}`}
+                  type="button"
+                  data-testid={`case-form-table-row-delete-${tableNo}-${rowNo}`}
+                  aria-label={`${t('case.form.tableRow.delete')} ${rowNo}: ${label}`}
+                  title={t('case.form.tableRow.delete')}
+                  onClick={() => onDelete(tableNo, rowNo)}
+                  className="rounded border border-slate-300 px-2 py-0.5 text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  {t('case.form.remove.icon')} {t('case.form.tableRow.row')}{' '}
+                  {rowNo}
+                </button>
+              );
+            })}
+          </div>
         );
       })}
     </div>
@@ -1758,7 +1930,36 @@ function ModalitiesPopup({
   );
 }
 
-/** Record physical generals: key/value rows. */
+/**
+ * Physical generals popup fields (M3-RWv6 item 8), exactly and in this order.
+ * `yesNo` fields are a Yes/No select; every other field is free text.
+ */
+const GENERALS_FIELDS: ReadonlyArray<{
+  readonly id: string;
+  readonly label: StringKey;
+  readonly yesNo?: true;
+}> = [
+  { id: 'appetite', label: 'case.form.generals.appetite' },
+  { id: 'thirst', label: 'case.form.generals.thirst' },
+  { id: 'thermal', label: 'case.form.generals.thermal' },
+  { id: 'constitution', label: 'case.form.generals.constitution' },
+  { id: 'diet', label: 'case.form.generals.diet' },
+  { id: 'cravings', label: 'case.form.generals.cravings' },
+  { id: 'aversions', label: 'case.form.generals.aversions' },
+  { id: 'urine', label: 'case.form.generals.urine' },
+  { id: 'stool', label: 'case.form.generals.stool' },
+  { id: 'perspiration', label: 'case.form.generals.perspiration' },
+  {
+    id: 'sun-aggravation',
+    label: 'case.form.generals.sunAggravation',
+    yesNo: true,
+  },
+  { id: 'sleep', label: 'case.form.generals.sleep' },
+  { id: 'dreams', label: 'case.form.generals.dreams' },
+  { id: 'sleep-position', label: 'case.form.generals.sleepPosition' },
+];
+
+/** Record physical generals: one Field|Value row per filled field. */
 function GeneralsPopup({
   onCancel,
   onRecord,
@@ -1766,33 +1967,32 @@ function GeneralsPopup({
   readonly onCancel: () => void;
   readonly onRecord: (seed: TableSeed) => void;
 }): JSX.Element {
-  const [appetite, setAppetite] = useState('');
-  const [thirst, setThirst] = useState('');
-  const [thermal, setThermal] = useState('');
-  const [notes, setNotes] = useState('');
+  const [values, setValues] = useState<Readonly<Record<string, string>>>({});
+
+  const setValue = useCallback((id: string, value: string): void => {
+    setValues((prev) => ({ ...prev, [id]: value }));
+  }, []);
 
   const record = useCallback((): void => {
     const rows: string[][] = [];
-    const push = (label: string, value: string): void => {
-      if (value.trim() !== '') rows.push([label, value]);
-    };
-    push(t('case.form.generals.appetite'), appetite);
-    push(t('case.form.generals.thirst'), thirst);
-    push(t('case.form.generals.thermal'), thermal);
-    push(t('case.form.generals.notes'), notes);
+    for (const f of GENERALS_FIELDS) {
+      const value = values[f.id] ?? '';
+      if (value.trim() !== '') rows.push([t(f.label), value]);
+    }
     if (rows.length === 0) rows.push(['', '']);
     onRecord({
       hcTableType: 'physical_generals',
       columns: [t('case.form.generals.field'), t('case.form.generals.value')],
       rows,
     });
-  }, [onRecord, appetite, thirst, thermal, notes]);
+  }, [onRecord, values]);
 
   return (
     <Dialog
       testId="case-form-generals-popup"
       title={t('case.form.generals.popupTitle')}
       onCancel={onCancel}
+      width="40rem"
       footer={
         <DialogFooter
           cancelTestId="case-form-record-generals-cancel"
@@ -1802,33 +2002,63 @@ function GeneralsPopup({
         />
       }
     >
-      <div className="flex flex-col gap-2">
-        <TextField
-          testId="case-generals-appetite"
-          label={t('case.form.generals.appetite')}
-          value={appetite}
-          onChange={setAppetite}
-        />
-        <TextField
-          testId="case-generals-thirst"
-          label={t('case.form.generals.thirst')}
-          value={thirst}
-          onChange={setThirst}
-        />
-        <TextField
-          testId="case-generals-thermal"
-          label={t('case.form.generals.thermal')}
-          value={thermal}
-          onChange={setThermal}
-        />
-        <TextField
-          testId="case-generals-notes"
-          label={t('case.form.generals.notes')}
-          value={notes}
-          onChange={setNotes}
-        />
+      <div className="grid grid-cols-2 gap-2">
+        {GENERALS_FIELDS.map((f) =>
+          f.yesNo === true ? (
+            <YesNoField
+              key={f.id}
+              testId={`case-generals-${f.id}`}
+              label={t(f.label)}
+              value={values[f.id] ?? ''}
+              onChange={(v) => setValue(f.id, v)}
+            />
+          ) : (
+            <TextField
+              key={f.id}
+              testId={`case-generals-${f.id}`}
+              label={t(f.label)}
+              value={values[f.id] ?? ''}
+              onChange={(v) => setValue(f.id, v)}
+            />
+          ),
+        )}
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * A labelled Yes/No select used inside popups (M3-RWv6 item 8). The stored
+ * value is the visible Yes / No text; '' means not recorded.
+ */
+function YesNoField({
+  testId,
+  label,
+  value,
+  onChange,
+}: {
+  readonly testId: string;
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+}): JSX.Element {
+  const yes = t('case.form.generals.yes');
+  const no = t('case.form.generals.no');
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-sm font-medium text-slate-600">{label}</span>
+      <select
+        data-testid={testId}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={label}
+        className="input"
+      >
+        <option value="">{t('case.form.generals.notRecorded')}</option>
+        <option value={yes}>{yes}</option>
+        <option value={no}>{no}</option>
+      </select>
+    </label>
   );
 }
 
@@ -2193,11 +2423,7 @@ function InvestigationsPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{
-    url: string;
-    name: string;
-    isImage: boolean;
-  } | null>(null);
+  const [preview, setPreview] = useState<AttachmentPreview | null>(null);
 
   const reload = useCallback(async (): Promise<void> => {
     const res = await run(commands.visitListAttachments({ visitId }));
@@ -2433,50 +2659,80 @@ function InvestigationsPanel({
       ) : null}
 
       {preview !== null ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={preview.name}
-          data-testid="case-form-investigations-preview"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setPreview(null);
-          }}
-        >
-          <div className="flex max-h-[85vh] w-[48rem] flex-col rounded border border-slate-300 bg-white shadow-lg">
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
-              <h2 className="truncate text-sm font-semibold">{preview.name}</h2>
-              <button
-                type="button"
-                data-testid="case-form-investigations-preview-close"
-                onClick={() => setPreview(null)}
-                className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                {t('case.form.investigations.remove.cancel')}
-              </button>
-            </div>
-            <div className="overflow-auto p-4">
-              {preview.isImage ? (
-                <img
-                  data-testid="case-form-investigations-preview-image"
-                  src={preview.url}
-                  alt={preview.name}
-                  className="mx-auto max-h-[70vh] max-w-full"
-                />
-              ) : (
-                <a
-                  data-testid="case-form-investigations-preview-download"
-                  href={preview.url}
-                  download={preview.name}
-                  className="inline-block rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-700"
-                >
-                  {t('case.form.investigations.download')}
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
+        <AttachmentPreviewDialog
+          testId="case-form-investigations-preview"
+          preview={preview}
+          onClose={() => setPreview(null)}
+        />
       ) : null}
+    </div>
+  );
+}
+
+/** An opened attachment ready for the in-app preview (data URL, no path). */
+interface AttachmentPreview {
+  readonly url: string;
+  readonly name: string;
+  readonly isImage: boolean;
+}
+
+/**
+ * The in-app attachment preview (image inline, PDF behind "Save to open"),
+ * shared by the Lab reports panel and the one-click Open on an investigation
+ * link row (M3-RWv6 item 4). role=dialog named by the file; Escape closes.
+ */
+function AttachmentPreviewDialog({
+  testId,
+  preview,
+  onClose,
+}: {
+  readonly testId: string;
+  readonly preview: AttachmentPreview;
+  readonly onClose: () => void;
+}): JSX.Element {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={preview.name}
+      data-testid={testId}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+    >
+      <div className="flex max-h-[85vh] w-[48rem] flex-col rounded border border-slate-300 bg-white shadow-lg">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
+          <h2 className="truncate text-sm font-semibold">{preview.name}</h2>
+          <button
+            type="button"
+            data-testid={`${testId}-close`}
+            onClick={() => onClose()}
+            className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            {t('case.form.investigations.remove.cancel')}
+          </button>
+        </div>
+        <div className="overflow-auto p-4">
+          {preview.isImage ? (
+            <img
+              data-testid={`${testId}-image`}
+              src={preview.url}
+              alt={preview.name}
+              className="mx-auto max-h-[70vh] max-w-full"
+            />
+          ) : (
+            <a
+              data-testid={`${testId}-download`}
+              href={preview.url}
+              download={preview.name}
+              className="inline-block rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-700"
+            >
+              {t('case.form.investigations.download')}
+            </a>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

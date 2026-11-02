@@ -567,8 +567,16 @@ describe('AppShell', () => {
       fireEvent.change(screen.getByTestId('setup-doctor-regno'), {
         target: { value: 'REG-0001' },
       });
-      fireEvent.change(screen.getByTestId('setup-doctor-council'), {
-        target: { value: 'Maharashtra — Maharashtra Council of Homoeopathy' },
+      // Chosen by option text so the flow does not depend on the council
+      // label format (M3-RWv6 item 1 changed it to "<State>: <Authority>").
+      const council = screen.getByTestId(
+        'setup-doctor-council',
+      ) as HTMLSelectElement;
+      const maharashtra = Array.from(council.options).find((o) =>
+        (o.textContent ?? '').startsWith('Maharashtra'),
+      );
+      fireEvent.change(council, {
+        target: { value: maharashtra?.value ?? '' },
       });
       await user.click(screen.getByTestId('setup-next'));
 

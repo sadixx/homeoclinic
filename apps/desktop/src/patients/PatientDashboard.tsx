@@ -5,9 +5,11 @@
 // SQL or raw filesystem paths). Every control / asserted value carries its
 // spec data-testid (R-UI-003); all visible text comes from en.json (R-UI-007).
 //
-// R2 slice (R-DEL-002): the visit timeline is HONEST-EMPTY (0 visits), the
-// last-prescription card shows its honest-empty note, the dues badge shows
-// Rs 0 (billing is R5), and the four consultation quick buttons (New visit /
+// The visit timeline lists the saved visits newest first with a readable
+// type, the last visit date is shown above it, and the last-prescription card
+// shows the latest recorded prescription labelled as an R4 PREVIEW (M3-RWv6
+// item 9; honest-empty text when none). The dues badge shows Rs 0 (billing is
+// R5, R-DEL-002), and the four consultation quick buttons (New visit /
 // Repertorise / Prescribe / Bill) are HIDDEN — not disabled — so there is no
 // dead end (ADR-0002 point 5). Demographics, alerts, family, recycle-bin
 // (soft-delete + restore) and export (PDF/JSON) are REAL.
@@ -26,6 +28,21 @@ import { formatMobile } from '@/shared/mobile';
 import { formatPaise } from '@/shared/money';
 import { PatientAvatar, avatarKindForSex } from '@/shared/PatientAvatar';
 import { t } from '@/shared/strings';
+import type { StringKey } from '@/shared/strings';
+
+/** Readable label key per stored visit type code (never show the code). */
+const VISIT_TYPE_LABEL: Readonly<Record<string, StringKey>> = {
+  first: 'followup.type.first',
+  follow_up: 'followup.type.followup',
+  acute: 'followup.type.acute',
+  tele: 'followup.type.tele',
+};
+
+/** The readable label of a visit type code. */
+function visitTypeLabel(kind: string): string {
+  const key = VISIT_TYPE_LABEL[kind];
+  return key === undefined ? t('patient.dash.visits.otherType') : t(key);
+}
 
 export interface PatientDashboardProps {
   /** The patient to show. */
@@ -421,11 +438,20 @@ export function PatientDashboard({
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
-        {/* Visit timeline — HONEST-EMPTY at R2 */}
+        {/* Visit timeline, newest first (M3-RWv6 item 9). */}
         <div>
           <h2 className="mb-1 text-xs font-semibold uppercase text-slate-500">
             {t('patient.dash.visits.title')}
           </h2>
+          {data.visits[0] !== undefined ? (
+            <p
+              data-testid="patient-dash-last-visit"
+              className="mb-1 text-sm text-slate-700"
+            >
+              {t('patient.dash.lastVisit')}{' '}
+              {formatDate(data.visits[0].visitAt) ?? t('common.none')}
+            </p>
+          ) : null}
           <div
             data-testid="patient-dash-timeline"
             className="rounded border border-slate-200"
@@ -443,7 +469,9 @@ export function PatientDashboard({
                     className="flex items-center justify-between border-b border-slate-100 px-3 py-2 last:border-0"
                   >
                     <span>{formatDate(v.visitAt) ?? t('common.none')}</span>
-                    <span className="text-slate-600">{v.kind}</span>
+                    <span className="text-slate-600">
+                      {visitTypeLabel(v.kind)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -452,7 +480,7 @@ export function PatientDashboard({
         </div>
 
         <div className="flex flex-col gap-4">
-          {/* Last prescription — honest-empty at R2 */}
+          {/* Last prescription: the latest recorded one, an R4 preview. */}
           <div>
             <h2 className="mb-1 text-xs font-semibold uppercase text-slate-500">
               {t('patient.dash.lastRx.title')}
@@ -461,9 +489,25 @@ export function PatientDashboard({
               data-testid="patient-dash-last-rx"
               className="rounded border border-slate-200 p-3 text-sm text-slate-500"
             >
-              {data.lastPrescription === null
-                ? t('patient.dash.lastRx.none')
-                : data.lastPrescription.itemsPreview}
+              {data.lastPrescription === null ? (
+                t('patient.dash.lastRx.none')
+              ) : (
+                <>
+                  <p
+                    data-testid="patient-dash-last-rx-items"
+                    className="text-slate-900"
+                  >
+                    {data.lastPrescription.itemsPreview}
+                  </p>
+                  <p
+                    data-testid="patient-dash-last-rx-preview"
+                    role="note"
+                    className="mt-1 rounded bg-amber-50 px-2 py-1 text-sm text-amber-800"
+                  >
+                    {t('patient.dash.lastRx.previewNote')}
+                  </p>
+                </>
+              )}
             </div>
           </div>
 

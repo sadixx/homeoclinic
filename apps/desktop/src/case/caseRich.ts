@@ -266,6 +266,27 @@ function sectionLabel(kind: RichTableType): string {
   return t(key);
 }
 
+/** Record kinds that have a `case.section.label.<kind>` string. */
+const LABELLED_KINDS: ReadonlySet<string> = new Set<RichTableType>([
+  'vitals',
+  'modalities',
+  'family_history',
+  'physical_generals',
+  'investigations',
+  'prescription',
+]);
+
+/**
+ * The display label of a table's `hcTableType` (M3-RWv6 item 6, row-delete
+ * controls): the section label for a known kind, else the generic label.
+ */
+export function sectionLabelFor(kind: string | null): string {
+  if (kind !== null && LABELLED_KINDS.has(kind)) {
+    return sectionLabel(kind as RichTableType);
+  }
+  return t('case.section.label.generic');
+}
+
 /**
  * The bullet marker that prefixes every record-section heading (M3-RWv5 C).
  * A typographic symbol, not language text, so it is not an en.json string.
@@ -1017,6 +1038,9 @@ export function splitSpineToComplaints(
     });
   };
   for (const node of top) {
+    // M3-RWv6 item 7: a complaint heading emptied by hand is dropped on save;
+    // the nodes after it stay with the complaint before it.
+    if (isGhostComplaintHeading(node)) continue;
     if (node.type === 'heading' && node.attrs?.['hcKind'] === 'complaint') {
       flush();
       const idAttr = node.attrs?.['hcComplaintId'];
@@ -1059,7 +1083,11 @@ export function currentComplaintId(
   let pos = 0;
   let owning: string | null = null;
   for (const node of top) {
-    if (node.type === 'heading' && node.attrs?.['hcKind'] === 'complaint') {
+    if (
+      node.type === 'heading' &&
+      node.attrs?.['hcKind'] === 'complaint' &&
+      !isGhostComplaintHeading(node)
+    ) {
       const id = node.attrs?.['hcComplaintId'];
       if (typeof id === 'string') {
         if (pos <= caretPos) owning = id;
@@ -1130,6 +1158,11 @@ export type TableRecordPlan =
       readonly mode: 'append';
       readonly index: number;
       readonly rows: ReadonlyArray<readonly string[]>;
+    }
+  | {
+      readonly mode: 'replace';
+      readonly index: number;
+      readonly node: ProseMirrorNode;
     };
 
 function isEntryHeadingNode(n: ProseMirrorNode): boolean {
@@ -1138,6 +1171,180 @@ function isEntryHeadingNode(n: ProseMirrorNode): boolean {
 
 function isComplaintHeadingNode(n: ProseMirrorNode): boolean {
   return n.type === 'heading' && n.attrs?.['hcKind'] === 'complaint';
+}
+
+/** The concatenated text of a node and its descendants. */
+function nodeText(n: ProseMirrorNode): string {
+  if (n.type === 'text') return n.text ?? '';
+  let s = '';
+  for (const c of n.content ?? []) s += nodeText(c);
+  return s;
+}
+
+/**
+ * A complaint heading the doctor emptied by hand (M3-RWv6 item 7): every
+ * rendered complaint heading carries `"<no>. <name>"` text, so an EMPTY one
+ * is a ghost ProseMirror kept after its text was deleted. It is not a
+ * complaint: it carries no number, does not start a complaint on save, and
+ * its nodes stay with the complaint before it.
+ */
+export function isGhostComplaintHeading(n: ProseMirrorNode): boolean {
+  return isComplaintHeadingNode(n) && nodeText(n).trim() === '';
+}
+
+const COMPLAINT_NUMBER_RE = /^\s*(\d+)\./;
+
+/**
+ * The number the NEXT "Add new complaint" allocates (M3-RWv6 item 7): the
+ * highest complaint number visible in the document's complaint-heading text,
+ * plus 1, computed from the live document at click time (not a count and not
+ * a running counter). A heading emptied by hand shows no number and so frees
+ * it. A fresh case's unnamed, header-less leading complaint (M3-RWv5 C)
+ * occupies number 1. Pure.
+ */
+export function nextComplaintNumber(spine: ProseMirrorNode): number {
+  const content = spine.content ?? [];
+  let max = 0;
+  const firstHeader = content.findIndex(isComplaintHeadingNode);
+  const leading = firstHeader === -1 ? content : content.slice(0, firstHeader);
+  if (leading.some(isEntryHeadingNode)) max = 1;
+  for (const n of content) {
+    if (!isComplaintHeadingNode(n)) continue;
+    const m = COMPLAINT_NUMBER_RE.exec(nodeText(n));
+    if (m === null) continue;
+    const no = Number(m[1]);
+    if (Number.isSafeInteger(no) && no > max) max = no;
+  }
+  return max + 1;
+}
+
+/** Fill-from-the-top merge (M3-RWv6 item 5) applies to these kinds only. */
+const FILL_EMPTY_CELL_KINDS: ReadonlySet<RichTableType> = new Set([
+  'family_history',
+]);
+
+/**
+ * Merge new column values into an existing table (M3-RWv6 item 5): for each
+ * column, the seed's non-empty values (top-down) fill that column's EMPTY body
+ * cells from the top; values beyond the empty cells become new rows at the
+ * bottom, packed per column so a ragged overflow does not offset. Non-empty
+ * cells are never overwritten. Returns a new table node. Pure.
+ */
+export function fillTableColumns(
+  table: ProseMirrorNode,
+  rows: ReadonlyArray<readonly string[]>,
+): ProseMirrorNode {
+  const existing = table.content ?? [];
+  const header = existing.slice(0, 1);
+  const body = existing.slice(1).map((r) => ({
+    ...r,
+    content: [...(r.content ?? [])],
+  }));
+  const width = Math.max(
+    0,
+    ...rows.map((r) => r.length),
+    ...existing.map((r) => (r.content ?? []).length),
+  );
+  const overflow: string[][] = [];
+  for (let col = 0; col < width; col += 1) {
+    const values = rows.map((r) => r[col] ?? '').filter((v) => v.trim() !== '');
+    let next = 0;
+    for (const r of body) {
+      if (next >= values.length) break;
+      const c = r.content[col];
+      if (c === undefined || nodeText(c).trim() !== '') continue;
+      r.content[col] = { ...c, content: [paragraph(values[next]!)] };
+      next += 1;
+    }
+    overflow.push(values.slice(next));
+  }
+  const extra = Math.max(0, ...overflow.map((v) => v.length));
+  const added: string[][] = [];
+  for (let i = 0; i < extra; i += 1) {
+    const row: string[] = [];
+    for (let col = 0; col < width; col += 1) row.push(overflow[col]![i] ?? '');
+    added.push(row);
+  }
+  return {
+    ...table,
+    content: [...header, ...body, ...buildBodyRows(added)],
+  };
+}
+
+/**
+ * The top-level nodes to drop with a table that loses its last data row
+ * (M3-RWv6 item 6): the table itself plus, directly before it, its section
+ * heading (`hcKind:"section"`, same `hcSectionType`) and the full-width rule
+ * before that heading. Returned as a `[start, end)` top-level index span.
+ */
+function tableSectionSpan(
+  content: readonly ProseMirrorNode[],
+  tableIndex: number,
+): readonly [number, number] {
+  const table = content[tableIndex]!;
+  const kind = table.attrs?.['hcTableType'];
+  let start = tableIndex;
+  const prev = content[tableIndex - 1];
+  if (
+    prev !== undefined &&
+    prev.type === 'heading' &&
+    prev.attrs?.['hcKind'] === 'section' &&
+    prev.attrs?.['hcSectionType'] === kind
+  ) {
+    start = tableIndex - 1;
+    if (content[start - 1]?.type === 'horizontalRule') start -= 1;
+  } else if (prev?.type === 'horizontalRule') {
+    // A linked-investigations table is created as [rule, table] (no heading).
+    start = tableIndex - 1;
+  }
+  return [start, tableIndex + 1];
+}
+
+/**
+ * Delete one row of an inserted table (M3-RWv6 item 6). `tableIndex` is the
+ * top-level index of the table node, `rowIndex` its row index (0 = header).
+ * The header row is never deleted (the spine is returned unchanged, as it is
+ * for an index that is not a table row). Deleting the LAST data row removes
+ * the table together with its section heading and rule. Pure; the input is
+ * not mutated.
+ */
+export function removeTableRow(
+  spine: ProseMirrorNode,
+  tableIndex: number,
+  rowIndex: number,
+): ProseMirrorNode {
+  const content = spine.content ?? [];
+  const table = content[tableIndex];
+  if (table === undefined || table.type !== 'table') return spine;
+  const rows = table.content ?? [];
+  if (rowIndex < 1 || rowIndex >= rows.length) return spine;
+  if (rows.length <= 2) {
+    const [start, end] = tableSectionSpan(content, tableIndex);
+    return {
+      ...spine,
+      content: [...content.slice(0, start), ...content.slice(end)],
+    };
+  }
+  const shrunk: ProseMirrorNode = {
+    ...table,
+    content: rows.filter((_r, i) => i !== rowIndex),
+  };
+  return {
+    ...spine,
+    content: content.map((n, i) => (i === tableIndex ? shrunk : n)),
+  };
+}
+
+/**
+ * The top-level span {@link removeTableRow} drops when the table at
+ * `tableIndex` loses its last data row, for the live-editor glue (same rule
+ * as the pure kernel).
+ */
+export function tableSectionSpanOf(
+  spine: ProseMirrorNode,
+  tableIndex: number,
+): readonly [number, number] {
+  return tableSectionSpan(spine.content ?? [], tableIndex);
 }
 
 /**
@@ -1233,6 +1440,14 @@ export function planTableRecord(
     const n = content[i]!;
     if (n.type === 'table' && n.attrs?.['hcTableType'] === kind) tableIndex = i;
   }
+  if (tableIndex !== -1 && FILL_EMPTY_CELL_KINDS.has(kind)) {
+    // M3-RWv6 item 5: fill the column's empty cells from the top first.
+    return {
+      mode: 'replace',
+      index: tableIndex,
+      node: fillTableColumns(content[tableIndex]!, seed.rows),
+    };
+  }
   if (tableIndex !== -1) {
     return {
       mode: 'append',
@@ -1264,6 +1479,12 @@ export function appendOrCreateTableInSpine(
 ): ProseMirrorNode {
   const content = spine.content ?? [];
   const plan = planTableRecord(spine, caretPos, kind, seed);
+  if (plan.mode === 'replace') {
+    return {
+      ...spine,
+      content: content.map((n, i) => (i === plan.index ? plan.node : n)),
+    };
+  }
   if (plan.mode === 'append') {
     const grown = appendRowsToTable(content[plan.index]!, plan.rows);
     return {

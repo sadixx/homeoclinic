@@ -942,9 +942,13 @@ export class CaseRichPage {
     return byTestId('case-form-complaint-empty-prompt');
   }
 
-  /** Open Record physical generals, fill the four fields, Record. */
+  /**
+   * Open Record physical generals, fill four text fields, Record. M3-RWv6
+   * item 8 removed Notes; the fourth field is now Constitution (one
+   * Field|Value row per filled field, so row counts are unchanged).
+   */
   async recordGenerals(
-    v: { appetite: string; thirst: string; thermal: string; notes: string },
+    v: { appetite: string; thirst: string; thermal: string; constitution: string },
     timeout = 15000,
   ): Promise<void> {
     await byTestId('case-form-record-generals').waitForClickable({ timeout });
@@ -958,7 +962,7 @@ export class CaseRichPage {
     await fill('case-generals-appetite', v.appetite);
     await fill('case-generals-thirst', v.thirst);
     await fill('case-generals-thermal', v.thermal);
-    await fill('case-generals-notes', v.notes);
+    await fill('case-generals-constitution', v.constitution);
     await byTestId('case-form-record-generals-confirm').waitForClickable({ timeout });
     await byTestId('case-form-record-generals-confirm').click();
     await byTestId('case-form-generals-popup').waitForDisplayed({ reverse: true, timeout });
@@ -1094,6 +1098,164 @@ export class CaseRichPage {
     }, `[data-testid="case-form-editor-${cid}"]`);
   }
 
+  // ---- M3-RWv6 helpers --------------------------------------------------
+  /** Item 8: open the physical generals popup (left open for inspection). */
+  async openGeneralsPopup(timeout = 15000): Promise<void> {
+    await byTestId('case-form-record-generals').waitForClickable({ timeout });
+    await byTestId('case-form-record-generals').click();
+    await byTestId('case-form-generals-popup').waitForDisplayed({ timeout });
+  }
+
+  /** Item 8: cancel the open generals popup. */
+  async cancelGeneralsPopup(timeout = 15000): Promise<void> {
+    await byTestId('case-form-record-generals-cancel').click();
+    await byTestId('case-form-generals-popup').waitForDisplayed({ reverse: true, timeout });
+  }
+
+  /**
+   * Item 8: every field control inside the generals popup, in DOM order:
+   * testid, tag, its visible label, the select options (for a <select>),
+   * and computed font sizes of the control and the label.
+   */
+  async generalsFields(): Promise<
+    { id: string; tag: string; label: string; options: string[]; controlPx: number; labelPx: number }[]
+  > {
+    return browser.execute(() => {
+      const pop = document.querySelector('[data-testid="case-form-generals-popup"]');
+      if (pop === null) return [];
+      return Array.from(pop.querySelectorAll('[data-testid^="case-generals-"]')).map((el) => {
+        const lbl = el.closest('label')?.querySelector('span') ?? null;
+        return {
+          id: el.getAttribute('data-testid') ?? '',
+          tag: el.tagName.toLowerCase(),
+          label: (lbl?.textContent ?? '').trim(),
+          options:
+            el.tagName.toLowerCase() === 'select'
+              ? Array.from((el as HTMLSelectElement).options).map((o) => o.text.trim())
+              : [],
+          controlPx: Number.parseFloat(window.getComputedStyle(el).fontSize),
+          labelPx: lbl === null ? 0 : Number.parseFloat(window.getComputedStyle(lbl).fontSize),
+        };
+      });
+    });
+  }
+
+  /** Item 5: record ONE side of the family history (other side left empty). */
+  async recordFamilySide(side: 'maternal' | 'paternal', lines: string[], timeout = 15000): Promise<void> {
+    await this.recordFamilyButton.waitForClickable({ timeout });
+    await this.recordFamilyButton.click();
+    await this.familyPopup.waitForDisplayed({ timeout });
+    const tab = side === 'maternal' ? this.familyMaternalTab : this.familyPaternalTab;
+    const input = side === 'maternal' ? this.familyMaternalInput : this.familyPaternalInput;
+    await tab.click();
+    await input.waitForDisplayed({ timeout });
+    // WebKitWebDriver drops "\n" inside setValue, so type one line at a time
+    // and press a real Enter between lines ("One condition per line").
+    await input.click();
+    for (const [i, line] of lines.entries()) {
+      if (i > 0) await browser.keys(['Enter']);
+      await input.addValue(line);
+    }
+    await browser.waitUntil(async () => (await input.getValue()) === lines.join('\n'), {
+      timeout,
+      timeoutMsg: `family ${side} textarea did not take ${lines.length} line(s)`,
+    });
+    await this.familyConfirm.waitForClickable({ timeout });
+    await this.familyConfirm.click();
+    await this.familyPopup.waitForDisplayed({ reverse: true, timeout });
+  }
+
+  /** Item 9: Add prescription with medicine, potency and dosage. */
+  async addPrescriptionFull(medicine: string, potency: string, dosage: string, timeout = 15000): Promise<void> {
+    await this.addPrescriptionButton.waitForClickable({ timeout });
+    await this.addPrescriptionButton.click();
+    await this.prescriptionPopup.waitForDisplayed({ timeout });
+    for (const [id, v] of [
+      ['case-rx-medicine', medicine],
+      ['case-rx-potency', potency],
+      ['case-rx-dosage', dosage],
+    ] as const) {
+      const el = byTestId(id);
+      await el.waitForDisplayed({ timeout });
+      await el.setValue(v);
+    }
+    await this.prescriptionConfirm.waitForClickable({ timeout });
+    await this.prescriptionConfirm.click();
+    await this.prescriptionPopup.waitForDisplayed({ reverse: true, timeout });
+  }
+
+  /** Item 6: testids of every rendered table-row delete control, in DOM order. */
+  async tableRowDeleteIds(): Promise<string[]> {
+    return browser.execute(() =>
+      Array.from(document.querySelectorAll('[data-testid^="case-form-table-row-delete-"]'))
+        .map((el) => el.getAttribute('data-testid') ?? '')
+        .filter((id) => /^case-form-table-row-delete-\d+-\d+$/.test(id)),
+    );
+  }
+
+  /** Item 6: 1-based doc-order table number of the first table of `type`. */
+  async tableNumber(type: string, cid = DEFAULT_CID): Promise<number> {
+    const all = await this.tables(cid);
+    const i = all.findIndex((t) => t.tableType === type);
+    if (i < 0) throw new Error(`no table of type ${type}`);
+    return i + 1;
+  }
+
+  /** Item 6: click a row-delete control, then confirm or cancel the dialog. */
+  async deleteTableRow(tableNo: number, rowNo: number, confirm: boolean, timeout = 15000): Promise<void> {
+    const btn = byTestId(`case-form-table-row-delete-${tableNo}-${rowNo}`);
+    await btn.waitForClickable({ timeout });
+    await btn.click();
+    const dialog = byTestId('case-form-table-row-delete-dialog');
+    await dialog.waitForDisplayed({ timeout });
+    const choice = byTestId(
+      confirm ? 'case-form-table-row-delete-confirm' : 'case-form-table-row-delete-cancel',
+    );
+    await choice.waitForClickable({ timeout });
+    await choice.click();
+    await dialog.waitForDisplayed({ reverse: true, timeout });
+  }
+
+  /** Item 4: the one-click Open on investigation link row n, and its preview. */
+  investigationOpenButton(n: number): ChainablePromiseElement {
+    return byTestId(`case-form-investigation-open-${n}`);
+  }
+
+  get investigationPreview(): ChainablePromiseElement {
+    return byTestId('case-form-investigation-preview');
+  }
+
+  /**
+   * Item 7: add a complaint with an EMPTY name (the "Untitled complaint"
+   * path): clear the shared name box, click Add new complaint.
+   */
+  async addUntitledComplaint(timeout = 15000): Promise<void> {
+    await this.complaintTitle.waitForDisplayed({ timeout });
+    await this.complaintTitle.clearValue();
+    await this.addComplaintButton.waitForClickable({ timeout });
+    await this.addComplaintButton.click();
+  }
+
+  /**
+   * Item 7: delete a complaint heading's text BY HAND with real keystrokes:
+   * native click on the h1 whose text starts with `<no>.`, End, then one
+   * Backspace per character. ProseMirror keeps the (now empty) heading node.
+   */
+  async clearComplaintHeadingByHand(no: number, cid = DEFAULT_CID): Promise<void> {
+    const sel = `[data-testid="case-form-editor-${cid}"] [data-hc-kind="complaint"]`;
+    const els = await $$(sel);
+    for (const el of els) {
+      const txt = (await el.getText()).trim();
+      if (txt.startsWith(`${no}.`)) {
+        await el.click();
+        await browser.keys(['End']);
+        for (let i = 0; i < txt.length; i += 1) await browser.keys(['Backspace']);
+        return;
+      }
+    }
+    throw new Error(`complaint heading "${no}." not found to clear by hand`);
+  }
+
   // ---- navigation --------------------------------------------------------
   async openVisit(patientId: string, visitId: string, timeout = 20000): Promise<void> {
     await browser.execute(
@@ -1115,6 +1277,114 @@ export class CaseRichPage {
       visitId,
     );
     await this.waitForForm(timeout);
+  }
+
+  /**
+   * M3-RWv6 load gate (build-18): navigate to a saved case with an IN-PAGE
+   * probe armed BEFORE the hash change. A MutationObserver (microtask after
+   * each React commit, i.e. before passive effects) watches for the FIRST
+   * commit in which `case-form` exists. At that instant it records how many
+   * complaint headers the editor holds and whether `marker` is in its text,
+   * then performs `action` SYNCHRONOUSLY in the same task:
+   *   - 'save': click case-form-save;
+   *   - 'add':  set case-form-complaint-title (native setter + input event, so
+   *             React's onChange writes the name ref) and click
+   *             case-form-add-complaint;
+   *   - 'none': act on nothing.
+   * A WebDriver round trip cannot land in a one-frame window; this can (same
+   * interleaving CaseForm.loadRace.test.tsx forces). Read the result with
+   * `readOpenProbe()`.
+   */
+  async openVisitWithProbe(
+    patientId: string,
+    visitId: string,
+    action: 'save' | 'add' | 'none',
+    name: string,
+    marker: string,
+  ): Promise<void> {
+    await browser.execute(
+      (pid: string, vid: string, act: string, nm: string, mk: string) => {
+        type Probe = {
+          t0: number;
+          sawLoading: boolean;
+          liveMs: number | null;
+          headersAtLive: number;
+          markerAtLive: boolean;
+          acted: string;
+          err: string | null;
+        };
+        const w = window as unknown as { __hcOpenProbe?: Probe };
+        const p: Probe = {
+          t0: performance.now(),
+          sawLoading: false,
+          liveMs: null,
+          headersAtLive: -1,
+          markerAtLive: false,
+          acted: 'pending',
+          err: null,
+        };
+        w.__hcOpenProbe = p;
+        const obs = new MutationObserver(() => {
+          if (document.querySelector('[data-testid="case-form-loading"]') !== null) p.sawLoading = true;
+          if (p.liveMs !== null) return;
+          if (document.querySelector('[data-testid="case-form"]') === null) return;
+          p.liveMs = performance.now() - p.t0;
+          obs.disconnect();
+          const ed = document.querySelector('[data-testid^="case-form-editor-"]');
+          p.headersAtLive = ed === null ? -1 : ed.querySelectorAll('[data-hc-kind="complaint"]').length;
+          p.markerAtLive = ed !== null && (ed.textContent ?? '').includes(mk);
+          try {
+            if (act === 'save') {
+              const b = document.querySelector('[data-testid="case-form-save"]') as HTMLButtonElement | null;
+              if (b === null) throw new Error('case-form-save missing at first live commit');
+              b.click();
+              p.acted = 'save-clicked';
+            } else if (act === 'add') {
+              const inp = document.querySelector('[data-testid="case-form-complaint-title"]') as HTMLInputElement | null;
+              const b = document.querySelector('[data-testid="case-form-add-complaint"]') as HTMLButtonElement | null;
+              if (inp === null || b === null) throw new Error('complaint title/add control missing at first live commit');
+              const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+              setter?.call(inp, nm);
+              inp.dispatchEvent(new Event('input', { bubbles: true }));
+              b.click();
+              p.acted = 'add-clicked';
+            } else {
+              p.acted = 'none';
+            }
+          } catch (e) {
+            p.err = String(e);
+          }
+        });
+        obs.observe(document.body, { childList: true, subtree: true, attributes: true });
+        window.location.hash = `#/patient/${encodeURIComponent(pid)}/case/${encodeURIComponent(vid)}`;
+      },
+      patientId,
+      visitId,
+      action,
+      name,
+      marker,
+    );
+  }
+
+  async readOpenProbe(): Promise<{
+    sawLoading: boolean;
+    liveMs: number | null;
+    headersAtLive: number;
+    markerAtLive: boolean;
+    acted: string;
+    err: string | null;
+  } | null> {
+    return browser.execute(() => {
+      const w = window as unknown as { __hcOpenProbe?: Record<string, unknown> };
+      if (w.__hcOpenProbe === undefined) return null;
+      const { t0: _t0, ...rest } = w.__hcOpenProbe;
+      return rest;
+    }) as never;
+  }
+
+  /** True while the CaseForm load gate (case-form-loading) is rendered. */
+  async isLoading(): Promise<boolean> {
+    return byTestId('case-form-loading').isExisting();
   }
 
   async routeIds(): Promise<{ patientId: string; visitId: string }> {

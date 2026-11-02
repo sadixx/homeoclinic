@@ -26,9 +26,18 @@ export interface RegistrationCouncil {
   readonly authority: string;
 }
 
-/** Display label stored in the doctor profile: `<State> — <Authority>`. */
+/** Display label stored in the doctor profile: `<State>: <Authority>`. */
 export function councilLabel(council: RegistrationCouncil): string {
-  return `${council.state} — ${council.authority}`;
+  return `${council.state}: ${council.authority}`;
+}
+
+/**
+ * Label format used before M3-RWv6 (`<State> \u2014 <Authority>`). Profiles
+ * saved then still hold it, so it is matched on re-open and mapped to the
+ * current label. Never shown or stored for new selections.
+ */
+function legacyCouncilLabel(council: RegistrationCouncil): string {
+  return `${council.state} \u2014 ${council.authority}`;
 }
 
 /** The verified list, in display order. */
@@ -136,7 +145,8 @@ export const REGISTRATION_COUNCIL_LABELS: readonly string[] =
 
 /**
  * Split a stored council string into the dropdown state that re-opens it:
- * a listed label selects that option; any other non-empty value re-opens as
+ * a listed label selects that option (a pre-RWv6 em-dash label selects the
+ * same option under its current label); any other non-empty value re-opens as
  * "Other" with the text preserved; empty selects nothing.
  */
 export function councilSelectionFor(stored: string): {
@@ -146,6 +156,12 @@ export function councilSelectionFor(stored: string): {
   if (stored === '') return { choice: 'none', text: '' };
   if (REGISTRATION_COUNCIL_LABELS.includes(stored)) {
     return { choice: 'listed', text: stored };
+  }
+  const legacy = REGISTRATION_COUNCILS.find(
+    (c) => legacyCouncilLabel(c) === stored,
+  );
+  if (legacy !== undefined) {
+    return { choice: 'listed', text: councilLabel(legacy) };
   }
   return { choice: 'other', text: stored };
 }

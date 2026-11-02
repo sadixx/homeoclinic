@@ -34,9 +34,12 @@ import {
   buildSectionNodes,
   currentComplaintId,
   bulletSectionHeadings,
+  isGhostComplaintHeading,
   joinComplaintsToSpine,
   nameLeadingComplaint,
+  nextComplaintNumber,
   planTableRecord,
+  tableSectionSpanOf,
   splitSpineToComplaints,
   type EntryKind,
   type ProseMirrorNode,
@@ -331,14 +334,14 @@ export function initialContent(doc: V3Doc): Content {
 }
 
 /**
- * The 1-based complaint number the NEXT "Add new complaint" allocates: the
- * count of existing complaints + 1 (M3-RWv3 §4, position-based numbering).
- * Counted via {@link splitSpineToComplaints} so an unnamed, header-less first
- * complaint (M3-RWv5 C) still occupies `cc1`. Read from the live editor doc so
- * it reflects in-session adds.
+ * The 1-based complaint number the NEXT "Add new complaint" allocates
+ * (M3-RWv6 item 7): the highest complaint number visible in the live editor
+ * doc + 1, read at click time ({@link nextComplaintNumber}). An unnamed,
+ * header-less first complaint (M3-RWv5 C) still occupies number 1, and a
+ * complaint heading emptied by hand frees its number.
  */
 function nextComplaintNo(editor: Editor): number {
-  return splitSpineToComplaints(editorSpine(editor)).length + 1;
+  return nextComplaintNumber(editorSpine(editor));
 }
 
 /**
@@ -469,7 +472,8 @@ export function currentComplaintName(editor: Editor): string {
     (n) =>
       n.type === 'heading' &&
       n.attrs?.['hcKind'] === 'complaint' &&
-      n.attrs?.['hcComplaintId'] === id,
+      n.attrs?.['hcComplaintId'] === id &&
+      !isGhostComplaintHeading(n),
   );
   if (header === undefined) return '';
   const raw = (header.content ?? [])
@@ -525,6 +529,14 @@ export function appendOrCreateTable(
         if (dispatch) tr.insert(at, nodes);
         return true;
       }
+      if (plan.mode === 'replace') {
+        // M3-RWv6 item 5: the merged table replaces the old one in place.
+        const from = offsets[plan.index] ?? 0;
+        const to = from + doc.child(plan.index).nodeSize;
+        const node = schema.nodeFromJSON(JSON.parse(JSON.stringify(plan.node)));
+        if (dispatch) tr.replaceWith(from, to, node);
+        return true;
+      }
       const table = doc.child(plan.index);
       // Inside the table, just after its last row.
       const at = (offsets[plan.index] ?? 0) + table.nodeSize - 1;
@@ -575,6 +587,8 @@ export function caseStructure(editor: Editor): {
   const entries: { complaintId: string; entryIndex: number }[] = [];
   let currentId = 'cc1';
   for (const n of content) {
+    // M3-RWv6 item 7: a heading emptied by hand is not a complaint.
+    if (isGhostComplaintHeading(n)) continue;
     if (n.type === 'heading' && n.attrs?.['hcKind'] === 'complaint') {
       const id = n.attrs?.['hcComplaintId'];
       currentId = typeof id === 'string' ? id : `cc${complaints.length + 1}`;
@@ -685,4 +699,94 @@ export function appendInvestigationLink(
   };
   const next = content.map((n, i) => (i === tableIndex ? grown : n));
   return { type: 'doc', content: next };
+}
+
+/** One inserted table of the live doc, for the row-delete controls. */
+export interface TableStructure {
+  /** The table's `hcTableType` (or null for a table without one). */
+  readonly kind: string | null;
+  /** How many DATA rows (header excluded) the table has. */
+  readonly dataRows: number;
+}
+
+/**
+ * The top-level tables of the live doc in document order (M3-RWv6 item 6), so
+ * the React layer can render a delete control per data row without making it
+ * an editable doc node.
+ */
+export function tableStructure(editor: Editor): TableStructure[] {
+  const out: TableStructure[] = [];
+  editor.state.doc.forEach((node) => {
+    if (node.type.name !== 'table') return;
+    const kind = node.attrs['hcTableType'];
+    out.push({
+      kind: typeof kind === 'string' ? kind : null,
+      dataRows: Math.max(0, node.childCount - 1),
+    });
+  });
+  return out;
+}
+
+/**
+ * The REAL ProseMirror position of data row `rowIndex` (1-based, header = 0)
+ * of the `tableNo`-th (1-based, doc order) top-level table, or null.
+ */
+export function tableRowPos(
+  editor: Editor,
+  tableNo: number,
+  rowIndex: number,
+): number | null {
+  let seen = 0;
+  let found: number | null = null;
+  editor.state.doc.forEach((node, offset) => {
+    if (found !== null || node.type.name !== 'table') return;
+    seen += 1;
+    if (seen !== tableNo || rowIndex < 0 || rowIndex >= node.childCount) return;
+    let pos = offset + 1;
+    for (let i = 0; i < rowIndex; i += 1) pos += node.child(i).nodeSize;
+    found = pos;
+  });
+  return found;
+}
+
+/**
+ * Delete the table row at REAL ProseMirror position `rowPos` (M3-RWv6 item 6)
+ * as ONE transaction (one undo step; the selection is mapped). The header row
+ * (first row) is refused: returns false and the doc is unchanged, as for a
+ * position that is not a row of a top-level table. Deleting the last data row
+ * removes the table with its section heading and rule (the same span as the
+ * pure `caseRich.removeTableRow`). Returns true when a row was deleted.
+ */
+export function removeTableRowAt(editor: Editor, rowPos: number): boolean {
+  const doc = editor.state.doc;
+  if (rowPos < 0 || rowPos > doc.content.size) return false;
+  const $pos = doc.resolve(rowPos);
+  // A top-level table's row sits at depth 1 (its parent is the table).
+  if ($pos.depth !== 1) return false;
+  const table = $pos.parent;
+  if (table.type.name !== 'table') return false;
+  const row = $pos.nodeAfter;
+  if (row === null || row.type.name !== 'tableRow') return false;
+  const rowIndex = $pos.index();
+  if (rowIndex === 0) return false;
+  let from = rowPos;
+  let to = rowPos + row.nodeSize;
+  if (table.childCount <= 2) {
+    const tableIndex = $pos.index(0);
+    const [start, end] = tableSectionSpanOf(editorSpine(editor), tableIndex);
+    const offsets: number[] = [];
+    doc.forEach((_n, offset) => {
+      offsets.push(offset);
+    });
+    offsets.push(doc.content.size);
+    from = offsets[start] ?? from;
+    to = offsets[end] ?? to;
+  }
+  return editor
+    .chain()
+    .command(({ tr, dispatch }) => {
+      if (dispatch) tr.delete(from, to);
+      return true;
+    })
+    .run();
 }
