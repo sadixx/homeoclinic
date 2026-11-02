@@ -73,8 +73,18 @@ receipt in later releases.
 
 - **Full name** (required)
 - **Qualification** (required) — e.g. BHMS, MD(Hom)
-- **Registration number** and **Council** (required)
-- **Phone** and **Email** (optional)
+- **Registration number** (required)
+- **Council** (required) — pick your registering council from the list. The
+  list holds the state and UT homoeopathy boards and councils published by
+  the Ministry of AYUSH, shown as *State: Council name* (for example
+  *Maharashtra: Maharashtra Council of Homoeopathy*), plus the **National
+  Commission for Homoeopathy (National Register)** and the former **Central
+  Council of Homoeopathy (pre-2020)**. If yours is not listed (for example
+  Himachal Pradesh, or a state or UT without its own board), choose **Other
+  (type manually)** and type the council name; it cannot be left empty.
+- **Phone** (optional) — asked only here. The same number is saved as both
+  your phone and the clinic phone, so Step 2 does not ask again.
+- **Email** (optional)
 - **Signature image** and **Clinic logo** (optional)
 
 Click **Next**. Required fields that are empty show an inline message under
@@ -86,7 +96,21 @@ the field.
 - **Address** (required)
 - **Default consultation fee** and **Default follow-up fee** (required) —
   amounts are shown in Indian number format
-- **Phone**, **GSTIN**, **Timings** (optional)
+- **GSTIN** (optional)
+- **Timings** (optional) — two tabs, **Morning** and **Evening**. For each,
+  type the **From** and **To** time the way it reads on a clock: an **hour
+  box (1 to 12)** and a **minute box (00 to 59)**. You never choose AM or
+  PM; it is set for you:
+  - **Morning** times are AM. A 12 o'clock time, or a To hour smaller than
+    the From hour, is read as PM — so *9:30 to 1:00* becomes **9:30 AM to
+    1:00 PM**.
+  - **Evening** times are PM — *5:00 to 8:30* becomes **5:00 PM to 8:30 PM**.
+  - An hour outside 1–12, minutes outside 00–59, or a To time that is not
+    after the From time shows a message under the box.
+  - Leave a session empty if the clinic is closed then.
+
+  Your timings are saved as, for example, *Morning 9:30 AM-1:00 PM; Evening
+  5:00 PM-8:30 PM*.
 
 Click **Next**.
 
@@ -169,8 +193,9 @@ Open **Patients** from the left navigation, then **New patient** (or press
 - **Age** (required) **or Date of birth** — entering a date of birth fills the
   age automatically; otherwise type the age directly (it may be estimated).
 - **Sex**, **Mobile**, **Alternate mobile**, **Address**, **City**,
-  **Occupation**, **Marital status**, **Blood group**, **Referred by** —
-  all optional.
+  **Occupation**, **Blood group**, **Referred by** — all optional.
+- **Marital status** (optional) — **Single**, **Married**, **Divorced** or
+  **Widowed**. A value saved by an earlier version still shows.
 - A **patient code** (e.g. `HC-000123`) is assigned automatically with your
   clinic prefix. Codes are **never reused**, even after a patient is deleted
   and restored.
@@ -188,6 +213,11 @@ In the form you can attach a photo two ways:
 
 You can **remove**, **retake**, or **swap** the photo (file ↔ webcam) before
 or after saving — the photo updates with the patient record.
+
+If no photo is added, the app shows a plain **default figure** instead: a male
+or female outline once **Sex** is chosen. It appears wherever the photo would
+(the form, the dashboard and the patient lists) and is replaced as soon as you
+add a real photo.
 
 ### Duplicate warning
 
@@ -250,14 +280,24 @@ Clicking a patient (from search or the list) opens their dashboard (screen
 S07):
 
 - **Demographics banner** — name, code, **age**/sex, mobile, city, referred by,
-  photo — plus any **allergies / alerts**. The **age updates itself** over
-  time from the date of birth, so it is always current.
+  photo (or the default figure) — plus any **allergies / alerts**. The **age
+  updates itself** over time from the date of birth, so it is always current.
 - **Family** — linked family members with quick-switch.
-- **Take case / Follow-up** — starts the first case, or (once a first case is
-  saved) a **Follow-up**. After the first case is recorded, the plain
-  "New visit" is greyed out so you don't accidentally start a second first
-  case — use **Follow-up** instead (see sections 8 and 9). New in R3.
-- **Visit timeline** builds up as you record visits (R3).
+- **Take case** — starts the patient's first case (section 8). Once a first
+  case is saved, **New visit** is greyed out ("First case already recorded —
+  use Follow-up") and **Follow-up** is offered instead (section 9), so you
+  cannot start a second first case by mistake.
+- **Visits (newest first)** — every saved case and follow-up, latest at the
+  top, with its date and type. The **last visit date** updates as soon as you
+  save.
+- **Last prescription** — the medicines (name, potency, dosage) from the most
+  recent prescription table you recorded. This is a **preview** taken from
+  the case notes; real prescriptions arrive in R4.
+- **Lab reports & Scans** — every report and scan uploaded for this patient,
+  from any visit, each with a **PDF** or **Image** badge. **Open** shows it;
+  **Delete file** removes the file everywhere (after a confirmation), including
+  from any investigation it was linked to. See section 8 for how reports are
+  uploaded and linked.
 
 A **dues** area and a **Clear dues** button appear as **disabled
 placeholders** — automatic fee totals and marking dues paid arrive with the
@@ -270,61 +310,111 @@ From the dashboard you can **Edit** the patient, **Export** their record
 
 ## 8. Taking a case (R3, new)
 
-From a patient's dashboard, click **Take case** (or **New visit** for a
-patient with no prior visit; shortcut **F5**). This opens the case form
-(screen S08) — the on-screen replacement for the paper case sheet. It is one
-**rich text editor per complaint** that works like a word processor: you type
-freely, and structured data drops **into the same document as editable
-tables**, so the entire case lives in one place.
+From a patient's dashboard, click **Take case** (shortcut **F5**). This opens
+the case form (screen S08) — the on-screen replacement for the paper case
+sheet. The whole case is **one running record** that works like a word
+processor: you type freely, and everything you record drops into the same
+record as an editable table, in date order.
 
-### The editor — one document for everything
+### Complaints and entries
 
-- Each complaint is **one rich editable document**. Type the case into it as
-  free text, format as you like, exactly as you would write on a sheet — and
-  everything you record (vitals, family history, prescription, …) is inserted
-  **into this same document** as a table.
-- **Add entry** stamps a **date header** and starts a fresh block beneath it.
-  The document is a **running dated log**: every time you open the case (and on
-  every follow-up) you add a new dated entry under the previous ones, so the
-  whole history of the complaint stays together in one scroll.
-- **Everything is editable in place** — all the text, and every cell of every
-  table, can be clicked into and changed at any time (tab between cells like a
-  spreadsheet).
+A new case opens empty, with the prompt *"Type the complaint name above, then
+choose Add new complaint."*
 
-### Record buttons — insert a section as a table
+1. Type the complaint (for example *Headache*) in the **Complaint name** box
+   and click **Add new complaint**. A new complaint section appears with a
+   **numbered heading in bold and underlined**, for example **1. Headache**,
+   and under it today's first entry, headed *Headache — 02-11-2026*. Record
+   everything for today under this entry.
+2. When the patient returns for the same complaint, click **Add follow-up
+   entry**. A new entry is added under the same complaint, headed
+   *Headache-follow-up — <date>*, and you record the follow-up findings there.
+3. For a different complaint, type its name and click **Add new complaint**
+   again; it becomes **2. …** and works the same way.
 
-A row of **Record** buttons sits above the editor. Each opens a small pop-up;
-when you press **Record**, it inserts that section **into the current dated
-entry** as an editable table, preceded by a **numbered heading** and a
-**full-width separator line** so each section reads as a clear block:
+Complaint numbers follow what is on the page: a new complaint always takes
+the highest number already shown plus one. If you remove complaint 2 and add
+another, the new one is numbered 2 again. If you click **Add new complaint**
+without a name, the section is added as *Untitled complaint*; remove it with
+its **✕** button if it was a mistake.
 
-- **Record vitals** — enter **blood pressure as two fields, systolic and
-  diastolic**, plus pulse, weight and height; **BMI is computed live**. Inserts
-  a vitals table.
-- **Record modalities** — aggravations / ameliorations, as a table.
-- **Record family history** — a pop-up with **Maternal** and **Paternal**
-  tabs; on Record it inserts a tidy **two-column table (Maternal | Paternal)**.
-- **Record physical generals** — appetite, thirst, cravings, thermal state,
-  and **Constitution**, **Diet**, **Sun aggravation (Yes/No)** and **Notes**.
-- **Record investigations** — what you have **Suggested** and what the patient
-  has **Submitted**.
-- **Add prescription** — a medicine table with columns **Medicine, Potency,
-  Dosage, Instructions**. In this release the prescription is a **preview**: it
-  is saved with the case, but formatted printing arrives with the prescription
-  release (R4).
+**Removing:** every complaint heading and every entry has a **✕** button.
+The app asks you to confirm first ("Remove this complaint and everything
+recorded under it? This cannot be undone."). The remaining complaints are
+renumbered.
 
-Each inserted section is **numbered in order**, so the case always reads in a
-fixed chronological sequence. On a **follow-up** the buttons read **Update
-vitals / Update prescription / …** and insert a fresh table under the new
-dated entry rather than overwriting the earlier one.
+**Editing:** all text, and every cell of every table, can be clicked into and
+changed at any time (Tab moves between cells). Use the **Bullet list** and
+**Numbered list** buttons to format notes like a word processor. Lists work
+in your notes, not on a complaint heading.
 
-### Uploading lab and scan reports
+### Record buttons — sections as tables
 
-Use the **Investigations** upload control to attach a **PDF or image**
-(ultrasound, CT, blood report, etc.). Each report shows a **PDF / Image** badge
-and an optional caption; you can **open** it or **remove** it (with
-confirmation). Reports are stored **encrypted** on your computer and never
-leave it.
+The buttons above the record each open a small pop-up. When you confirm, the
+section is added to the **entry you are working in** (the one where your
+cursor is) as an editable table, under a bullet heading such as **• Vitals**
+and a separator line:
+
+- **Record vitals** — blood pressure as **two fields, systolic and
+  diastolic**, plus pulse, temperature, SpO2, weight and height; **BMI is
+  worked out for you**.
+- **Modalities** — factor, aggravation (<) and amelioration (>).
+- **Record family history** — **Maternal** and **Paternal** tabs (one
+  condition per line), shown as a two-column table *Maternal | Paternal*.
+- **Record physical generals** — appetite, thirst, thermal state,
+  constitution, diet, cravings, aversions, urine, stool, perspiration, **sun
+  aggravation (Yes / No)**, sleep, dreams and sleep position. Anything you
+  leave blank shows as *Not recorded*.
+- **Record investigations** — the investigation name, its **status** chosen
+  from a list (**Suggested** or **Submitted**), and notes. See *Lab and scan
+  reports* below.
+- **Add prescription** — medicine, potency, dosage and instructions. This is a
+  **preview** saved with the case; real prescriptions and printing arrive in
+  R4.
+
+**One table of each kind per entry.** The first time you record, say, vitals
+in an entry, a vitals table is created. Recording vitals again in the **same
+entry** adds new rows to that **same table** rather than starting another
+one. The same applies to every kind of table. A **follow-up entry gets its
+own fresh tables**, so each visit's readings stay together and the earlier
+visit's tables are never changed.
+
+**Family history fills in, not down.** If you record only the mother's side
+and later record the father's side in the same entry, the father's side fills
+the empty *Paternal* column of the existing rows from the top, so the table
+stays lined up. New rows are added only if there are more lines than empty
+cells.
+
+**Deleting a row:** each table row has a **Delete row** button. After you
+confirm, the row is removed. The header row cannot be deleted, and deleting
+the last remaining row removes the whole table.
+
+### Lab and scan reports
+
+There are two ways to attach a PDF or image report (ultrasound, CT, blood
+report and so on):
+
+- **From an investigation:** in **Record investigations**, set the status to
+  **Submitted**. The *Submit a report* pop-up offers **Upload a new report**,
+  or **pick an already-uploaded report** for this patient and click **Link
+  selected report**. A reminder under the upload reads *"Make sure to upload
+  the correct file against the name."* The report is named automatically as
+  *<investigation>-<patient name>-<date>* so it is easy to match later.
+- **Directly:** use **Upload report** in the case's *Lab reports & scans*
+  area, with an optional caption.
+
+Either way the report also appears in the patient's **Lab reports & Scans**
+list on the dashboard (section 7). In the investigation's row, click **Open**
+to view the report in one click.
+
+**Removing a link versus deleting a file.** If a report was linked to the
+wrong investigation, use **Remove from this investigation**: only the link is
+removed, and the file stays in Lab reports & Scans. To get rid of the file
+itself, use **Delete file** (in Lab reports & Scans) or **Remove** next to the
+report in the case; that permanently deletes it everywhere. Both ask you to
+confirm.
+
+Reports are stored **encrypted** on your computer and never leave it.
 
 ### Saving — autosave plus a Save button
 
@@ -335,6 +425,8 @@ leave it.
 - If the app closes — or the computer crashes — **mid-typing**, reopening the
   case restores the last saved content (text **and** the inserted tables) with
   **nothing lost**.
+- When you open a saved case, a short loading screen shows until the whole
+  record is ready, so nothing you click can land on a half-loaded page.
 
 > The **"Send to repertory"** action is not shown yet; it switches on when the
 > repertory ships in a later release.
@@ -343,36 +435,39 @@ leave it.
 
 ## 9. Follow-up visits (R3, new)
 
-Once a patient has a saved first case, the dashboard offers **Follow-up** (the
-plain "New visit" is greyed out, because the first case is already recorded —
-so you can't start a second first case by mistake). Click **Follow-up** to
-record a return consultation.
+Once a patient has a saved first case, the dashboard greys out **New visit**
+and offers **Follow-up**. Click **Follow-up** to record a return consultation.
 
-A follow-up **reopens the very same document** as the case, already filled
-with the previous entries and everything you recorded:
+A follow-up **reopens the same record** with everything from earlier visits
+already in it — every complaint, every dated entry, and every table you
+recorded, **including family history**. Nothing is lost between visits.
 
-- The editor **pre-loads** with the earlier dated entries, the prior complaint
-  text, and the tables you recorded before — **including the family history**
-  and every other recorded section, so nothing is lost between visits.
-- Click **Add entry** to stamp **today's date** and write what has changed.
-- The Record buttons now read **Update vitals / Update family history /
-  Update prescription / …**; each inserts a fresh table under the new dated
-  entry, so you can see the earlier readings and the new ones together.
-- **Next follow-up**: set the next appointment with the quick buttons
-  **7d / 15d / 1m / 2m** or a **custom date**. The scheduled date is shown on
-  the visit and puts the patient onto the Today screen for that date (section
-  10).
-- Like the case, the follow-up **autosaves** and has an explicit **Save**
-  button.
+1. For each complaint the patient reports on, click inside that complaint and
+   click **Add follow-up entry**. A new entry headed
+   *<complaint>-follow-up — <today's date>* is added under it.
+2. Record today's findings in that entry with the same buttons as in section
+   8. The follow-up entry gets **its own fresh tables**, so today's vitals,
+   modalities and so on sit together, while earlier visits' tables stay as
+   they were. Recording the same kind again in this entry adds rows to its
+   table.
+3. A new complaint can be added at any visit with **Add new complaint**.
 
-When you finish and save, the patient's **Today / home screen updates** to
-reflect the follow-up you entered — if you scheduled a next appointment the
-patient appears under **Due today / Overdue** on the right date, and the visit
-shows under **Registered today**.
+The case header shows the **next follow-up date** when one is scheduled.
+
+> **Not yet in this build:** setting the next follow-up date from the case
+> screen. The new record screen shows the date but has no control to set it,
+> so new appointments do not yet appear under Due today / Overdue on the
+> Today screen. This is being fixed for the R3 release.
+
+Like the first case, a follow-up **autosaves** and has a **Save** button.
+After you save, the visit is listed on the patient dashboard under **Visits
+(newest first)** above the earlier ones, the **last visit date** updates,
+**Last prescription** shows the newest prescription you recorded, and the
+Today screen lists the visit under **Registered today**.
 
 > The **progress chart** and formatted **Prescribe / print** actions are not
-> active yet; they switch on in later releases (the prescription table you add
-> in the box is saved as a preview in the meantime).
+> active yet; they switch on in later releases. The prescription table you
+> record is saved as a preview in the meantime.
 
 ---
 
@@ -385,10 +480,11 @@ lists, driven by the follow-up dates you set:
 - **Overdue** — patients whose follow-up date has passed (most overdue first).
 - **Registered today** — the visits recorded today.
 
-Each row shows the patient's photo, name, code and age/sex; click or press
-**Enter** to open their dashboard. Set a follow-up date on a visit and the
-patient appears under **Due today** on that date, then moves to **Overdue**
-afterwards.
+Each row shows the patient's photo (or default figure), name, code and
+age/sex; click or press **Enter** to open their dashboard. A patient with a
+follow-up date appears under **Due today** on that date, then moves to
+**Overdue** afterwards. (See the note in section 9: in this build the date
+cannot yet be set from the case screen.)
 
 Today also shows the **backup warning banner** when your last good backup is
 more than 7 days old (see section 11). The licence-renewal reminder becomes
@@ -469,7 +565,7 @@ and **all cases and visits** come back.
 | F2 / Ctrl+K | Focus / open global patient search |
 | F3 | Today |
 | F4 | New patient |
-| F5 | New visit for the open patient (case or follow-up) |
+| F5 | Take case for the open patient (for a returning patient, use the **Follow-up** button) |
 | Alt+← | Back (up one level: case/follow-up → dashboard → list → Today) |
 | Ctrl+= / Ctrl+- | Zoom text and layout in / out |
 | Ctrl+0 | Reset zoom |
@@ -482,10 +578,13 @@ and **all cases and visits** come back.
 > screen, and **Alt+←** does the same from the keyboard. Going back never
 > discards your work — the case is already autosaved.
 
-> **Zoom** scales both the text and the layout, so you can make the whole app
-> larger on a big consulting-room screen or smaller to fit more in. When the
-> window is **maximised / full-screen, the layout now fills the whole screen**
-> rather than sitting in a narrow centred column.
+> **Zoom** scales the **whole app** — text, buttons and layout — not just the
+> case record, so you can make everything larger on a big consulting-room
+> screen or smaller to fit more in. Use the zoom buttons at the top or the
+> keys above. The layout **adjusts to the window size at any zoom**: when you
+> maximise, go full-screen, tile the window to one side or drag it smaller,
+> the screen re-flows to fit instead of sitting in a narrow centred column or
+> being cut off.
 
 ---
 
