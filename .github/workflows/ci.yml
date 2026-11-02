@@ -245,10 +245,19 @@ jobs:
             WEBDRIVER_PKG=webkit2gtk-driver
           fi
           echo "Installing WebDriver package: $WEBDRIVER_PKG"
+          # x11-utils (xwininfo, xprop), libxtst6 and gdb are used by the
+          # real native file-picker smoke spec to find the GTK dialog window,
+          # confirm it is a GtkFileChooserDialog and dismiss it.
           sudo apt-get install -y \
             ${{ env.LINUX_TAURI_DEPS }} \
             "$WEBDRIVER_PKG" \
-            xvfb
+            xvfb \
+            x11-utils \
+            libxtst6 \
+            gdb
+          # Let gdb attach to the app process it did not start (the smoke spec
+          # reads the app's live GTK toplevels). Runner-only setting.
+          sudo sysctl -w kernel.yama.ptrace_scope=0 || true
           if ! command -v WebKitWebDriver >/dev/null 2>&1; then
             DRV="$(dpkg -L "$WEBDRIVER_PKG" | grep -E '/WebKitWebDriver$' | head -1)"
             if [ -z "$DRV" ]; then
