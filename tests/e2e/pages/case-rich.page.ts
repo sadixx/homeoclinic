@@ -21,6 +21,7 @@
 // data-testid (controls) + scoped structural queries inside the editor root; no
 // sleeps — all waits go through waitUntil / waitForDisplayed.
 import { $, $$, browser } from '@wdio/globals';
+import { Key } from 'webdriverio';
 
 import { appBarPage } from './appbar.page.js';
 
@@ -328,7 +329,15 @@ export class CaseRichPage {
             ths.forEach((c) => headers.push((c.textContent ?? '').trim()));
           }
           if (tds.length > 0) {
-            rows.push(tds.map((c) => (c.textContent ?? '').trim()));
+            // M3ux: a data row's LAST cell also holds the view-only row-delete
+            // widget (span.hc-row-delete, glyph "−"); it is not cell content.
+            rows.push(
+              tds.map((c) => {
+                const k = c.cloneNode(true) as HTMLElement;
+                k.querySelectorAll('.hc-row-delete').forEach((w) => w.remove());
+                return (k.textContent ?? '').trim();
+              }),
+            );
           }
         });
         out.push({
@@ -1072,7 +1081,14 @@ export class CaseRichPage {
         for (const tbl of tbls) {
           const rows = Array.from(tbl.querySelectorAll('tr'))
             .filter((tr) => tr.querySelectorAll('td').length > 0)
-            .map((tr) => Array.from(tr.querySelectorAll('td')).map((c) => (c.textContent ?? '').trim()));
+            .map((tr) =>
+              Array.from(tr.querySelectorAll('td')).map((c) => {
+                // M3ux: drop the view-only row-delete widget (not cell content).
+                const k = c.cloneNode(true) as HTMLElement;
+                k.querySelectorAll('.hc-row-delete').forEach((w) => w.remove());
+                return (k.textContent ?? '').trim();
+              }),
+            );
           cur.tables.push({ type: tbl.getAttribute('data-hc-table-type'), rows });
         }
       }
@@ -1214,6 +1230,314 @@ export class CaseRichPage {
     await choice.waitForClickable({ timeout });
     await choice.click();
     await dialog.waitForDisplayed({ reverse: true, timeout });
+  }
+
+  // ---- M3ux inline row delete --------------------------------------------
+  get rowDeleteDialog(): ChainablePromiseElement {
+    return byTestId('case-form-table-row-delete-dialog');
+  }
+
+  get rowDeleteConfirm(): ChainablePromiseElement {
+    return byTestId('case-form-table-row-delete-confirm');
+  }
+
+  get rowDeleteCancel(): ChainablePromiseElement {
+    return byTestId('case-form-table-row-delete-cancel');
+  }
+
+  /**
+   * M3ux: where every row-delete control is rendered, per editor table: for
+   * each <tr>, header or data, the ids of the delete buttons INSIDE that row,
+   * whether each button box lies within its row box, and the button's glyph,
+   * name, shortcut and tooltip. Plus page-wide checks for the removed strip:
+   * the old container testid and any button outside the editor whose text
+   * looks like the old "✕ Row N".
+   */
+  async rowDeleteLayout(cid = DEFAULT_CID): Promise<{
+    stripPresent: boolean;
+    oldStyleButtons: string[];
+    buttonsOutsideTables: number;
+    tables: {
+      tableType: string | null;
+      rows: {
+        header: boolean;
+        buttons: {
+          id: string;
+          inRowBox: boolean;
+          text: string;
+          label: string;
+          keys: string;
+          title: string;
+          left: number;
+          right: number;
+          top: number;
+          bottom: number;
+          row: { left: number; right: number; top: number; bottom: number };
+          cell: { left: number; right: number; top: number; bottom: number };
+        }[];
+      }[];
+    }[];
+  }> {
+    return browser.execute((selector: string) => {
+      const root = document.querySelector(selector);
+      const allBtns = Array.from(
+        document.querySelectorAll('[data-testid^="case-form-table-row-delete-"]'),
+      ).filter((b) => /^case-form-table-row-delete-\d+-\d+$/.test(b.getAttribute('data-testid') ?? ''));
+      const oldStyle = Array.from(document.querySelectorAll('button'))
+        .filter((b) => root === null || !root.contains(b))
+        .map((b) => (b.textContent ?? '').trim())
+        .filter((t) => /\bRow\s*\d+/.test(t));
+      const tables = root === null ? [] : Array.from(root.querySelectorAll('table'));
+      return {
+        stripPresent: document.querySelector('[data-testid="case-form-table-row-controls"]') !== null,
+        oldStyleButtons: oldStyle,
+        buttonsOutsideTables: allBtns.filter((b) => b.closest('table') === null).length,
+        tables: tables.map((tbl) => ({
+          tableType: tbl.getAttribute('data-hc-table-type'),
+          rows: Array.from(tbl.querySelectorAll('tr')).map((tr) => {
+            const trBox = tr.getBoundingClientRect();
+            return {
+              header: tr.querySelectorAll('th').length > 0 && tr.querySelectorAll('td').length === 0,
+              buttons: allBtns
+                .filter((b) => b.closest('tr') === tr)
+                .map((b) => {
+                  const r = b.getBoundingClientRect();
+                  return {
+                    id: b.getAttribute('data-testid') ?? '',
+                    inRowBox:
+                      r.width > 0 &&
+                      r.left >= trBox.left - 0.5 &&
+                      r.right <= trBox.right + 0.5 &&
+                      r.top >= trBox.top - 0.5 &&
+                      r.bottom <= trBox.bottom + 0.5,
+                    text: (b.textContent ?? '').trim(),
+                    label: b.getAttribute('aria-label') ?? '',
+                    keys: b.getAttribute('aria-keyshortcuts') ?? '',
+                    title: b.getAttribute('title') ?? '',
+                    left: Math.round(r.left),
+                    right: Math.round(r.right),
+                    top: Math.round(r.top * 10) / 10,
+                    bottom: Math.round(r.bottom * 10) / 10,
+                    row: {
+                      left: Math.round(trBox.left),
+                      right: Math.round(trBox.right),
+                      top: Math.round(trBox.top * 10) / 10,
+                      bottom: Math.round(trBox.bottom * 10) / 10,
+                    },
+                    cell: ((): { left: number; right: number; top: number; bottom: number } => {
+                      const c = (b.closest('td') ?? b).getBoundingClientRect();
+                      return {
+                        left: Math.round(c.left),
+                        right: Math.round(c.right),
+                        top: Math.round(c.top * 10) / 10,
+                        bottom: Math.round(c.bottom * 10) / 10,
+                      };
+                    })(),
+                  };
+                }),
+            };
+          }),
+        })),
+      };
+    }, `[data-testid="case-form-editor-${cid}"]`);
+  }
+
+  /**
+   * M3ux: native click into the FIRST cell of row `row` (0 = header row) of
+   * the first table of `type`, placing the real caret there (the first cell
+   * never holds the minus widget, which sits in the LAST cell).
+   */
+  async clickTableCell(type: string, row: number, cid = DEFAULT_CID): Promise<void> {
+    const tables = await $$(`[data-testid="case-form-editor-${cid}"] table`);
+    for (const tbl of tables) {
+      if ((await tbl.getAttribute('data-hc-table-type')) !== type) continue;
+      const trs = await tbl.$$('tr');
+      const tr = trs[row];
+      if (tr === undefined) throw new Error(`table ${type} has no row ${row}`);
+      const cell = (await tr.$$('th, td'))[0];
+      if (cell === undefined) throw new Error(`table ${type} row ${row} has no cell`);
+      await cell.scrollIntoView({ block: 'center' });
+      await cell.click();
+      return;
+    }
+    throw new Error(`no table of type ${type}`);
+  }
+
+  /**
+   * M3ux: where keyboard focus and the caret are: whether the editor's
+   * ProseMirror root is document.activeElement, and the table type + row
+   * index (0 = header) of the DOM selection anchor, or null outside a table.
+   */
+  async caretAndFocus(cid = DEFAULT_CID): Promise<{
+    editorFocused: boolean;
+    activeTestId: string | null;
+    tableType: string | null;
+    row: number | null;
+  }> {
+    return browser.execute((selector: string) => {
+      const root = document.querySelector(selector);
+      const pm = root?.querySelector('.ProseMirror') ?? null;
+      const active = document.activeElement as HTMLElement | null;
+      const sel = window.getSelection();
+      let node: Node | null = sel?.anchorNode ?? null;
+      if (node !== null && node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
+      const tr = (node as Element | null)?.closest('tr') ?? null;
+      const tbl = tr?.closest('table') ?? null;
+      const inEditor = tbl !== null && root !== null && root.contains(tbl);
+      return {
+        editorFocused: pm !== null && active === pm,
+        activeTestId: active?.getAttribute('data-testid') ?? null,
+        tableType: inEditor ? tbl.getAttribute('data-hc-table-type') : null,
+        row: inEditor && tbl !== null ? Array.from(tbl.querySelectorAll('tr')).indexOf(tr as HTMLTableRowElement) : null,
+      };
+    }, `[data-testid="case-form-editor-${cid}"]`);
+  }
+
+  /** M3ux: wait until the caret is in row `row` of the `type` table, editor focused. */
+  async waitCaretIn(type: string, row: number, what: string, cid = DEFAULT_CID): Promise<void> {
+    await browser
+      .waitUntil(
+        async () => {
+          const c = await this.caretAndFocus(cid);
+          return c.editorFocused && c.tableType === type && c.row === row;
+        },
+        { timeout: 10000, interval: 100 },
+      )
+      .catch(async () => {
+        throw new Error(`${what}: caret/focus not in ${type} row ${row}: ${JSON.stringify(await this.caretAndFocus(cid))}`);
+      });
+  }
+
+  /** M3ux: the REAL Ctrl+Shift+Backspace chord via WebDriver key actions. */
+  async pressRowDeleteShortcut(): Promise<void> {
+    await browser
+      .action('key')
+      .down(Key.Ctrl)
+      .down(Key.Shift)
+      .down(Key.Backspace)
+      .up(Key.Backspace)
+      .up(Key.Shift)
+      .up(Key.Ctrl)
+      .perform();
+  }
+
+  /** M3ux: a real Escape key press. */
+  async pressEscape(): Promise<void> {
+    await browser.action('key').down(Key.Escape).up(Key.Escape).perform();
+  }
+
+  /**
+   * M3ux: open Record physical generals and fill EVERY field (inputs get
+   * `<Label> value`, the sun-aggravation select gets Yes), then Record, so
+   * the generals table has one Field|Value row per field (14).
+   */
+  async recordAllGenerals(timeout = 15000): Promise<number> {
+    await this.openGeneralsPopup(timeout);
+    const fields = await this.generalsFields();
+    for (const f of fields) {
+      const el = byTestId(f.id);
+      await el.waitForDisplayed({ timeout });
+      if (f.tag === 'select') await el.selectByVisibleText('Yes');
+      else await el.setValue(`${f.label} value`);
+    }
+    await byTestId('case-form-record-generals-confirm').waitForClickable({ timeout });
+    await byTestId('case-form-record-generals-confirm').click();
+    await byTestId('case-form-generals-popup').waitForDisplayed({ reverse: true, timeout });
+    return fields.length;
+  }
+
+  /**
+   * M3ux: horizontal-fit metrics for the first table of `type`: the table's
+   * own scroll vs client width, its scroll container (the editor) and the
+   * viewport, and whether every minus button lies inside the viewport.
+   */
+  async tableFit(type: string, cid = DEFAULT_CID): Promise<{
+    found: boolean;
+    tableRight: number;
+    viewport: number;
+    wrapperOverflowX: number;
+    editorOverflowX: number;
+    buttonsOutsideViewport: number;
+  }> {
+    return browser.execute(
+      (selector: string, tType: string) => {
+        const root = document.querySelector(selector) as HTMLElement | null;
+        const tbl = root === null
+          ? undefined
+          : Array.from(root.querySelectorAll('table')).find((t) => t.getAttribute('data-hc-table-type') === tType);
+        const vw = window.innerWidth;
+        if (root === null || tbl === undefined) {
+          return { found: false, tableRight: 0, viewport: vw, wrapperOverflowX: 0, editorOverflowX: 0, buttonsOutsideViewport: 0 };
+        }
+        const wrap = (tbl.parentElement ?? tbl) as HTMLElement;
+        let scroller: HTMLElement | null = root;
+        while (scroller !== null && scroller.scrollHeight <= scroller.clientHeight && scroller.parentElement !== null) {
+          scroller = scroller.parentElement;
+        }
+        const ed = scroller ?? root;
+        const btns = Array.from(tbl.querySelectorAll('.hc-row-delete-btn'));
+        return {
+          found: true,
+          tableRight: Math.round(tbl.getBoundingClientRect().right),
+          viewport: vw,
+          wrapperOverflowX: wrap.scrollWidth - wrap.clientWidth,
+          editorOverflowX: ed.scrollWidth - ed.clientWidth,
+          buttonsOutsideViewport: btns.filter((b) => {
+            const r = b.getBoundingClientRect();
+            return r.left < 0 || r.right > vw;
+          }).length,
+        };
+      },
+      `[data-testid="case-form-editor-${cid}"]`,
+      type,
+    );
+  }
+
+  /** M3ux: scroll the first `type` table into view and save an element screenshot. */
+  async screenshotTable(type: string, file: string, cid = DEFAULT_CID): Promise<void> {
+    const tables = await $$(`[data-testid="case-form-editor-${cid}"] table`);
+    for (const tbl of tables) {
+      if ((await tbl.getAttribute('data-hc-table-type')) !== type) continue;
+      await tbl.scrollIntoView({ block: 'start' });
+      await tbl.saveScreenshot(file);
+      return;
+    }
+    throw new Error(`no table of type ${type} to screenshot`);
+  }
+
+  /**
+   * M3ux: the saved case JSON as the app stores it, read through the
+   * PRODUCTION IPC the case form itself uses on open
+   * (case_visit_open_or_create reuses today's same-type visit).
+   */
+  async savedCaseJson(patientId: string, visitType = 'first'): Promise<{ visitId: string; dataJson: string }> {
+    const res = (await browser.executeAsync(
+      (pid: string, vt: string, done: (v: unknown) => void) => {
+        const internals = (
+          window as unknown as {
+            __TAURI_INTERNALS__?: { invoke: (cmd: string, args: unknown) => Promise<unknown> };
+          }
+        ).__TAURI_INTERNALS__;
+        if (internals === undefined) {
+          done({ status: 'error', error: { message: 'no __TAURI_INTERNALS__' } });
+          return;
+        }
+        internals
+          .invoke('case_visit_open_or_create', { req: { patientId: pid, visitType: vt } })
+          .then((v) => done(v))
+          .catch((e) => done({ status: 'error', error: { message: String(e) } }));
+      },
+      patientId,
+      visitType,
+    )) as
+      | { status: 'ok'; data: { visitId: string; dataJson: string } }
+      | { visitId: string; dataJson: string }
+      | { status: 'error'; error: { message?: string } };
+    if ('status' in res) {
+      if (res.status !== 'ok') throw new Error(`case_visit_open_or_create failed: ${res.error.message ?? ''}`);
+      return { visitId: res.data.visitId, dataJson: res.data.dataJson };
+    }
+    return { visitId: res.visitId, dataJson: res.dataJson };
   }
 
   /** Item 4: the one-click Open on investigation link row n, and its preview. */

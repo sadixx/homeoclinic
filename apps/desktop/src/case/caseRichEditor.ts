@@ -18,6 +18,10 @@
 
 import { Extension } from '@tiptap/core';
 import type { Content } from '@tiptap/core';
+import type { Node as PmNode } from '@tiptap/pm/model';
+import { Plugin, PluginKey, Selection } from '@tiptap/pm/state';
+import type { EditorState } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Table from '@tiptap/extension-table';
@@ -236,15 +240,253 @@ const HcAttributes = Extension.create({
 });
 
 /**
+ * How the inline row-delete control (M3ux) talks to the React layer. The
+ * control itself is a ProseMirror WIDGET decoration, so it is view-only: it is
+ * never a doc node, never in `getJSON()`, data_json or the fts text mirror.
+ */
+export interface RowDeleteOptions {
+  /** The accessible name for data row `rowNo` (1-based) of a `kind` table. */
+  readonly label: (rowNo: number, kind: string | null) => string;
+  /** The tooltip (`title`) for data row `rowNo`: the name plus the shortcut. */
+  readonly title: (rowNo: number, kind: string | null) => string;
+  /** The visible glyph (a minus sign). */
+  readonly glyph: string;
+  /**
+   * Called on activation of a row's minus button OR on
+   * {@link ROW_DELETE_SHORTCUT} with the caret in that data row; the caller
+   * confirms, then deletes by real position.
+   */
+  readonly onDelete: (tableNo: number, rowNo: number) => void;
+}
+
+/**
+ * M3ux rowdelete-1: the keyboard path to the row delete. TipTap Table owns
+ * Tab/Shift-Tab inside cells (goToNextCell / addRowAfter), so the minus buttons
+ * are not reachable by Tab from the caret; this shortcut opens the SAME confirm
+ * for the caret's DATA row. `Mod` = Ctrl on Windows/Linux (the MVP1 targets).
+ */
+export const ROW_DELETE_SHORTCUT = 'Mod-Shift-Backspace';
+
+/** {@link ROW_DELETE_SHORTCUT} in `aria-keyshortcuts` syntax (Windows/Linux). */
+export const ROW_DELETE_ARIA_KEYSHORTCUTS = 'Control+Shift+Backspace';
+
+const rowDeleteKey = new PluginKey<DecorationSet>('hcRowDelete');
+
+/**
+ * The top-level table row holding the caret (selection head), numbered as
+ * {@link tableRowPos} counts them: `tableNo` 1-based in doc order, `rowNo` 0
+ * for the header row and 1-based for data rows. Null outside a table.
+ */
+export function caretTableRow(
+  state: EditorState,
+): { readonly tableNo: number; readonly rowNo: number } | null {
+  const $head = state.selection.$head;
+  // A top-level table sits at depth 1, its rows at depth 2.
+  if ($head.depth < 2) return null;
+  if ($head.node(1).type.name !== 'table') return null;
+  if ($head.node(2).type.name !== 'tableRow') return null;
+  const tableIndex = $head.index(0);
+  let tableNo = 0;
+  for (let i = 0; i <= tableIndex; i += 1) {
+    if (state.doc.child(i).type.name === 'table') tableNo += 1;
+  }
+  return { tableNo, rowNo: $head.index(1) };
+}
+
+/**
+ * Put the caret (no focus, doc unchanged) at the nearest text position at or
+ * after `pos`, clamped to the doc. No scroll is requested (CaseForm opts out
+ * of selection-scroll).
+ */
+function setCaretNear(editor: Editor, pos: number): void {
+  const { state, view } = editor;
+  const clamped = Math.max(0, Math.min(pos, state.doc.content.size));
+  const selection = Selection.near(state.doc.resolve(clamped), 1);
+  view.dispatch(state.tr.setSelection(selection));
+}
+
+/**
+ * M3ux rowdelete-2: return keyboard focus to the editor with the caret in the
+ * first cell of row `rowNo` of the `tableNo`-th table (the row a cancelled
+ * confirm was opened for), else at the start of the doc.
+ */
+export function focusTableRow(
+  editor: Editor,
+  tableNo: number,
+  rowNo: number,
+): void {
+  const pos = tableRowPos(editor, tableNo, rowNo);
+  // +1 steps into the row, so Selection.near lands in its first cell.
+  setCaretNear(editor, pos !== null ? pos + 1 : 0);
+  editor.view.focus();
+}
+
+/**
+ * M3ux rowdelete-2: BEFORE data row `rowNo` of the `tableNo`-th table is
+ * deleted, park the caret where the keyboard user should land afterwards: the
+ * next row (it moves up into the deleted row's place), else the previous data
+ * row, else (the delete removes the whole table) the text after the table. The
+ * delete transaction maps the caret, so it stays valid; the caller then
+ * focuses the view.
+ */
+export function parkCaretForRowDelete(
+  editor: Editor,
+  tableNo: number,
+  rowNo: number,
+): void {
+  const next = tableRowPos(editor, tableNo, rowNo + 1);
+  const prev = rowNo > 1 ? tableRowPos(editor, tableNo, rowNo - 1) : null;
+  const row = next ?? prev;
+  if (row !== null) {
+    setCaretNear(editor, row + 1);
+    return;
+  }
+  const header = tableRowPos(editor, tableNo, 0);
+  if (header === null) return;
+  // header - 1 is the table's own offset; past its end is the next block.
+  const table = editor.state.doc.resolve(header).parent;
+  setCaretNear(editor, header - 1 + table.nodeSize);
+}
+
+/**
+ * The widget + cell-class decorations for every DATA row (header excluded) of
+ * every top-level table, numbered exactly as {@link tableRowPos} counts them
+ * (t = doc-order table, r = data row, both 1-based). The widget sits at the end
+ * of the row's LAST cell (valid HTML inside the row's own <td>); the cell gets
+ * a class that reserves the right-edge gutter the button is drawn in.
+ */
+function rowDeleteDecorations(
+  doc: PmNode,
+  options: RowDeleteOptions,
+): DecorationSet {
+  const decorations: Decoration[] = [];
+  let tableNo = 0;
+  doc.forEach((table, tableOffset) => {
+    if (table.type.name !== 'table') return;
+    tableNo += 1;
+    const kind =
+      typeof table.attrs['hcTableType'] === 'string'
+        ? (table.attrs['hcTableType'] as string)
+        : null;
+    let rowPos = tableOffset + 1;
+    table.forEach((row, _o, rowIndex) => {
+      const thisRowPos = rowPos;
+      rowPos += row.nodeSize;
+      if (rowIndex === 0 || row.childCount === 0) return;
+      const last = row.lastChild;
+      if (last === null) return;
+      const cellTo = thisRowPos + row.nodeSize - 1;
+      const cellFrom = cellTo - last.nodeSize;
+      decorations.push(
+        Decoration.node(cellFrom, cellTo, { class: 'hc-row-delete-cell' }),
+      );
+      const tNo = tableNo;
+      const rNo = rowIndex;
+      const label = options.label(rNo, kind);
+      const title = options.title(rNo, kind);
+      decorations.push(
+        Decoration.widget(
+          cellTo - 1,
+          () => rowDeleteWidget(tNo, rNo, label, title, options),
+          {
+            side: 1,
+            key: `hc-row-delete-${tNo}-${rNo}-${title}`,
+            ignoreSelection: true,
+            // The button owns its own events: ProseMirror must not treat a
+            // click or an Enter/Space on it as editing input.
+            stopEvent: () => true,
+          },
+        ),
+      );
+    });
+  });
+  return DecorationSet.create(doc, decorations);
+}
+
+/** The non-editable wrapper + real <button> for one data row. */
+function rowDeleteWidget(
+  tableNo: number,
+  rowNo: number,
+  label: string,
+  title: string,
+  options: RowDeleteOptions,
+): HTMLElement {
+  const wrap = document.createElement('span');
+  wrap.className = 'hc-row-delete';
+  wrap.setAttribute('contenteditable', 'false');
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'hc-row-delete-btn';
+  btn.setAttribute(
+    'data-testid',
+    `case-form-table-row-delete-${tableNo}-${rowNo}`,
+  );
+  btn.setAttribute('aria-label', label);
+  btn.setAttribute('aria-keyshortcuts', ROW_DELETE_ARIA_KEYSHORTCUTS);
+  btn.title = title;
+  btn.textContent = options.glyph;
+  btn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    options.onDelete(tableNo, rowNo);
+  });
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+/**
+ * M3ux: the inline row-delete control on every DATA row of every inserted
+ * table. Decorations are derived from the doc and recomputed on every doc
+ * change (incl. `setContent`), so rows added by Record or removed by a delete
+ * are renumbered at once without a reload.
+ */
+function rowDeleteExtension(options: RowDeleteOptions): Extension {
+  return Extension.create({
+    name: 'hcRowDelete',
+    addKeyboardShortcuts() {
+      return {
+        // rowdelete-1: the caret's DATA row -> the same confirm as its minus.
+        // On the header row the key is consumed and nothing happens (the
+        // header is never deletable, and the native Ctrl+Shift+Backspace text
+        // deletion must not edit it either). Outside a table it is not ours.
+        [ROW_DELETE_SHORTCUT]: () => {
+          const hit = caretTableRow(this.editor.state);
+          if (hit === null) return false;
+          if (hit.rowNo >= 1) options.onDelete(hit.tableNo, hit.rowNo);
+          return true;
+        },
+      };
+    },
+    addProseMirrorPlugins() {
+      return [
+        new Plugin<DecorationSet>({
+          key: rowDeleteKey,
+          state: {
+            init: (_config, state) => rowDeleteDecorations(state.doc, options),
+            apply: (tr, old) =>
+              tr.docChanged ? rowDeleteDecorations(tr.doc, options) : old,
+          },
+          props: {
+            decorations: (state) => rowDeleteKey.getState(state),
+          },
+        }),
+      ];
+    },
+  });
+}
+
+/**
  * The extension set every case editor uses. `dropcursor`/`gapcursor` are
  * disabled: they add nothing for a single-column clinical note and their
  * coordinate maths touches DOM APIs jsdom lacks; table column-resizing is off
  * (`resizable: false`) for the same reason and because the grid is fixed-shape.
  * StarterKit supplies doc/paragraph/text/history/heading/horizontalRule.
+ * `rowDelete` adds the inline row-delete control (M3ux); headless callers omit
+ * it.
  */
-export function caseEditorExtensions(): ReturnType<
-  typeof StarterKit.configure
->[] {
+export function caseEditorExtensions(
+  rowDelete?: RowDeleteOptions,
+): ReturnType<typeof StarterKit.configure>[] {
   return [
     StarterKit.configure({ dropcursor: false, gapcursor: false }),
     Table.configure({ resizable: false }),
@@ -252,6 +494,7 @@ export function caseEditorExtensions(): ReturnType<
     TableHeader,
     TableCell,
     HcAttributes,
+    ...(rowDelete !== undefined ? [rowDeleteExtension(rowDelete)] : []),
   ] as unknown as ReturnType<typeof StarterKit.configure>[];
 }
 
@@ -699,32 +942,6 @@ export function appendInvestigationLink(
   };
   const next = content.map((n, i) => (i === tableIndex ? grown : n));
   return { type: 'doc', content: next };
-}
-
-/** One inserted table of the live doc, for the row-delete controls. */
-export interface TableStructure {
-  /** The table's `hcTableType` (or null for a table without one). */
-  readonly kind: string | null;
-  /** How many DATA rows (header excluded) the table has. */
-  readonly dataRows: number;
-}
-
-/**
- * The top-level tables of the live doc in document order (M3-RWv6 item 6), so
- * the React layer can render a delete control per data row without making it
- * an editable doc node.
- */
-export function tableStructure(editor: Editor): TableStructure[] {
-  const out: TableStructure[] = [];
-  editor.state.doc.forEach((node) => {
-    if (node.type.name !== 'table') return;
-    const kind = node.attrs['hcTableType'];
-    out.push({
-      kind: typeof kind === 'string' ? kind : null,
-      dataRows: Math.max(0, node.childCount - 1),
-    });
-  });
-  return out;
 }
 
 /**
