@@ -73,6 +73,7 @@ import { isUserFacingError, run } from '@/shared/command';
 import { formatDate, formatDateTime, todayIsoDate } from '@/shared/datetime';
 import { t } from '@/shared/strings';
 import type { StringKey } from '@/shared/strings';
+import { NextFollowupControl } from '@/case/NextFollowupControl';
 
 // The legacy v2->* upcast now lives in caseRich (parseCaseDoc). It is re-exported
 // here for continuity with callers/tests that imported it alongside the
@@ -263,6 +264,35 @@ export function CaseForm({
       setStatus({ kind: 'error' });
     }
   }, [visitId, buildPayload]);
+
+  // Ctrl+S / Cmd+S = the Save button (CASE-005, HC-MVP1-M3vis): an immediate
+  // force-save of the newest in-editor content, from anywhere while the case
+  // form is mounted (prose, a table cell, the header, or nothing focused). A
+  // window CAPTURE listener runs before ProseMirror's keymaps and any element
+  // handler, so the webview's own "save page" default is always suppressed.
+  // It matches only Mod+S without Alt (Caps Lock gives key "S"), so the table
+  // keymaps (Tab, Ctrl+Shift+Backspace row delete) are untouched. Removed on
+  // unmount so a closed visit is never saved into.
+  //
+  // Layouts: `key` is "s"/"S" on Latin layouts. On a non-Latin layout (e.g.
+  // Hindi InScript, Marathi) `key` is the layout's own character, so the
+  // physical key (`code === 'KeyS'`) is matched instead, but only when `key`
+  // is not a Latin letter, so Ctrl+O on Dvorak (physical KeyS) is not Save.
+  // An auto-repeat (key held down) is swallowed but does not save again, so
+  // holding the chord never bursts autosave writes (one audit row each).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.isComposing) return;
+      const key = e.key.toLowerCase();
+      const isSave = key === 's' || (e.code === 'KeyS' && !/^[a-z]$/.test(key));
+      if (!isSave) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      void flushSave();
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [flushSave]);
 
   const scheduleSave = useCallback((): void => {
     setStatus({ kind: 'saving' });
@@ -688,7 +718,9 @@ export function CaseForm({
     >
       <HeaderBar
         status={status}
+        visitId={visitId}
         nextFollowupOn={nextFollowupOn}
+        onNextFollowupSaved={setNextFollowupOn}
         onForceSave={() => void flushSave()}
         {...(onBack !== undefined ? { onBack } : {})}
       />
@@ -1355,15 +1387,19 @@ function cellText(node: ProseMirrorNode): string {
   return s;
 }
 
-/** Top header: next F/U display, Save + status. */
+/** Top header: next F/U display + scheduler (VIS-004), Save + status. */
 function HeaderBar({
   status,
+  visitId,
   nextFollowupOn,
+  onNextFollowupSaved,
   onForceSave,
   onBack,
 }: {
   readonly status: SaveStatus;
+  readonly visitId: string;
   readonly nextFollowupOn: string | null;
+  readonly onNextFollowupSaved: (next: string | null) => void;
   readonly onForceSave: () => void;
   readonly onBack?: () => void;
 }): JSX.Element {
@@ -1372,8 +1408,10 @@ function HeaderBar({
       ? `${t('case.form.nextFollowup.prefix')} ${formatDate(nextFollowupOn)}`
       : t('case.form.nextFollowup.none');
   return (
-    <header className="flex flex-none items-center justify-between gap-3 border-b border-slate-200 px-4 py-2">
-      <div className="flex items-center gap-3">
+    // Wraps (the scheduler drops under the F/U text) rather than scrolling
+    // sideways when the window is narrower than 1366x768 needs.
+    <header className="flex flex-none flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-slate-200 px-4 py-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         {onBack !== undefined ? (
           <button
             type="button"
@@ -1387,10 +1425,15 @@ function HeaderBar({
         ) : null}
         <span
           data-testid="case-form-next-followup"
-          className="text-sm text-slate-700"
+          className="whitespace-nowrap text-sm text-slate-700"
         >
           {nextText}
         </span>
+        <NextFollowupControl
+          visitId={visitId}
+          value={nextFollowupOn}
+          onSaved={onNextFollowupSaved}
+        />
       </div>
       <div className="flex items-center gap-2">
         <SaveIndicator status={status} />

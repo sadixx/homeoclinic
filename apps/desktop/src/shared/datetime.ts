@@ -41,6 +41,13 @@ export function formatDate(rfc3339: string | null | undefined): string | null {
   if (rfc3339 === null || rfc3339 === undefined || rfc3339.trim() === '') {
     return null;
   }
+  // A bare calendar date (`YYYY-MM-DD`, e.g. `next_followup_on`) is a day,
+  // not an instant: `new Date('YYYY-MM-DD')` parses it as UTC midnight, which
+  // shows the previous day west of UTC. Read its parts literally instead.
+  const parts = parseIsoDate(rfc3339);
+  if (parts !== null) {
+    return `${pad2(parts.day)}-${pad2(parts.month)}-${parts.year}`;
+  }
   const date = new Date(rfc3339);
   if (Number.isNaN(date.getTime())) {
     return null;
@@ -76,13 +83,55 @@ export function isoDatePlusDays(days: number): string {
 
 /**
  * `today + months` as an ISO calendar date (`YYYY-MM-DD`), computed in local
- * time (VIS-004 quick buttons 1m / 2m). `Date.setMonth` handles year rollover;
- * a day that does not exist in the target month (e.g. 31 Jan + 1m) overflows
- * into the following month per the platform `Date` semantics, which is
- * acceptable for an advisory follow-up date.
+ * time (VIS-004 quick buttons 1m / 2m): the same day of the month `months`
+ * later, with year rollover. A day that does not exist in the target month is
+ * clamped to that month's last day (31 Jan + 1m = 28/29 Feb), so "1 month"
+ * never spills into the month after.
  */
 export function isoDatePlusMonths(months: number): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + months);
-  return toIsoDate(d);
+  const now = new Date();
+  const day = now.getDate();
+  // Day 1 of the target month (setMonth on day 1 never overflows), then clamp.
+  const target = new Date(now.getFullYear(), now.getMonth() + months, 1);
+  const lastDay = new Date(
+    target.getFullYear(),
+    target.getMonth() + 1,
+    0,
+  ).getDate();
+  target.setDate(Math.min(day, lastDay));
+  return toIsoDate(target);
+}
+
+/** The numeric parts of a strict `YYYY-MM-DD` calendar date, or `null`. */
+function parseIsoDate(
+  iso: string,
+): { year: number; month: number; day: number } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
+  if (m === null) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const check = new Date(year, month - 1, day);
+  if (
+    check.getFullYear() !== year ||
+    check.getMonth() !== month - 1 ||
+    check.getDate() !== day
+  ) {
+    return null;
+  }
+  return { year, month, day };
+}
+
+/** True when `iso` is a valid `YYYY-MM-DD` calendar date. */
+export function isValidIsoDate(iso: string): boolean {
+  return parseIsoDate(iso) !== null;
+}
+
+/**
+ * True when the `YYYY-MM-DD` date `iso` is before the LOCAL today (VIS-004:
+ * a next follow-up may be today or later, never in the past). ISO calendar
+ * dates compare correctly as strings once both are zero-padded.
+ */
+export function isIsoDateBeforeToday(iso: string): boolean {
+  return iso < todayIsoDate();
 }

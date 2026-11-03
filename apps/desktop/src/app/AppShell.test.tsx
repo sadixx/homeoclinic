@@ -882,6 +882,93 @@ describe('AppShell', () => {
       expect(await screen.findByTestId('case-form')).toBeInTheDocument();
     });
 
+    // HC-MVP1-M3vis (2): F5 must not start a SECOND first case for a patient
+    // whose first case is already saved; it takes the same path as the
+    // dashboard Follow-up button (open-or-create follow_up + /followup route).
+    it('M3vis: F5 opens the FOLLOW-UP when the open patient already has a saved first case', async () => {
+      visitHasSavedFirstCase.mockResolvedValue({ hasSavedFirstCase: true });
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patients?id=p-123');
+      // The dashboard has resolved the gate (its Follow-up button shows).
+      await screen.findByTestId('patient-dash-followup');
+      caseVisitOpenOrCreate.mockClear();
+
+      await user.keyboard('{F5}');
+
+      await waitFor(() =>
+        expect(caseVisitOpenOrCreate).toHaveBeenCalledWith({
+          patientId: 'p-123',
+          visitType: 'follow_up',
+        }),
+      );
+      expect(caseVisitOpenOrCreate).not.toHaveBeenCalledWith({
+        patientId: 'p-123',
+        visitType: 'first',
+      });
+      await waitFor(() => expect(window.location.hash).toContain('/followup'));
+      expect(await screen.findByTestId('case-form')).toBeInTheDocument();
+    });
+
+    it('M3vis: F5 from inside a case asks the saved-first-case gate and opens the follow-up', async () => {
+      visitHasSavedFirstCase.mockResolvedValue({ hasSavedFirstCase: true });
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      // No dashboard on screen: the shell itself must ask the gate.
+      await navigateViaHash('#/patient/p-123/case/v-1');
+      await screen.findByTestId('case-form');
+      caseVisitOpenOrCreate.mockClear();
+      visitHasSavedFirstCase.mockClear();
+
+      await user.keyboard('{F5}');
+
+      await waitFor(() =>
+        expect(visitHasSavedFirstCase).toHaveBeenCalledWith({
+          patientId: 'p-123',
+        }),
+      );
+      await waitFor(() =>
+        expect(caseVisitOpenOrCreate).toHaveBeenCalledWith({
+          patientId: 'p-123',
+          visitType: 'follow_up',
+        }),
+      );
+      expect(caseVisitOpenOrCreate).not.toHaveBeenCalledWith({
+        patientId: 'p-123',
+        visitType: 'first',
+      });
+    });
+
+    it('M3vis: F5 still opens Take case (first) when there is no saved first case', async () => {
+      visitHasSavedFirstCase.mockResolvedValue({ hasSavedFirstCase: false });
+      const user = userEvent.setup();
+      render(<AppShell />);
+      expect(await screen.findByTestId('today-screen')).toBeInTheDocument();
+
+      await navigateViaHash('#/patients?id=p-123');
+      await screen.findByTestId('patient-dash-demographics');
+      caseVisitOpenOrCreate.mockClear();
+
+      await user.keyboard('{F5}');
+
+      await waitFor(() =>
+        expect(caseVisitOpenOrCreate).toHaveBeenCalledWith({
+          patientId: 'p-123',
+          visitType: 'first',
+        }),
+      );
+      expect(caseVisitOpenOrCreate).not.toHaveBeenCalledWith({
+        patientId: 'p-123',
+        visitType: 'follow_up',
+      });
+      expect(await screen.findByTestId('case-form')).toBeInTheDocument();
+      expect(window.location.hash).not.toContain('/followup');
+    });
+
     it('blocks the case route before setup completion (completion guard holds)', async () => {
       setupGetState.mockResolvedValue({
         completed: false,

@@ -433,6 +433,34 @@ function ShellFrame({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [zoom]);
 
+  // F5 "new visit for the open patient" (S08 keyboard, HC-MVP1-M3vis): the
+  // same choice the dashboard makes. When the patient already has a saved
+  // first case F5 opens the follow-up (the dashboard's Follow-up button path),
+  // otherwise it opens Take case. The shell asks the gate itself because F5
+  // also fires from inside a case, where no dashboard is mounted. A failed
+  // gate read is surfaced like a failed open (R-UI-008) rather than guessing,
+  // so F5 never silently starts a second first case; the dashboard buttons
+  // stay available. No patient data in the log line (R-PRIV-001).
+  const startVisitForPatient = useCallback(
+    async (patientId: string): Promise<void> => {
+      let hasSavedFirstCase: boolean;
+      try {
+        const gate = await run(commands.visitHasSavedFirstCase({ patientId }));
+        hasSavedFirstCase = gate.hasSavedFirstCase;
+      } catch {
+        setOpenError(t('app.case.openFailed'));
+        console.error('[AppShell] saved-first-case check failed');
+        return;
+      }
+      if (hasSavedFirstCase) {
+        await startFollowupForPatient(patientId);
+      } else {
+        await startCaseForPatient(patientId);
+      }
+    },
+    [startCaseForPatient, startFollowupForPatient],
+  );
+
   // F5: new visit for the open patient (S08 keyboard). Feature-gated with the
   // case flag (R-DEL-002); never fires during IME composition (00-conventions).
   useEffect(() => {
@@ -441,11 +469,11 @@ function ShellFrame({
       if (e.key !== 'F5' || e.isComposing) return;
       if (openPatientId === null) return;
       e.preventDefault();
-      void startCaseForPatient(openPatientId);
+      void startVisitForPatient(openPatientId);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [openPatientId, startCaseForPatient]);
+  }, [openPatientId, startVisitForPatient]);
 
   // Idle auto-lock (SET-004): after the configured idle timeout with no user
   // activity, lock the app. Any clinical edit is already autosaved (CASE-005),
