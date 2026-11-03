@@ -19,6 +19,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readlinkSync,
   rmSync,
 } from 'node:fs';
 import os from 'node:os';
@@ -41,6 +42,54 @@ interface SpecDataState {
 }
 
 let state: SpecDataState | undefined;
+
+/**
+ * The PREVIOUS-release binary (relaunchIntoWithBinary) currently running, if
+ * any. driver.ts reaps only the default HC_APP_BINARY by path, so an R1/R2
+ * worktree app could otherwise outlive its session and keep the data dir's
+ * SQLCipher DB open while the next build launches over the SAME dir. Reaped
+ * (SIGKILL, matched by executable — see killByExecutable) before every
+ * relaunch. The previous-release app is idle by then (its writes committed).
+ */
+let previousBinaryRunning: string | undefined;
+
+function reapPreviousBinary(): void {
+  if (previousBinaryRunning === undefined) return;
+  killByExecutable(previousBinaryRunning);
+  previousBinaryRunning = undefined;
+}
+
+/**
+ * SIGKILL every process whose executable IS `binary` (Linux /proc/<pid>/exe).
+ * Matching the executable rather than `pkill -f <path>` means a shell or
+ * runner whose command LINE merely mentions the path (e.g. an
+ * `HC_R2_APP_BINARY=<path> xvfb-run …` invocation) is never hit. Best-effort;
+ * a no-op where /proc is absent (Windows reaps through the driver chain).
+ */
+function killByExecutable(binary: string): void {
+  const want = path.resolve(binary);
+  let pids: string[];
+  try {
+    pids = readdirSync('/proc').filter((d) => /^\d+$/.test(d));
+  } catch {
+    return;
+  }
+  for (const pid of pids) {
+    let exe: string;
+    try {
+      exe = readlinkSync(`/proc/${pid}/exe`);
+    } catch {
+      continue; // not ours / already gone
+    }
+    if (exe === want || exe === `${want} (deleted)`) {
+      try {
+        process.kill(Number(pid), 'SIGKILL');
+      } catch {
+        // already exited
+      }
+    }
+  }
+}
 
 /**
  * (Re)initialise per-spec state. Called from `beforeSession` with a unique base
@@ -95,6 +144,7 @@ function retainAppLogs(s: SpecDataState): void {
 
 /** Tear down per-spec state and remove the whole base root. */
 export function cleanupSpecData(): void {
+  reapPreviousBinary();
   if (state) {
     retainAppLogs(state);
     try {
@@ -158,8 +208,33 @@ export async function relaunchInto(name: string): Promise<void> {
   const s = requireState();
   const dir = dataDir(name);
   s.current = dir;
+  // A session reloaded WITHOUT capabilities keeps the LAST session's
+  // `tauri:options.application`. After relaunchIntoWithBinary(previous build)
+  // a bare reloadSession() would therefore relaunch the PREVIOUS build again,
+  // not the build under test — so switch back to the default binary
+  // explicitly. (This is what makes upgrade-path's "install N over N-1"
+  // relaunch actually run build N.)
+  const switchBack = previousBinaryRunning !== undefined;
+  reapPreviousBinary();
   await startDriver(dataDirEnv(dir));
-  await browser.reloadSession();
+  if (switchBack) {
+    await browser.reloadSession(defaultCapabilities());
+  } else {
+    await browser.reloadSession();
+  }
+}
+
+/** The build-under-test capabilities (wdio.conf.ts), with HC_APP_BINARY. */
+function defaultCapabilities(): WebdriverIO.Capabilities {
+  const app = process.env.HC_APP_BINARY;
+  if (app === undefined) {
+    throw new Error('HC_APP_BINARY is not set (wdio.conf.ts sets it at load)');
+  }
+  return {
+    'tauri:options': { application: app },
+    browserName: 'wry',
+    'wdio:enforceWebDriverClassic': true,
+  } as WebdriverIO.Capabilities;
 }
 
 /** Relaunch into a brand-new clean data dir identified by `name`. */
@@ -190,8 +265,9 @@ export async function relaunchIntoWithBinary(
     throw new Error(
       `infra_incomplete: application binary not found at ${binaryPath} ` +
         `(upgrade-path harness needs both the previous- and current-release ` +
-        `builds; set HC_R1_APP_BINARY to the R1 build and leave the default ` +
-        `target/debug/homeoclinic-desktop as the R2 build).`,
+        `builds; set HC_R1_APP_BINARY / HC_R2_APP_BINARY to the previous-release ` +
+        `build and leave the default target/debug/homeoclinic-desktop as ` +
+        `the build under test).`,
     );
   }
   const s = requireState();
@@ -199,6 +275,7 @@ export async function relaunchIntoWithBinary(
   s.current = dir;
   // The app is launched by WebKitWebDriver, which inherits XDG_DATA_HOME from
   // the driver chain; reap+respawn it pointed at `dir` first.
+  reapPreviousBinary();
   await startDriver(dataDirEnv(dir));
   // Reload with the overridden application capability so THIS launch runs the
   // chosen binary. tauri-driver reads `tauri:options.application` per session.
@@ -207,6 +284,9 @@ export async function relaunchIntoWithBinary(
     browserName: 'wry',
     'wdio:enforceWebDriverClassic': true,
   } as WebdriverIO.Capabilities);
+  if (path.resolve(binaryPath) !== process.env.HC_APP_BINARY) {
+    previousBinaryRunning = path.resolve(binaryPath);
+  }
 }
 
 /**

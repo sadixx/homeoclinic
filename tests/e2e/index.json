@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-03T08:06:47.777Z",
+  "generatedAt": "2026-11-03T12:13:53.288Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -249,6 +249,22 @@
         "BAK-002",
         "BAK-003",
         "LIC-063"
+      ],
+      "tier": "regression",
+      "area": "release",
+      "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/release/r3-demo.e2e.ts",
+      "reqs": [
+        "CASE-001",
+        "CASE-005",
+        "VIS-001",
+        "VIS-004",
+        "VIS-005"
       ],
       "tier": "regression",
       "area": "release",

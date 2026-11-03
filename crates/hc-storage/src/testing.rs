@@ -281,3 +281,37 @@ pub fn insert_visit_for(
     .expect("seed synthetic visit");
     id_ret
 }
+
+// ---------------------------------------------------------------------------
+// b21-d1 upgrade-path test seam: build a DB frozen at an OLDER schema version
+// (e.g. 3 = R1-final, 7 = R2-final) so an unlock-path test can prove the app
+// migrates an upgraded install forward (NFR-011, R-DEL-004).
+// ---------------------------------------------------------------------------
+
+/// Apply the compiled-in migrations to `pool` ONLY up to and including
+/// `target`, bumping `user_version` per step exactly as an older release's
+/// binary would have left the file. Takes no pre-migration backup (it models
+/// the historical first-run setup, which starts from an empty DB).
+///
+/// Panics if `target` exceeds [`crate::migrate::latest_version`] or if a step
+/// fails (test seam only).
+pub fn migrate_to(pool: &Pool, target: u32) {
+    assert!(
+        target <= crate::migrate::latest_version(),
+        "migrate_to target {target} exceeds the latest known migration"
+    );
+    pool.with_writer(|conn| {
+        let current = crate::migrate::current_version(conn)?;
+        for m in crate::migrate::migrations() {
+            if m.target <= current || m.target > target {
+                continue;
+            }
+            let tx = conn.transaction()?;
+            tx.execute_batch(m.sql)?;
+            tx.execute_batch(&format!("PRAGMA user_version = {};", m.target))?;
+            tx.commit()?;
+        }
+        Ok(())
+    })
+    .expect("migrate test DB to target version");
+}

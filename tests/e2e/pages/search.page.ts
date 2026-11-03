@@ -16,6 +16,8 @@
 // immediately findable.
 import { $, $$, browser } from '@wdio/globals';
 
+import { backupPage } from './backup.page.js';
+
 function byTestId(id: string): ChainablePromiseElement {
   return $(`[data-testid="${id}"]`);
 }
@@ -129,6 +131,44 @@ export class SearchPage {
     }
     throw new Error(`patient_import_fixture failed: ${result.error}`);
   }
+
+  /**
+   * Every live patient (id, code, name) through the typed `patient_list_query`
+   * the S05 list uses, paged by its keyset cursor (sort by id, no filters).
+   * Used by the upgrade-path hop to compare the full patient set before and
+   * after an upgrade install. Works on the R2 build and later (PSR-008).
+   */
+  async listAllPatients(pageSize = 500): Promise<PatientRow[]> {
+    const out: PatientRow[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 1000; page += 1) {
+      const res: { rows: PatientRow[]; nextCursor: string | null } =
+        await backupPage.invokeCommand('patient_list_query', {
+          req: { filters: {}, sort: { field: 'id', dir: 'asc' }, cursor, limit: pageSize },
+        });
+      for (const r of res.rows) {
+        out.push({ patientId: r.patientId, code: r.code, name: r.name });
+      }
+      cursor = res.nextCursor ?? null;
+      if (cursor === null || res.rows.length === 0) return out;
+    }
+    throw new Error('patient_list_query paging did not terminate');
+  }
+
+  /** Rows the typed `patient_search` (the F2 overlay's command) returns for `query`. */
+  async searchRows(query: string, limit = 50): Promise<PatientRow[]> {
+    const res: { results: PatientRow[] } = await backupPage.invokeCommand('patient_search', {
+      req: { query, limit, cursor: null },
+    });
+    return res.results.map((r) => ({ patientId: r.patientId, code: r.code, name: r.name }));
+  }
+}
+
+/** One patient as the list / search commands return it (subset). */
+export interface PatientRow {
+  patientId: string;
+  code: string;
+  name: string;
 }
 
 export const searchPage = new SearchPage();

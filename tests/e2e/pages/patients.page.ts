@@ -174,6 +174,19 @@ export class PatientsPage {
     return byTestId("patient-dash-new-visit");
   }
 
+  // S07 "Follow-up" (shown once the first case is saved): opens the follow-up
+  // in the rich case form (/patient/:id/case/:vid/followup), prior record
+  // copied forward.
+  get dashFollowupBtn(): ChainablePromiseElement {
+    return byTestId("patient-dash-followup");
+  }
+
+  /** Click the dashboard "Follow-up"; the caller waits for the case form. */
+  async dashFollowup(timeout = 15000): Promise<void> {
+    await this.dashFollowupBtn.waitForClickable({ timeout });
+    await this.dashFollowupBtn.click();
+  }
+
   // S07 dashboard Back control (UX1): returns to the patient LIST.
   get dashBackBtn(): ChainablePromiseElement {
     return byTestId("patient-dash-back");

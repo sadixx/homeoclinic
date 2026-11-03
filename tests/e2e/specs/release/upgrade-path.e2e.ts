@@ -6,7 +6,7 @@
 // HC-MVP1-226 — the upgrade-path harness (NFR-011 "the previous release's data
 // always opens after an upgrade install"; NFR-042; R-DEL-004). From R1 onward
 // every release must open the previous release's data after an upgrade install.
-// This harness carries EVERY release hop; it currently runs TWO:
+// This harness carries EVERY release hop; it currently runs THREE:
 //   • R0 -> R1 (PHASE A/B): install R1 over the empty/baseline dir an R0 install
 //     leaves, prove R1 opens it, migrations 0001..0002 run forward, and an
 //     R1-made backup opens.
@@ -14,7 +14,37 @@
 //     R1 build provisions clinic.db @ user_version 3 + an R1-made .hcbak), prove
 //     the R2 build opens it, migrations 0004..0007 advance 3 -> 7, the R1 PIN
 //     unlocks it, the R1 profile/setup persists, and the R1-made .hcbak opens.
-// Each future release adds one more hop here (R2 -> R3, …) with the same shape.
+//   • R2 -> R3 (PHASE E/F): install the R3 build over a GENUINE R2 install (the
+//     R2 build provisions clinic.db @ user_version 7, 200 fixture patients plus
+//     one registered through the R2 UI with a photo, and an R2-made .hcbak),
+//     prove the R3 build opens it, migrations 0008..0011 advance 7 -> 11 (the
+//     R3 case/visit schema serves), the R2 PIN unlocks it, EVERY R2 patient is
+//     present (full id/code/name set equality + search), the R2 setup/licence
+//     persists, and the R2-made .hcbak opens.
+// Each future release adds one more hop here (R3 -> R4, …) with the same shape.
+//
+// ── Building the previous-release binaries (executor / local run) ───────────
+// The hops launch the PREVIOUS release's own debug build from a git worktree
+// next to the repo ($HC_ROOT/hc-r1-worktree, $HC_ROOT/hc-r2-worktree).
+//   R1 (staging-main 95e823c, plain --debug; or set HC_R1_APP_BINARY, which
+//   the executor sets — the R1 fallback below is cwd-relative):
+//     git worktree add --detach ../hc-r1-worktree 95e823c
+//     cd ../hc-r1-worktree/apps/desktop && npm ci &&
+//       npm run tauri build -- --debug --no-bundle
+//   R2 (R2-final staging-main 5b180b9, WITH e2e-test-keys so the R2 build has
+//   patient_import_fixture for seeding; or set HC_R2_APP_BINARY):
+//     git worktree add --detach ../hc-r2-worktree 5b180b9
+//     cd ../hc-r2-worktree/apps/desktop && npm ci &&
+//       npm run tauri build -- --debug --features e2e-test-keys --no-bundle
+//     -> ../hc-r2-worktree/target/debug/homeoclinic-desktop (resolved from the
+//        repo root, so it is found from any cwd)
+//   CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 keep a worktree target small
+//   and do not change behaviour. The R2 hop also needs hc-seed (cargo build -p
+//   hc-seed --bin hc-seed, or HC_SEED_BIN); tools/seed is unchanged between R2
+//   and R3, so the current hc-seed JSONL is what the R2 import reads.
+// A hop whose previous-release binary is absent SKIPS (infra, logged with the
+// path and how to build it), so CI, which builds only the current release,
+// still runs every other phase.
 //
 // ── What "R0 data" is, precisely (honest seeding) ───────────────────────────
 // R0 (milestone M0, HC-MVP1-214) shipped ONLY the Tauri shell + an empty Today
@@ -66,18 +96,26 @@
 // upgrade flow targets the SAME dir (the R0-baseline dir, provisioned/migrated
 // in place), so both phases run in a single tauri-driver session. Network
 // disabled (product rule 1).
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { expect } from '@wdio/globals';
+import { browser, expect } from '@wdio/globals';
 
 import { backupPage } from '../../pages/backup.page.js';
 import { bootPage } from '../../pages/boot.page.js';
+import { caseRichPage } from '../../pages/case-rich.page.js';
 import { lockPage } from '../../pages/lock.page.js';
-import { setupPage } from '../../pages/setup.page.js';
+import { patientsPage } from '../../pages/patients.page.js';
+import { searchPage, type PatientRow } from '../../pages/search.page.js';
 import { shellPage } from '../../pages/shell.page.js';
 import { provisionAndEnterApp } from '../../helpers/setup-flow.js';
+import { evidence } from '../../helpers/evidence.js';
+import { seedFixtureIntoApp } from '../../helpers/fixture.js';
+import { todayIso } from '../../helpers/dates.js';
 import {
+  dataDir,
   relaunchInto,
   relaunchIntoWithBinary,
   sharedBackupDir,
@@ -108,6 +146,80 @@ const R1_PIN = '2468';
 const R1_BACKUP_PASSWORD = 'r1-made-backup-9';
 /** Named data dir that carries the R1 install forward into the R2 launch. */
 const R1_OVER_DIR = 'r1-install';
+
+// ── R2 -> R3 hop configuration ───────────────────────────────────────────────
+// The R2-final build (staging-main 5b180b9) built WITH e2e-test-keys in the
+// worktree $HC_ROOT/hc-r2-worktree (see the header). Resolved from the repo
+// root (not the cwd) so it is found whether wdio runs from the repo root or
+// from tests/e2e; HC_R2_APP_BINARY overrides it.
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+const R2_APP_BINARY =
+  process.env.HC_R2_APP_BINARY ??
+  path.resolve(REPO_ROOT, '../hc-r2-worktree/target/debug/homeoclinic-desktop');
+
+/** R2-install PIN: set under the R2 build, re-entered under the R3 build. */
+const R2_PIN = '1593';
+/** Password of the R2-MADE .hcbak that the R3 build must still open. */
+const R2_BACKUP_PASSWORD = 'r2-made-backup-7';
+/** Named data dir that carries the R2 install forward into the R3 launch. */
+const R2_OVER_DIR = 'r2-install';
+/** Fixture size the R2 build imports (hc-seed's fixture minimum is 200). */
+const R2_FIXTURE_COUNT = 200;
+/** The one patient registered through the R2 UI, with a photo. */
+const R2_UI_PATIENT = 'Upgradia Photopatient';
+
+/** What PHASE E recorded under the R2 build, checked under R3 in PHASE F. */
+interface R2Snapshot {
+  dataDir: string;
+  patients: PatientRow[];
+  uiPatient: PatientRow;
+  licence: { kind: string; validUntil: string; expired: boolean };
+  appVersion: string;
+  backupPath: string;
+}
+let r2: R2Snapshot | undefined;
+
+/** A tiny valid 1x1 PNG on disk for the R2 photo attach (as register-photo). */
+function tinyPngPath(): string {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'hc-e2e-upgrade-photo-'));
+  const file = path.join(dir, 'patient.png');
+  writeFileSync(
+    file,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  );
+  return file;
+}
+
+/**
+ * Call a typed command that reads a table of the CURRENT release's schema and
+ * return null when it serves, else its error text. Lets a hop report exactly
+ * which post-upgrade schema read fails (an unmigrated DB) instead of a bare
+ * WebDriver error.
+ */
+async function schemaError(cmd: string, args: Record<string, unknown> = {}): Promise<string | null> {
+  let last = '';
+  // WebKitWebDriver can fail an in-flight async script with a bare
+  // WebDriverError when the page throws meanwhile (e.g. the Today screen's own
+  // failing load); one retry then reads the command's real result/error.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await backupPage.invokeCommand(cmd, args);
+      return null;
+    } catch (e) {
+      last = e instanceof Error ? e.message : String(e);
+      if (!last.includes('WebDriverError')) return last;
+    }
+  }
+  return last;
+}
+
+/** Rows sorted by patient id (stable comparison of two snapshots). */
+function byId(rows: PatientRow[]): PatientRow[] {
+  return [...rows].sort((a, b) => a.patientId.localeCompare(b.patientId));
+}
 
 describe('HC-MVP1-226 upgrade-path PHASE A: R1 opens an R0-equivalent (empty/baseline) data dir and migrates forward (NFR-011)', () => {
   it('self-routes the empty R0-baseline dir to the wizard, then provisions in place so R1 opens over the R0 data dir and the migrated schema serves', async () => {
@@ -232,6 +344,13 @@ describe('HC-MVP1-226 upgrade-path PHASE B: an R1-made backup over the upgraded 
 //     0005_patient_diagnosis, 0006_patient_registration, 0007_patient_recent),
 //     the app unlocks with the R1 PIN, the R1 profile/setup persists, and the
 //     R1-made .hcbak still opens under R2.
+//   NOTE (HC-MVP1-226, R3): "the build under test" is whatever the default
+//     binary is — on the R3 branch PHASE D therefore installs R3 over R1. It
+//     now also proves the CURRENT build really runs and migrated the R1 DB
+//     (patient_search, absent in R1, reads the 0004 schema). Before R3 a bare
+//     reloadSession() silently relaunched the R1 binary here (cached
+//     capabilities), so PHASE D did not actually exercise the newer build; see
+//     helpers/launch.ts relaunchInto.
 //
 // ── What the R2 build can assert through the webview (and the honest caveat) ──
 // As in the R0 hop, no typed command exposes PRAGMA user_version or the raw
@@ -367,6 +486,7 @@ describe('HC-MVP1-226 upgrade-path PHASE D: the R2 build opens the R1 data dir, 
     // by setup_get_state (XDG_DATA_HOME/<identifier>).
     expect(existsSync(`${upgraded.dataDir}/clinic.db`)).toBe(true);
 
+
     // The R1-MADE .hcbak still opens under the R2 build (NFR-011 "any backups
     // still open"): verify_backup re-hashes + decrypt-tests it, and
     // restore_preview reads a valid plaintext header. The archive was written
@@ -392,5 +512,265 @@ describe('HC-MVP1-226 upgrade-path PHASE D: the R2 build opens the R1 data dir, 
     console.log(
       `[upgrade][D] R1-made .hcbak opens under R2: app_version=${preview.appVersion} createdAt=${preview.createdAt}`,
     );
+
+    // It really is the CURRENT build running over the R1 dir (not the R1
+    // binary relaunched — see launch.ts relaunchInto) and the DB was migrated
+    // forward: patient_search exists only from R2 (the R1 build has no such
+    // command) and reads the 0004 search schema the R1 DB does not have until
+    // migrated.
+    const searchErr = await schemaError('patient_search', { req: { query: 'a', limit: 5, cursor: null } });
+    evidence(`[upgrade][D] patient_search (0004 schema) over the upgraded R1 dir: ${searchErr ?? 'serves'}`);
+    if (searchErr !== null) {
+      throw new Error(
+        `NFR-011 upgrade defect: the current build opened the R1 dir but its schema was not migrated forward ` +
+          `(patient_search -> ${searchErr})`,
+      );
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R2 -> R3 HOP (HC-MVP1-226, NFR-011, R-DEL-004; R3 exit "an upgrade install
+// over R2 keeps all patients"). R2 leaves a REAL clinic: clinic.db at the R2
+// schema (user_version 7 — 0001..0007), the PIN key hierarchy, the doctor /
+// clinic / trial rows, PATIENTS (with photos) and R2-made .hcbak backups.
+//
+// ── How the R2-state is seeded (honest, genuine previous-release data) ───────
+//   PHASE E launches the ACTUAL R2 BUILD (R2_APP_BINARY, R2-final 5b180b9 built
+//     with e2e-test-keys) over a fresh `r2-install` dir: the real first-run
+//     wizard (setup_set_pin applies 0001..0007, user_version 0 -> 7), ONE
+//     patient registered through the R2 S06 form WITH a photo, then the
+//     200-patient synthetic fixture imported through the R2 build's own
+//     patient_create path (patient_import_fixture), then a REAL R2 .hcbak via
+//     the R2 build's backup_now. It snapshots, through the R2 build's own typed
+//     commands, the FULL patient set (patient_list_query: id, code, name), the
+//     licence row and the R2 app version.
+//   PHASE F relaunches the R3 BUILD UNDER TEST over that SAME dir.
+//
+// ── What PHASE F proves through the webview (and the honest caveat) ─────────
+//   • #/lock on the R2 dir and the R2 PIN unlocks (key hierarchy survived);
+//   • migrations ran FORWARD to the R3 latest: case_template_get_default and
+//     today_get_overview — which read tables only 0008_case_template /
+//     0009_visit / 0011_case_template_journal create — serve, and a case is
+//     taken + saved on an R2 patient (writes 0009 visit rows). PHASE E shows
+//     the R2 build has no such command, so the DB really started at R2.
+//     PRAGMA user_version itself (7 -> 11) is not exposed to the webview and is
+//     asserted at the Rust layer (crates/hc-storage/tests/migrate_test.rs), as
+//     for the earlier hops;
+//   • ALL R2 patients are present: patient_list_query under R3 returns EXACTLY
+//     the R2 snapshot (same count, same id/code/name on every row); search
+//     (typed patient_search + the real F2 overlay) finds R2 patients by name
+//     and by code; the photo patient's dashboard still shows the photo;
+//   • the R2 setup/profile persists: setup completed, same data dir, the same
+//     licence (kind + validUntil) as under R2. Exact doctor/clinic value
+//     equality has no read command in R3 and stays a Rust-layer assertion;
+//   • the R2-made .hcbak opens under R3 (verify_backup + restore_preview with
+//     the R2 app version in its header).
+//
+// SKIP-not-fail: if R2_APP_BINARY is absent the hop cannot run honestly; it is
+// reported as an infra skip (path + how to build it), never a silent pass.
+const r2BuildPresent = existsSync(R2_APP_BINARY);
+
+describe('HC-MVP1-226 upgrade-path PHASE E: provision a GENUINE R2 install (the R2 build writes clinic.db @ user_version 7, R2 patients incl a photo, and an R2-made .hcbak)', () => {
+  before(function () {
+    if (!r2BuildPresent) {
+      evidence(
+        `[upgrade][E] SKIP (infra): R2 build not found at ${R2_APP_BINARY}. ` +
+          `Build the R2-final worktree (git worktree add --detach ../hc-r2-worktree 5b180b9; ` +
+          `cd ../hc-r2-worktree/apps/desktop && npm ci && npm run tauri build -- --debug ` +
+          `--features e2e-test-keys --no-bundle) or set HC_R2_APP_BINARY to run the R2->R3 hop.`,
+      );
+      this.skip();
+    }
+  });
+
+  it('runs the REAL R2 wizard under the R2 build, registers a photo patient through the R2 UI, imports the 200-patient fixture through R2, snapshots every patient, and writes an R2-made .hcbak', async () => {
+    expect(BACKUP_DIR).toBeDefined();
+
+    await relaunchIntoWithBinary(R2_OVER_DIR, R2_APP_BINARY);
+    const decided = await bootPage.waitForDecidedScreen();
+    evidence(`[upgrade][E] R2 build (${R2_APP_BINARY}) self-chosen launch hash = ${await bootPage.launchHash()}`);
+    expect(decided).toBe('#/setup');
+
+    // Real first-run wizard under R2 (0001..0007 applied, user_version 0 -> 7).
+    await provisionAndEnterApp(R2_OVER_DIR, R2_PIN);
+    await expect(shellPage.todayScreen).toBeDisplayed();
+    const r2State = await backupPage.setupState();
+    expect(r2State.completed).toBe(true);
+    expect(existsSync(`${r2State.dataDir}/clinic.db`)).toBe(true);
+    const appInfo = await backupPage.invokeCommand<{ name: string; version: string }>('app_info');
+
+    // This really is an R2 install: the R2 build has no R3 case-template
+    // command (so the 0008+ schema cannot exist yet).
+    let r2HasCaseTemplates = true;
+    try {
+      await backupPage.invokeCommand('case_template_get_default');
+    } catch {
+      r2HasCaseTemplates = false;
+    }
+    expect(r2HasCaseTemplates).toBe(false);
+
+    // ONE patient through the real R2 S06 register form, with a photo.
+    await patientsPage.openRegister();
+    await expect(patientsPage.form).toBeDisplayed();
+    await patientsPage.fillCore({ name: R2_UI_PATIENT, age: '47', mobile: '9876501234', city: 'Kolhapur' });
+    await patientsPage.attachPhotoFile(tinyPngPath());
+    await browser.waitUntil(async () => patientsPage.hasPhoto(), {
+      timeout: 15000,
+      timeoutMsg: 'R2 register form: photo preview did not appear after file attach',
+    });
+    await patientsPage.saveAndWaitForDashboard();
+    expect(await patientsPage.dashboardText()).toContain(R2_UI_PATIENT);
+    expect(await patientsPage.dashHasPhotoImg()).toBe(true);
+
+    // The 200-patient synthetic fixture through the R2 build's own create path.
+    const jsonl = path.join(dataDir('r2-fixture'), 'fixture.jsonl');
+    const imported = await seedFixtureIntoApp(jsonl, R2_FIXTURE_COUNT, 42);
+    expect(imported).toBeGreaterThanOrEqual(R2_FIXTURE_COUNT);
+
+    // Snapshot EVERY R2 patient through the R2 build's own list command.
+    const patients = await searchPage.listAllPatients();
+    expect(patients.length).toBe(imported + 1);
+    const uiPatient = patients.find((p) => p.name === R2_UI_PATIENT);
+    expect(uiPatient).toBeDefined();
+    const licence = await backupPage.invokeCommand<{ kind: string; validUntil: string; expired: boolean }>(
+      'get_licence_status',
+    );
+
+    // A REAL R2-made .hcbak through the R2 build's backup_now.
+    const r2BackupDir = path.join(sharedBackupDir(), 'r2-made');
+    mkdirSync(r2BackupDir, { recursive: true });
+    await backupPage.open();
+    await expect(backupPage.screen).toBeDisplayed();
+    const res = await backupPage.backupNow(r2BackupDir, R2_BACKUP_PASSWORD);
+    expect(res.ok).toBe(true);
+    expect(res.verified).toBe(true);
+    expect(existsSync(res.filePath)).toBe(true);
+
+    r2 = {
+      dataDir: r2State.dataDir,
+      patients: byId(patients),
+      uiPatient: uiPatient as PatientRow,
+      licence: { kind: licence.kind, validUntil: licence.validUntil, expired: licence.expired },
+      appVersion: appInfo.version,
+      backupPath: res.filePath,
+    };
+    evidence(
+      `[upgrade][E] R2 install: version=${appInfo.version} dataDir=${r2State.dataDir} ` +
+        `patients=${patients.length} (fixture ${imported} + UI photo patient ${uiPatient?.code}) ` +
+        `case_template_get_default under R2 = absent; licence=${JSON.stringify(r2.licence)}; ` +
+        `R2 .hcbak=${res.filePath}`,
+    );
+  });
+});
+
+describe('HC-MVP1-226 upgrade-path PHASE F: the R3 build opens the R2 data dir, migrates 7->11 forward, unlocks with the R2 PIN, keeps EVERY R2 patient, and the R2-made .hcbak still opens (NFR-011, R-DEL-004)', () => {
+  before(function () {
+    if (!r2BuildPresent) {
+      this.skip();
+    }
+  });
+
+  it('relaunches the R3 build over the SAME R2 data dir: lock -> R2 PIN unlock, R3 schema serves, all R2 patients + photo + search survive, setup/licence persist, and the R2 backup opens', async () => {
+    expect(r2).toBeDefined();
+    const snap = r2 as R2Snapshot;
+
+    // THE UPGRADE INSTALL: the R3 build under test (the default binary) over
+    // the SAME `r2-install` dir. The idle R2 app is reaped first (launch.ts).
+    await relaunchInto(R2_OVER_DIR);
+    const decided = await bootPage.waitForDecidedScreen();
+    evidence(`[upgrade][F] R3 build over R2 dir self-chosen launch hash = ${await bootPage.launchHash()}`);
+    expect(decided).toBe('#/lock');
+    await expect(bootPage.lockCard).toBeDisplayed();
+    await lockPage.attempt(R2_PIN);
+    await shellPage.waitForShell();
+    await expect(shellPage.todayScreen).toBeDisplayed();
+
+    // Setup / profile persisted, same data dir, migrated pool serves.
+    const upgraded = await backupPage.setupState();
+    expect(upgraded.completed).toBe(true);
+    expect(upgraded.dataDir).toBe(snap.dataDir);
+    expect(existsSync(`${upgraded.dataDir}/clinic.db`)).toBe(true);
+    const status = await backupPage.getStatus();
+    expect(status.retention).toEqual({ daily: 14, weekly: 8, monthly: 12 });
+    const licence = await backupPage.invokeCommand<{ kind: string; validUntil: string; expired: boolean }>(
+      'get_licence_status',
+    );
+    expect({ kind: licence.kind, validUntil: licence.validUntil, expired: licence.expired }).toEqual(snap.licence);
+    const info = await backupPage.invokeCommand<{ name: string; version: string }>('app_info');
+
+    // EVERY R2 patient is present: the full id/code/name set is identical.
+    const after = byId(await searchPage.listAllPatients());
+    expect(after.length).toBe(snap.patients.length);
+    expect(after).toEqual(snap.patients);
+
+    // Search finds R2 patients (typed command) by name and by code.
+    const picks = [
+      snap.patients[0],
+      snap.patients[Math.floor(snap.patients.length / 2)],
+      snap.patients[snap.patients.length - 1],
+      snap.uiPatient,
+    ] as PatientRow[];
+    for (const p of picks) {
+      const byName = await searchPage.searchRows(p.name);
+      expect(byName.some((r) => r.patientId === p.patientId)).toBe(true);
+      const byCode = await searchPage.searchRows(p.code);
+      expect(byCode.some((r) => r.patientId === p.patientId)).toBe(true);
+    }
+
+    // The R2-MADE .hcbak still opens under R3.
+    const verified = await backupPage.invokeCommand<{ ok: boolean; checksumOk: boolean; decryptOk: boolean }>(
+      'verify_backup',
+      { filePath: snap.backupPath, password: R2_BACKUP_PASSWORD },
+    );
+    expect(verified.ok).toBe(true);
+    expect(verified.checksumOk).toBe(true);
+    expect(verified.decryptOk).toBe(true);
+    const preview = await backupPage.restorePreview(snap.backupPath, R2_BACKUP_PASSWORD);
+    expect(preview.createdAt.length).toBeGreaterThan(0);
+    expect(preview.appVersion).toBe(snap.appVersion);
+
+    evidence(
+      `[upgrade][F] R3 (version ${info.version}) over R2 dir (R2 version ${snap.appVersion}): unlocked with R2 PIN; ` +
+        `patients ${after.length} == R2 ${snap.patients.length}, id/code/name set identical; search by name+code found ` +
+        `${picks.map((p) => p.code).join(',')}; licence ` +
+        `${JSON.stringify(snap.licence)} kept; R2 .hcbak verify ok, preview appVersion=${preview.appVersion} ` +
+        `createdAt=${preview.createdAt} patientCount=${preview.patientCount} visitCount=${preview.visitCount}`,
+    );
+
+    // Migrations 0008..0011 ran forward: the R3-only case/visit schema serves
+    // (case_template_get_default reads 0008/0011, today_get_overview 0009).
+    const tmplErr = await schemaError('case_template_get_default');
+    const todayErr = await schemaError('today_get_overview', { req: { today: todayIso() } });
+    evidence(
+      `[upgrade][F] R3 schema over the upgraded R2 dir: case_template_get_default=${tmplErr ?? 'serves'}; ` +
+        `today_get_overview=${todayErr ?? 'serves'}`,
+    );
+    if (tmplErr !== null || todayErr !== null) {
+      throw new Error(
+        `NFR-011 upgrade defect: the R3 build opened the R2 dir but did not migrate it to the R3 schema ` +
+          `(case_template_get_default -> ${tmplErr ?? 'ok'}; today_get_overview -> ${todayErr ?? 'ok'})`,
+      );
+    }
+
+    // The real F2 overlay finds the R2 photo patient; its dashboard (which
+    // reads the migrated visit tables) opens and keeps the photo.
+    await searchPage.openWithF2();
+    await searchPage.searchFor(R2_UI_PATIENT);
+    expect(await searchPage.firstResultText()).toContain(R2_UI_PATIENT);
+    await searchPage.openFirstResult();
+    await patientsPage.waitForDashboard();
+    expect(await patientsPage.dashboardText()).toContain(R2_UI_PATIENT);
+    expect(await patientsPage.dashboardText()).toContain(snap.uiPatient.code);
+    expect(await patientsPage.dashHasPhotoImg()).toBe(true);
+    evidence(`[upgrade][F] F2 search opened R2 photo patient ${snap.uiPatient.code}; dashboard photo=true`);
+
+    // An R3 case on an R2 patient saves (writes the migrated 0009 visit rows).
+    await patientsPage.dashTakeCase();
+    await caseRichPage.waitForForm();
+    await caseRichPage.typeProse('Upgrade check: first R3 case on an R2 patient.');
+    await caseRichPage.save();
+    expect(await caseRichPage.waitForSaved()).toMatch(/^Saved/);
+    evidence(`[upgrade][F] R3 case taken + saved on R2 patient ${snap.uiPatient.code}`);
   });
 });

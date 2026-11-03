@@ -102,7 +102,8 @@ fn bak033_restore_preview_reads_counts_without_mutation() {
     let preview = svc
         .restore_preview(&backup.file_path)
         .expect("restore_preview reads the header");
-    // M1 has no patient/visit tables yet, so counts are 0 by design.
+    // seeded_data_dir holds no patients/visits, so the counts are 0 (the
+    // populated case is covered in hc-storage backup_test, b21-a1).
     assert_eq!(preview.patient_count, 0);
     assert_eq!(preview.visit_count, 0);
     assert!(

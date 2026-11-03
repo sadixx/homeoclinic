@@ -94,7 +94,8 @@ fn bak030_header_readable_without_password() {
         !header.created_at.is_empty(),
         "header carries the created_at date for preview"
     );
-    // M1: no patient/visit tables yet, so preview counts are 0 but present.
+    // seeded_data_dir holds no patients/visits, so the counts are 0 but present
+    // (the populated case is covered by the b21-a1 preview tests below).
     assert_eq!(header.preview.patient_count, 0);
     assert_eq!(header.preview.visit_count, 0);
 
@@ -359,4 +360,307 @@ fn bak033_restore_rekeys_db_openable_under_target_key() {
         })
         .expect("read doctor after re-key");
     assert_eq!(doctor, "Test Doctor 001");
+}
+
+// ---------------------------------------------------------------------------
+// b21-a1: the plaintext header preview must carry the REAL aggregate counts
+// (S17 restore step 2 / BackupScreen "Patients: N"). Before the fix the engine
+// hard-codes patient_count 0 / visit_count 0 / last_visit_date None, so the
+// restore wizard always tells the doctor a backup holds 0 patients.
+//
+// Counting rule (decided here, documented in test-plan.md):
+// - patient_count = LIVE patients only (`patient.deleted_at IS NULL`); a
+//   recycle-bin patient is NOT counted — the number matches what the doctor
+//   will see in the patient list after the restore.
+// - visit_count = LIVE visits (`visit.deleted_at IS NULL`) of LIVE patients;
+//   a soft-deleted visit and a visit of a recycle-bin patient are not counted.
+// - last_visit_date = the newest such visit's date as `YYYY-MM-DD` (the UTC
+//   date part of `visit_at`), or None when there is none.
+// Counts only, never a name (R-PRIV-001). No format change (still v1).
+// ---------------------------------------------------------------------------
+
+use hc_storage::testing::{insert_visit_for, seed_patient};
+
+/// The expected preview of [`seed_counted_clinic`].
+const EXPECTED_LIVE_PATIENTS: u64 = 3;
+const EXPECTED_LIVE_VISITS: u64 = 3;
+const EXPECTED_LAST_VISIT_DATE: &str = "2026-10-20";
+
+/// Seed `pool` (already migrated, from `seeded_data_dir`) with a synthetic
+/// clinic whose live vs. deleted rows differ, so a preview that counts the
+/// wrong thing is caught:
+/// - 3 live patients: 001 (2 visits), 002 (1 visit), 003 (no visit);
+/// - 1 soft-deleted visit on 001, NEWER than every live visit;
+/// - 1 recycle-bin patient 004 with its own visit, NEWEST of all.
+///
+/// Live result: 3 patients, 3 visits, last visit 2026-10-20. Visit times are
+/// 06:00Z so the UTC date equals the IST date (no midnight ambiguity).
+fn seed_counted_clinic(pool: &Pool) {
+    let p1 = seed_patient(pool, "HC-000001", "Test Patient 001");
+    let p2 = seed_patient(pool, "HC-000002", "Test Patient 002");
+    let _p3 = seed_patient(pool, "HC-000003", "Test Patient 003");
+    let p4 = seed_patient(pool, "HC-000004", "Test Patient 004");
+
+    insert_visit_for(pool, &p1, "2026-10-01T06:00:00Z", None);
+    insert_visit_for(pool, &p1, "2026-10-20T06:00:00Z", None);
+    insert_visit_for(pool, &p2, "2026-10-15T06:00:00Z", None);
+
+    // A soft-deleted visit (no repo delete API yet, so set deleted_at directly;
+    // parameterised). Newer than every live visit -> must not set last date.
+    let deleted_visit = insert_visit_for(pool, &p1, "2026-10-30T06:00:00Z", None);
+    pool.with_writer(|c| {
+        c.execute(
+            "UPDATE visit SET deleted_at = ?2 WHERE id = ?1",
+            rusqlite::params![deleted_visit, "2026-10-30T07:00:00Z"],
+        )?;
+        Ok(())
+    })
+    .expect("soft-delete one visit");
+
+    // Patient 004 gets the newest visit, then goes to the recycle bin through
+    // the real soft-delete path (PAT-008).
+    insert_visit_for(pool, &p4, "2026-10-31T06:00:00Z", None);
+    pool.with_writer(|c| {
+        let tx = c.transaction()?;
+        hc_storage::patient::soft_delete_patient(&tx, &p4, "2026-11-01T00:00:00Z", None)?;
+        tx.commit()?;
+        Ok(())
+    })
+    .expect("move patient 004 to the recycle bin");
+}
+
+/// Live counts read straight from a DB, using the counting rule above. Used to
+/// prove the header agrees with the snapshot the body actually carries.
+fn live_counts(pool: &Pool) -> (u64, u64, Option<String>) {
+    pool.with_reader(|c| {
+        let patients: i64 = c.query_row(
+            "SELECT COUNT(*) FROM patient WHERE deleted_at IS NULL",
+            [],
+            |r| r.get(0),
+        )?;
+        let (visits, last): (i64, Option<String>) = c.query_row(
+            "SELECT COUNT(*), substr(MAX(v.visit_at), 1, 10) \
+               FROM visit v JOIN patient p ON p.id = v.patient_id \
+              WHERE v.deleted_at IS NULL AND p.deleted_at IS NULL",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        Ok((patients as u64, visits as u64, last))
+    })
+    .expect("read live counts")
+}
+
+/// b21-a1 (S17 step 2, R-PRIV-001): a backup of a clinic with 3 live patients,
+/// 1 recycle-bin patient, 3 live visits and 2 non-live visits previews
+/// 3 patients / 3 visits / last visit 2026-10-20 — both via `read_header` and
+/// via the engine's password-free `restore_preview`.
+/// Bug caught: the preview hard-codes 0, or counts recycle-bin / deleted rows,
+/// or picks the newest date from a deleted visit.
+#[test]
+fn bak030_preview_counts_live_patients_and_visits_excluding_recycle_bin() {
+    let (src_dir, pool, _ids) = seeded_data_dir();
+    seed_counted_clinic(&pool);
+    let clock = fake_clock();
+    let engine = BackupEngine::new(&pool, src_dir.path(), &clock);
+    let out = tempfile::tempdir().expect("out dir");
+    let outcome = engine
+        .backup_to(out.path(), TEST_BACKUP_PASSWORD)
+        .expect("backup_to");
+
+    let header = read_header(&outcome.file_path).expect("header without password");
+    assert_eq!(
+        header.preview.patient_count, EXPECTED_LIVE_PATIENTS,
+        "preview must count live patients only (recycle-bin patient excluded)"
+    );
+    assert_eq!(
+        header.preview.visit_count, EXPECTED_LIVE_VISITS,
+        "preview must count live visits of live patients only"
+    );
+    assert_eq!(
+        header.preview.last_visit_date.as_deref(),
+        Some(EXPECTED_LAST_VISIT_DATE),
+        "last visit date is the newest LIVE visit, as YYYY-MM-DD"
+    );
+
+    let preview = engine
+        .restore_preview(&outcome.file_path)
+        .expect("restore_preview without password");
+    assert_eq!(
+        preview.preview, header.preview,
+        "restore_preview returns the same counts the header holds"
+    );
+}
+
+/// b21-a1: an empty clinic (profiles only, no patients/visits) previews 0 / 0 /
+/// None — the fix must not invent a date or fail on an empty visit table.
+/// Bug caught: `MAX(visit_at)` over no rows mapped to "" or a panic instead of
+/// None; COUNT on an empty table erroring.
+#[test]
+fn bak030_preview_counts_empty_clinic_is_zero_with_no_last_visit() {
+    let (src_dir, pool, _ids) = seeded_data_dir();
+    let clock = fake_clock();
+    let engine = BackupEngine::new(&pool, src_dir.path(), &clock);
+    let out = tempfile::tempdir().expect("out dir");
+    let outcome = engine
+        .backup_to(out.path(), TEST_BACKUP_PASSWORD)
+        .expect("backup_to");
+
+    let preview = engine
+        .restore_preview(&outcome.file_path)
+        .expect("restore_preview")
+        .preview;
+    assert_eq!(preview.patient_count, 0);
+    assert_eq!(preview.visit_count, 0);
+    assert_eq!(
+        preview.last_visit_date, None,
+        "no visits -> no last visit date"
+    );
+}
+
+/// b21-a1 (consistency): the header counts describe the SAME snapshot the body
+/// carries — after restoring the archive onto a clean install, the restored
+/// DB's live counts equal the header preview (and the seeded truth). The DB is
+/// changed AFTER the backup to prove the header was taken at backup time, not
+/// re-read later.
+/// Bug caught: counts computed from a different view than the exported
+/// snapshot (e.g. outside the snapshot, or still hard-coded 0), so the preview
+/// promises a different clinic than the restore delivers.
+#[test]
+fn bak030_preview_counts_match_the_restored_database() {
+    let (src_dir, pool, _ids) = seeded_data_dir();
+    seed_counted_clinic(&pool);
+    let clock = fake_clock();
+    let engine = BackupEngine::new(&pool, src_dir.path(), &clock);
+    let out = tempfile::tempdir().expect("out dir");
+    let outcome = engine
+        .backup_to(out.path(), TEST_BACKUP_PASSWORD)
+        .expect("backup_to");
+
+    // Change the live DB after the backup: must not affect this archive.
+    let late = seed_patient(&pool, "HC-000005", "Test Patient 005");
+    insert_visit_for(&pool, &late, "2026-11-02T06:00:00Z", None);
+
+    let header = read_header(&outcome.file_path).expect("header");
+
+    let (dst_dir, target_key) = clean_install();
+    let dst_db = dst_dir.path().join("clinic.db");
+    let dst_pool = Pool::open(&dst_db, &target_key as &dyn KeyProvider).expect("open dst");
+    hc_storage::migrate::run(&dst_pool).ok();
+    let dst_engine = BackupEngine::new(&dst_pool, dst_dir.path(), &clock);
+    dst_engine
+        .restore_apply(&outcome.file_path, TEST_BACKUP_PASSWORD, &target_key)
+        .expect("restore_apply");
+    drop(dst_pool);
+    let restored = Pool::open(&dst_db, &target_key as &dyn KeyProvider).expect("reopen restored");
+    let (patients, visits, last) = live_counts(&restored);
+
+    assert_eq!(
+        (patients, visits, last.as_deref()),
+        (
+            EXPECTED_LIVE_PATIENTS,
+            EXPECTED_LIVE_VISITS,
+            Some(EXPECTED_LAST_VISIT_DATE)
+        ),
+        "the restored DB holds the seeded live clinic (sanity)"
+    );
+    assert_eq!(
+        (
+            header.preview.patient_count,
+            header.preview.visit_count,
+            header.preview.last_visit_date.as_deref()
+        ),
+        (patients, visits, last.as_deref()),
+        "header preview must equal what the restore actually lands"
+    );
+}
+
+/// CRC-32 (IEEE) — test fixture only, needed to forge a self-consistent
+/// pre-fix header (the archive format's documented header checksum).
+fn fixture_crc32(data: &[u8]) -> u32 {
+    let mut crc: u32 = 0xFFFF_FFFF;
+    for &b in data {
+        crc ^= b as u32;
+        for _ in 0..8 {
+            let mask = (crc & 1).wrapping_neg();
+            crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+        }
+    }
+    !crc
+}
+
+/// Rewrite the header of the `.hcbak` at `src` so its preview reads exactly
+/// what a pre-b21-a1 build wrote (patient_count 0, visit_count 0,
+/// last_visit_date null), keeping the body untouched and the header CRC valid.
+/// Writes the result to `dst`.
+fn forge_pre_fix_archive(src: &Path, dst: &Path) {
+    let bytes = std::fs::read(src).expect("read archive");
+    let magic_len = 8;
+    let len = u32::from_le_bytes(bytes[magic_len..magic_len + 4].try_into().unwrap()) as usize;
+    let json_start = magic_len + 4;
+    let json_end = json_start + len;
+    let body = &bytes[json_end + 4..];
+
+    let mut header: serde_json::Value =
+        serde_json::from_slice(&bytes[json_start..json_end]).expect("header json");
+    header["preview"]["patient_count"] = serde_json::json!(0);
+    header["preview"]["visit_count"] = serde_json::json!(0);
+    header["preview"]["last_visit_date"] = serde_json::Value::Null;
+    let json = serde_json::to_vec(&header).expect("re-encode header");
+
+    let mut out = Vec::with_capacity(bytes.len());
+    out.extend_from_slice(&bytes[..magic_len]);
+    out.extend_from_slice(&(json.len() as u32).to_le_bytes());
+    out.extend_from_slice(&json);
+    out.extend_from_slice(&fixture_crc32(&json).to_le_bytes());
+    out.extend_from_slice(body);
+    std::fs::write(dst, out).expect("write forged archive");
+}
+
+/// b21-a1 backward compatibility: an archive written by an older build (header
+/// preview 0 / 0 / None, same v1 format) still previews, verifies and restores
+/// its real data — the fix must not start rejecting or "correcting" old files.
+/// Bug caught: a format bump, a new required header field, or a reader that
+/// treats a 0-count header as corrupt.
+#[test]
+fn bak030_older_backup_with_zero_preview_still_opens_and_restores() {
+    let (src_dir, pool, _ids) = seeded_data_dir();
+    seed_counted_clinic(&pool);
+    let clock = fake_clock();
+    let engine = BackupEngine::new(&pool, src_dir.path(), &clock);
+    let out = tempfile::tempdir().expect("out dir");
+    let outcome = engine
+        .backup_to(out.path(), TEST_BACKUP_PASSWORD)
+        .expect("backup_to");
+    let old = out.path().join("pre-fix.hcbak");
+    forge_pre_fix_archive(&outcome.file_path, &old);
+
+    let header = engine.restore_preview(&old).expect("old archive previews");
+    assert_eq!(
+        header.format_version, 1,
+        "still format v1 (no format change)"
+    );
+    assert_eq!(header.preview.patient_count, 0);
+    assert_eq!(header.preview.visit_count, 0);
+    assert_eq!(header.preview.last_visit_date, None);
+
+    let v = engine
+        .verify(&old, TEST_BACKUP_PASSWORD)
+        .expect("verify old");
+    assert!(v.checksum_ok && v.decrypt_ok, "old archive verifies fully");
+
+    let (dst_dir, target_key) = clean_install();
+    let dst_db = dst_dir.path().join("clinic.db");
+    let dst_pool = Pool::open(&dst_db, &target_key as &dyn KeyProvider).expect("open dst");
+    hc_storage::migrate::run(&dst_pool).ok();
+    let dst_engine = BackupEngine::new(&dst_pool, dst_dir.path(), &clock);
+    dst_engine
+        .restore_apply(&old, TEST_BACKUP_PASSWORD, &target_key)
+        .expect("old archive restores");
+    drop(dst_pool);
+    let restored = Pool::open(&dst_db, &target_key as &dyn KeyProvider).expect("reopen restored");
+    assert_eq!(
+        live_counts(&restored).0,
+        EXPECTED_LIVE_PATIENTS,
+        "the old archive's real patients come back despite its 0 preview"
+    );
 }

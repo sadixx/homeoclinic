@@ -113,11 +113,11 @@ pub struct BackupKdf {
 /// Counts only; never a name or any patient data (R-PRIV-001).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BackupPreview {
-    /// Patient row count at backup time (0 in M1 — no patient table yet).
+    /// Live patient count at backup time (recycle-bin patients excluded).
     pub patient_count: u64,
-    /// Visit row count at backup time (0 in M1).
+    /// Live visit count of live patients at backup time.
     pub visit_count: u64,
-    /// Last visit date (RFC3339 date) or None if no visits.
+    /// Newest live visit date (`YYYY-MM-DD`) or None if no visits.
     pub last_visit_date: Option<String>,
     /// Number of attachment files included.
     pub attachment_count: u64,
@@ -573,8 +573,9 @@ impl<'a> BackupEngine<'a> {
         password: &str,
         stamp: &str,
     ) -> Result<(), StorageError> {
-        // 1. Portable plaintext DB snapshot via SQLCipher online export.
-        let db_snapshot = self.export_portable_snapshot()?;
+        // 1. Portable plaintext DB snapshot via SQLCipher online export, with
+        //    the preview counts read from that same snapshot (b21-a1).
+        let (db_snapshot, counts) = self.export_portable_snapshot()?;
         let schema_version = self.schema_version()?;
 
         // 2. Collect attachment blobs (opaque, already sealed on disk).
@@ -621,9 +622,9 @@ impl<'a> BackupEngine<'a> {
             cipher: "AES-256-GCM".to_string(),
             kdf,
             preview: BackupPreview {
-                patient_count: 0,
-                visit_count: 0,
-                last_visit_date: None,
+                patient_count: counts.patient_count,
+                visit_count: counts.visit_count,
+                last_visit_date: counts.last_visit_date,
                 attachment_count,
             },
         };
@@ -693,7 +694,11 @@ impl<'a> BackupEngine<'a> {
     /// writer connection) and yields a DB the restore can re-key under any
     /// target DEK (design §5). The snapshot is read back into memory and the
     /// temp plaintext file is removed.
-    fn export_portable_snapshot(&self) -> Result<Vec<u8>, StorageError> {
+    ///
+    /// The preview counts are read from the attached snapshot itself, on the
+    /// same writer connection right after the export, so they describe exactly
+    /// the data the archive holds (b21-a1). Counts and a date only, no PII.
+    fn export_portable_snapshot(&self) -> Result<(Vec<u8>, SnapshotCounts), StorageError> {
         let tmp_dir = self.data_dir.join(".hc-snapshot-tmp");
         std::fs::create_dir_all(&tmp_dir)?;
         let snap_path = tmp_dir.join("snapshot.db");
@@ -713,24 +718,24 @@ impl<'a> BackupEngine<'a> {
         // Attach a PLAINTEXT destination (KEY '') and export into it. The path
         // is engine-constructed (never external input); the same documented
         // R-SEC-001 exception as PRAGMA key / the migration backup.
-        self.pool.with_writer(|conn| {
+        let counts = self.pool.with_writer(|conn| {
             conn.execute_batch(&format!("ATTACH DATABASE '{snap_str}' AS hc_snap KEY '';"))?;
-            let export = (|| -> Result<(), StorageError> {
+            let export = (|| -> Result<SnapshotCounts, StorageError> {
                 conn.query_row("SELECT sqlcipher_export('hc_snap')", [], |_| Ok(()))?;
                 // Carry the schema version onto the plaintext snapshot.
                 let v = crate::migrate::current_version(conn)?;
                 conn.execute_batch(&format!("PRAGMA hc_snap.user_version = {v};"))?;
-                Ok(())
+                snapshot_counts(conn)
             })();
             let detach = conn.execute_batch("DETACH DATABASE hc_snap;");
-            export?;
+            let counts = export?;
             detach?;
-            Ok(())
+            Ok(counts)
         })?;
 
         let snapshot = std::fs::read(&snap_path)?;
         let _ = std::fs::remove_dir_all(&tmp_dir);
-        Ok(snapshot)
+        Ok((snapshot, counts))
     }
 
     /// The current schema `user_version` of the live DB.
@@ -818,6 +823,41 @@ impl<'a> BackupEngine<'a> {
         prune_tier(&monthly, RetentionPolicy::DEFAULT.monthly)?;
         Ok(())
     }
+}
+
+/// Live-row counts read from the attached `hc_snap` snapshot for the header
+/// preview (b21-a1). Aggregates only; never a name or any patient data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SnapshotCounts {
+    patient_count: u64,
+    visit_count: u64,
+    last_visit_date: Option<String>,
+}
+
+/// Count live patients, live visits of live patients, and the newest such
+/// visit's date (`YYYY-MM-DD`, the date part of the RFC3339 UTC `visit_at`)
+/// in the attached `hc_snap` database. Recycle-bin rows (`deleted_at` set) are
+/// excluded so the preview matches the lists the doctor sees after restoring.
+/// Static SQL with no bound values (R-SEC-001).
+fn snapshot_counts(conn: &rusqlite::Connection) -> Result<SnapshotCounts, StorageError> {
+    let patients: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM hc_snap.patient WHERE deleted_at IS NULL",
+        [],
+        |r| r.get(0),
+    )?;
+    let (visits, last_visit_date): (i64, Option<String>) = conn.query_row(
+        "SELECT COUNT(*), substr(MAX(v.visit_at), 1, 10) \
+         FROM hc_snap.visit v JOIN hc_snap.patient p ON p.id = v.patient_id \
+         WHERE v.deleted_at IS NULL AND p.deleted_at IS NULL",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    Ok(SnapshotCounts {
+        // COUNT(*) is never negative, so unsigned_abs is exact.
+        patient_count: patients.unsigned_abs(),
+        visit_count: visits.unsigned_abs(),
+        last_visit_date,
+    })
 }
 
 /// Split the chunk stream + trailer out of `bytes` starting at `body_start`.
