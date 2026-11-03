@@ -91,9 +91,21 @@ impl<'a> AuthService<'a> {
     /// Unlock by PIN: unwrap the DEK and open the encrypted [`Pool`]. A wrong
     /// PIN maps to [`AppError::WrongPin`] and yields no pool (SUX-005: the next
     /// correct attempt still works).
+    ///
+    /// After a successful open the schema is brought up to this build's
+    /// latest version with [`hc_storage::migrate::run`] BEFORE the pool is
+    /// returned, so an install upgraded from an older release is migrated on
+    /// its first unlock (b21-d1, NFR-011, R-DEL-004). `migrate::run` keeps its
+    /// guarantees: a pre-migration backup of a non-empty DB, forward-only
+    /// steps, and a refused downgrade (`SchemaTooNew`). An already-latest DB
+    /// is a no-op (no backup), so the setup and restore paths, which migrate
+    /// themselves, are not migrated twice. A wrong PIN fails before the DB is
+    /// opened and therefore never migrates. On a migration failure the pool is
+    /// dropped and the error returned, so the caller stays locked.
     pub fn unlock(&self, pin: &str) -> Result<Pool, AppError> {
         let dek = KeyHierarchy::new(self.keystore).unlock_with_pin(pin)?;
         let pool = Pool::open(&self.db_path(), &dek)?;
+        hc_storage::migrate::run(&pool)?;
         Ok(pool)
     }
 
