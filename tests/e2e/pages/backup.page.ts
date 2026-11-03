@@ -201,6 +201,8 @@ export class BackupPage {
   ): Promise<{
     patientCount: number;
     visitCount: number;
+    /** Newest live visit day (`YYYY-MM-DD`, UTC) or null when no visits. */
+    lastVisitDate: string | null;
     createdAt: string;
     appVersion: string;
   }> {

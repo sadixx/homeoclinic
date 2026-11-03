@@ -18,7 +18,14 @@
 //   3. Discover the source .hcbak in the shared folder, then:
 //        - real restore_preview: reads the plaintext header WITHOUT mutating
 //          anything and WITHOUT the body key (BAK-003 preview / AC4) — asserts a
-//          valid created_at + app_version came from the source archive.
+//          valid created_at + app_version came from the source archive, and
+//          (b21-a1) that the header carries the source's REAL counts: PHASE A
+//          registers 3 patients and saves 2 visits through the real UI, so the
+//          preview must say 3 patients, 2 visits and the visits' UTC day. The
+//          S17 Step 2 panel renders exactly this object; the panel itself is
+//          not reachable headlessly with a real .hcbak (the Step 1 file comes
+//          from list_removable_drives, see pages/backup.page.ts), and its
+//          rendering of these fields is covered by BackupScreen.test.tsx.
 //        - a WRONG password is refused by restore_apply before anything live is
 //          swapped (AC4) — the destination profile is still intact afterwards.
 //        - real restore_apply with the correct password: safety copy -> atomic
@@ -40,8 +47,12 @@ import path from 'node:path';
 import { expect } from '@wdio/globals';
 
 import { backupPage } from '../../pages/backup.page.js';
+import { caseRichPage } from '../../pages/case-rich.page.js';
+import { patientsPage } from '../../pages/patients.page.js';
+import { shellPage } from '../../pages/shell.page.js';
 import { relaunchInto } from '../../helpers/launch.js';
 import { provisionAndEnterApp } from '../../helpers/setup-flow.js';
+import { evidence } from '../../helpers/evidence.js';
 
 const PIN = '7788';
 const SOURCE_PIN = '4321';
@@ -49,6 +60,42 @@ const SOURCE_BACKUP_PASSWORD = 'clinic-backup-1';
 const WRONG_PASSWORD = 'not-the-password';
 
 const BACKUP_DIR = process.env.HC_E2E_BACKUP_DIR;
+
+// b21-a1: the source install holds 3 synthetic patients, 2 of whom have one
+// saved visit each, so the .hcbak header preview must say 3 / 2 / <visit day>.
+const SOURCE_PATIENTS = [
+  { name: 'Backupa Countone', age: '34', withVisit: true },
+  { name: 'Backupb Counttwo', age: '47', withVisit: true },
+  { name: 'Backupc Countthree', age: '29', withVisit: false },
+] as const;
+const EXPECTED_PATIENTS = SOURCE_PATIENTS.length;
+const EXPECTED_VISITS = SOURCE_PATIENTS.filter((p) => p.withVisit).length;
+
+/** UTC calendar day now (visit_at is stored RFC3339 UTC; the header keeps its day). */
+function utcDay(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * UTC days bracketing the visit saves in PHASE A. The newest visit's UTC day
+ * must be one of these (two values only if the seed straddles UTC midnight).
+ */
+const visitDays: string[] = [];
+
+/** Register one patient through the real S04 form; optionally save one visit (real case form). */
+async function registerSourcePatient(p: (typeof SOURCE_PATIENTS)[number]): Promise<void> {
+  await patientsPage.openRegister();
+  await expect(patientsPage.form).toBeDisplayed();
+  await patientsPage.fillCore({ name: p.name, age: p.age, city: 'Pune' });
+  await patientsPage.saveAndWaitForDashboard();
+  if (!p.withVisit) return;
+  await patientsPage.dashTakeCase();
+  await caseRichPage.waitForForm();
+  await caseRichPage.typeProse(`Chief complaint for ${p.name}`);
+  await caseRichPage.save();
+  const saved = await caseRichPage.waitForSaved();
+  expect(saved).toMatch(/^Saved/);
+}
 
 /** Resolve the single .hcbak phase A left in the shared folder. */
 function sourceArchive(): string {
@@ -78,6 +125,15 @@ describe('R1 demo step 3 — PHASE A (self-provision): back up a source install 
     // completing the wizard on this fresh 'main' launch lands on Today,
     // unlocked, and the guard then admits /backup — no relaunch needed.
     await provisionAndEnterApp('main', SOURCE_PIN);
+    await shellPage.waitForShell();
+
+    // b21-a1: populate the source through the real UI (3 patients, 2 visits)
+    // so the backup header preview has real counts to carry.
+    visitDays.push(utcDay());
+    for (const p of SOURCE_PATIENTS) {
+      await registerSourcePatient(p);
+    }
+    visitDays.push(utcDay());
 
     await backupPage.open();
     await expect(backupPage.screen).toBeDisplayed();
@@ -136,6 +192,19 @@ describe('R1 demo step 3 — PHASE B: restore on a clean install (HC-MVP1-033)',
     expect(preview.createdAt.length).toBeGreaterThan(0);
     expect(typeof preview.appVersion).toBe('string');
     expect(preview.appVersion.length).toBeGreaterThan(0);
+
+    // b21-a1: the header preview (the exact object S17 Step 2 renders as
+    // backup-restore-preview-{patients,visits,lastvisit}) carries the SOURCE
+    // install's real counts, not the old hard-coded 0 / 0 / null. Read from the
+    // clean install, which itself holds 0 patients, so a live-DB count cannot
+    // pass this by accident.
+    evidence(
+      `[b21-a1] preview patientCount=${preview.patientCount} visitCount=${preview.visitCount} lastVisitDate=${preview.lastVisitDate} expected=${EXPECTED_PATIENTS}/${EXPECTED_VISITS}/${visitDays.join('|')}`,
+    );
+    expect(preview.patientCount).toBe(EXPECTED_PATIENTS);
+    expect(preview.visitCount).toBe(EXPECTED_VISITS);
+    expect(preview.lastVisitDate).not.toBe(null);
+    expect(visitDays).toContain(preview.lastVisitDate);
 
     // 3b. A wrong password is refused before anything live is swapped (AC4):
     //     restore_apply throws and the install stays a completed setup.
