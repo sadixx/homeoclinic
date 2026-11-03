@@ -26,8 +26,12 @@ replaced. Everything autosaves; a visible Save button force-flushes.
   saved first case; after the first case is saved, "New visit" resolves to a
   follow-up (S09) and starting a fresh first case is greyed out (first-case
   gating, carried from ADR 0018).
-- Global shortcut F5 (new visit for the open patient) when the type resolves to
-  First.
+- Global shortcut F5 (new visit for the open patient), from the dashboard or
+  from inside a case: it checks `visit_has_saved_first_case`; with no saved
+  first case it opens this screen as a First visit, and once a first case is
+  saved it resolves to a follow-up (S09, the same path as the dashboard's "New
+  visit"), so F5 never creates a second first case (HC-MVP1-M3vis). If the
+  check fails the existing "could not open" alert shows and nothing is created.
 - Deep link from Today (S03) when a first visit is started.
 
 ## Layout (wireframe)
@@ -40,6 +44,7 @@ in a toolbar under the editor; the PAT-009 uploader is a side panel.
 ```
 +--------------------------------------------------------------------------------------------------------+
 | [< Back] Ramesh Kumar  HC-000123  34 y / M   Visit: First 16-10-2026   Next F/U: 16-11-2026  [-][zoom][+] [Save] {Saved 10:42} |
+|          [7 days][15 days][1 month][2 months]  Custom date [dd-mm-yyyy]  [Clear]   (inline after Next F/U; wraps here when narrow) |
 +------------------------+-------------------------------------------------------------------------------+
 | COMPLAINTS       [+]   |  Headache                                        [+ Add entry]                 |
 | > Headache             |  +=====================================================================+       |
@@ -132,7 +137,12 @@ etc.; behaviour is identical (insert under the NEW dated entry).
 | Back | button | top-left, common placement (00-conventions §3); never discards (autosaves) | case-form-back |
 | Save | button | force-flush autosave, shows Saved hh:mm; autosave still runs (CASE-005) | case-form-save |
 | Zoom out / in | buttons | scale the editor DOCUMENT ROOT (WYSIWYG page zooms as a unit; SET-005 extension) | case-form-zoom-out, case-form-zoom-in |
-| Next follow-up display | text | shows visit.next_followup_on (read-only on this screen) | case-form-next-followup |
+| Next follow-up display | text | shows visit.next_followup_on as `Next F/U: DD-MM-YYYY` (or `Next F/U: —`); updates after each successful set/clear | case-form-next-followup |
+| Next follow-up group | role=group, name "Next follow-up" | EDITABLE on this screen for first AND follow-up visits (VIS-004, HC-MVP1-M3vis); sits in the header beside the display and wraps under it when the window is narrow (no horizontal scroll at 1366x768) | case-form-next-group |
+| 7 days / 15 days / 1 month / 2 months | buttons (visible text = accessible name) | set next follow-up to LOCAL today + 7 / 15 days or + 1 / 2 months (same day of month, clamped to month end, e.g. 31 Jan + 1 month = 28/29 Feb) via `visit_set_next_followup` | case-form-next-7d, case-form-next-15d, case-form-next-1m, case-form-next-2m |
+| Custom date | date input inside a visible "Custom date" label | today or later (min = local today); a past date shows an inline alert and is never sent; committed on blur, Enter, or after a short pause (not on every intermediate keystroke) | case-form-next-custom |
+| Clear | button | sets next follow-up to none (`next_followup_on: null`); disabled when none is set | case-form-next-clear |
+| Next follow-up error | inline role=alert | "Pick today or a later date." (past custom date) or "Could not set the follow-up date. Please try again." (command failed; the saved value is kept) | case-form-next-error |
 | Complaint list item | button | selects the active complaint editor | case-form-complaint-<n> |
 | Add complaint | button | appends a new complaint editor | case-form-add-complaint |
 | Remove complaint | button | confirm if it has content | case-form-remove-complaint-<n> |
@@ -222,8 +232,17 @@ Personal history section, the per-field complaint grid. Send-to-repertory
 
 ## Keyboard
 
-- F5 new visit, Ctrl+S force save (Save button; autosave still runs), Esc closes
-  a dialog/popup without discarding, Alt+Left back, Ctrl+= / Ctrl+- zoom in/out.
+- F5 new visit (resolves to a follow-up once a first case is saved, see Entry
+  points), Ctrl+S / Cmd+S force save from anywhere in the case form (prose, a
+  table cell, the header, or nothing focused): the same immediate flush as the
+  Save button, the webview's "save page" default is suppressed, autosave still
+  runs. It matches the S key on non-Latin layouts too (physical key, e.g. Hindi
+  InScript), and holding the chord saves once (auto-repeat is ignored). Esc
+  closes a dialog/popup without discarding, Alt+Left back, Ctrl+= / Ctrl+- zoom
+  in/out.
+- Next follow-up: Tab reaches each quick button, the custom date and Clear;
+  Enter/Space on a button sets it, Enter in the custom date commits it. Rapid
+  choices are applied one at a time and the LAST choice is what stays.
   Inside a table, Tab / Shift-Tab move between cells (ProseMirror native).
   Shortcuts never fire during IME composition.
 
@@ -233,7 +252,7 @@ Personal history section, the per-field complaint grid. Send-to-repertory
 - `case_template_get_default` req {} resp { template_id, name, schema_json }  (schema_json now drives only the record-popup field sets)
 - `case_template_list` req {} resp { templates: [{ id, name, is_default }] }
 - `case_visit_autosave` req { visit_id, data_json, vitals_json } resp { saved_at }  (data_json = whole v3 document incl. text mirror, opaque)
-- `visit_set_next_followup` req { visit_id, next_followup_on } resp { ok }
+- `visit_set_next_followup` req { visit_id, next_followup_on } resp { ok }  (header Next follow-up control; `null` clears; sets visit + patient next_followup_on in one transaction with one audit row, which feeds Today Due / Overdue)
 - `visit_has_saved_first_case` req { patient_id } resp { has_saved_first_case }
 - PAT-009 attachments (unchanged): `visit_pick_report_file`, `visit_attach_report`, `visit_list_attachments`, `visit_open_attachment`, `visit_delete_attachment`
 - `case_summary_render` — DEPRECATED this slice; no UI entry point (ADR 0018 #5 carried).
@@ -267,6 +286,16 @@ Personal history section, the per-field complaint grid. Send-to-repertory
   `text` mirror; trigger unchanged).
 - Patient age in the header is derived from DOB at read time.
 - Zoom scales the whole editor document root.
+- Next follow-up (HC-MVP1-M3vis): on a first AND a follow-up visit, 7 days /
+  15 days / 1 month / 2 months / Custom date set the date shown in
+  `case-form-next-followup`, Clear empties it, and the patient appears in Today
+  Due on that day and in Overdue after it; a past custom date is rejected
+  inline and nothing is written; the header fits 1366x768 with no horizontal
+  scroll.
+- F5 on a patient with a saved first case opens a follow-up, never a second
+  first case.
+- Ctrl+S / Cmd+S anywhere in the form saves at once (status Saving… then Saved
+  hh:mm) and does not trigger the webview's save-page dialog.
 
 ## Open questions
 
