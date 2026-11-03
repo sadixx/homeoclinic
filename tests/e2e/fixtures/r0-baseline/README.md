@@ -78,3 +78,49 @@ must supply the R1 build. The exact `user_version` advance and profile-value
 equality remain asserted at the Rust layer
 (`crates/hc-storage/tests/migrate_test.rs`); the E2E hop asserts the equivalent
 webview-observable end state.
+
+Note (added with the R2 -> R3 hop): on the R3 branch "the build under test" is
+R3, so PHASE D now installs R3 over R1. It also asserts that the CURRENT build
+really runs over the R1 dir and migrated it (`patient_search`, absent in R1,
+reads the 0004 schema). Before this, `relaunchInto` after
+`relaunchIntoWithBinary` reloaded the session with the cached capabilities and
+silently relaunched the R1 binary, so PHASE D never exercised the newer build;
+`helpers/launch.ts` now switches back to the default binary explicitly.
+
+## R3 onward (IMPLEMENTED: the R2 -> R3 hop)
+
+PHASE E/F of the same harness install the **R3 build over a GENUINE R2
+install**:
+
+- PHASE E launches the **R2-final build** (staging-main `5b180b9`, built with
+  `--features e2e-test-keys`, from the worktree `$HC_ROOT/hc-r2-worktree`, or
+  `HC_R2_APP_BINARY`) and runs the real first-run wizard (`clinic.db` at
+  `user_version` **7**: 0001..0007), registers ONE patient through the R2 S06
+  form **with a photo**, imports the 200-patient synthetic fixture through the
+  R2 build's own `patient_import_fixture` (the real `patient_create` path),
+  snapshots every patient (`patient_list_query`: id, code, name), the licence
+  row and the R2 app version, and writes a real R2-made `.hcbak`.
+- PHASE F launches the **R3 build under test** over that SAME dir and asserts:
+  `#/lock` and the R2 PIN unlocks; setup completed with the same data dir; the
+  same licence (kind + validUntil); EVERY R2 patient present (the full id /
+  code / name set equals the R2 snapshot); typed search finds R2 patients by
+  name and by code; the R2-made `.hcbak` opens (`verify_backup` +
+  `restore_preview` stamped with the R2 version); then that migrations
+  **0008..0011** ran forward (`case_template_get_default` and
+  `today_get_overview` serve), the real F2 overlay opens the R2 photo patient's
+  dashboard with the photo, and an R3 case is taken and saved on that patient.
+
+Building the R2 binary (documented in the spec header too):
+
+```
+git worktree add --detach ../hc-r2-worktree 5b180b9
+cd ../hc-r2-worktree/apps/desktop && npm ci
+npm run tauri build -- --debug --features e2e-test-keys --no-bundle
+# -> ../hc-r2-worktree/target/debug/homeoclinic-desktop
+```
+
+If the R2 binary is absent PHASE E/F SKIP (infra, the log names the path and
+the build command) so CI, which builds only the current release, still runs the
+other phases. As for the earlier hops, `PRAGMA user_version` (7 -> 11) and
+exact doctor/clinic value equality have no read command in the webview and
+stay Rust-layer assertions.

@@ -232,8 +232,12 @@ export class CaseRichPage {
    * dated-entry heading of a fresh case), we press Enter first so the prose
    * lands in its own paragraph rather than being appended to the heading. A
    * trailing blur (click the complaint title) flushes autosave.
+   *
+   * `blur = false` (R3 demo, CASE-005 kill mid-typing) leaves the caret IN the
+   * editor after the text lands: no blur flush, so only the 2 s autosave
+   * debounce could persist it — the "still typing" state the app is killed in.
    */
-  async typeProse(text: string, cid = DEFAULT_CID): Promise<void> {
+  async typeProse(text: string, cid = DEFAULT_CID, blur = true): Promise<void> {
     const ed = this.editor(cid);
     await ed.waitForDisplayed({ timeout: 15000 });
     // Focus the inner contenteditable, place the caret at the end of the doc,
@@ -272,7 +276,7 @@ export class CaseRichPage {
       timeout: 15000,
       timeoutMsg: 'typed prose did not appear in the editor',
     });
-    await this.complaintTitle.click();
+    if (blur) await this.complaintTitle.click();
   }
 
   /** The visible text content of the whole editor (prose + table cells). */

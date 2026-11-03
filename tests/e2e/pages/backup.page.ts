@@ -127,18 +127,27 @@ export class BackupPage {
             };
           }
         ).__TAURI_INTERNALS__;
+        // A rejection is handed back under a NON-`status` key: WebKitWebDriver
+        // turns an async-script result carrying `status: 'error'` into a bare
+        // "WebDriverError: [object Object]", hiding the command's real error.
+        // A UserFacingError rejects as an object ({code, message, …}), so it
+        // is JSON-encoded (String() would give "[object Object]").
         if (internals === undefined) {
-          done({ status: 'error', error: { message: 'no __TAURI_INTERNALS__' } });
+          done({ hcInvokeError: 'no __TAURI_INTERNALS__' });
           return;
         }
         internals
           .invoke(c, a)
           .then((v) => done(v))
-          .catch((e) => done({ status: 'error', error: { message: String(e) } }));
+          .catch((e) => done({ hcInvokeError: typeof e === 'string' ? e : JSON.stringify(e) }));
       },
       cmd,
       args,
-    )) as Envelope | T;
+    )) as Envelope | T | { hcInvokeError: string };
+
+    if (result !== null && typeof result === 'object' && 'hcInvokeError' in (result as Record<string, unknown>)) {
+      throw new Error(`command ${cmd} failed: ${(result as { hcInvokeError: string }).hcInvokeError}`);
+    }
 
     if (
       result !== null &&
