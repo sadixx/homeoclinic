@@ -385,9 +385,10 @@ the empty *Paternal* column of the existing rows from the top, so the table
 stays lined up. New rows are added only if there are more lines than empty
 cells.
 
-**Deleting a row:** each table row has a **Delete row** button. After you
-confirm, the row is removed. The header row cannot be deleted, and deleting
-the last remaining row removes the whole table.
+**Deleting a row:** each data row has a small **−** button at its right-hand
+end. Click it, confirm, and that row is removed. From the keyboard, put the
+cursor in the row and press **Ctrl+Shift+Backspace**. The header row cannot be
+deleted, and deleting the last remaining row removes the whole table.
 
 ### Lab and scan reports
 
@@ -420,7 +421,7 @@ Reports are stored **encrypted** on your computer and never leave it.
 
 - The case **autosaves every 2 seconds and whenever you pause**; the status
   shows "Saving..." then **"Saved hh:mm"**.
-- There is also an explicit **Save** button. Pressing it forces an immediate
+- There is also an explicit **Save** button (or press **Ctrl+S**). Pressing it forces an immediate
   save and confirms **"Saved"** — for peace of mind that the case is written.
 - If the app closes — or the computer crashes — **mid-typing**, reopening the
   case restores the last saved content (text **and** the inserted tables) with
@@ -452,12 +453,18 @@ recorded, **including family history**. Nothing is lost between visits.
    table.
 3. A new complaint can be added at any visit with **Add new complaint**.
 
-The case header shows the **next follow-up date** when one is scheduled.
+**Scheduling the next follow-up.** The **Next follow-up** buttons sit at the
+top of the case screen, on the first case and on every follow-up:
 
-> **Not yet in this build:** setting the next follow-up date from the case
-> screen. The new record screen shows the date but has no control to set it,
-> so new appointments do not yet appear under Due today / Overdue on the
-> Today screen. This is being fixed for the R3 release.
+- **7 days**, **15 days**, **1 month** or **2 months** sets the date counted
+  from today. (One month from 31 January is the last day of February.)
+- **Custom date** picks any date. Past dates are refused with *"Pick today or
+  a later date."*
+- **Clear** removes the scheduled date.
+
+The header then shows it, for example *Next F/U: 10-11-2026*. On that date the
+patient appears under **Due today** on the Today screen, and under **Overdue**
+if the date passes without a visit.
 
 Like the first case, a follow-up **autosaves** and has a **Save** button.
 After you save, the visit is listed on the patient dashboard under **Visits
@@ -483,8 +490,8 @@ lists, driven by the follow-up dates you set:
 Each row shows the patient's photo (or default figure), name, code and
 age/sex; click or press **Enter** to open their dashboard. A patient with a
 follow-up date appears under **Due today** on that date, then moves to
-**Overdue** afterwards. (See the note in section 9: in this build the date
-cannot yet be set from the case screen.)
+**Overdue** afterwards. Set the date with the **Next follow-up** buttons on
+the case screen (section 9).
 
 Today also shows the **backup warning banner** when your last good backup is
 more than 7 days old (see section 11). The licence-renewal reminder becomes
@@ -565,7 +572,9 @@ and **all cases and visits** come back.
 | F2 / Ctrl+K | Focus / open global patient search |
 | F3 | Today |
 | F4 | New patient |
-| F5 | Take case for the open patient (for a returning patient, use the **Follow-up** button) |
+| F5 | Open the case for the open patient: **Take case** for a new patient, **Follow-up** once a first case is saved |
+| Ctrl+S | Save the case now (same as the **Save** button) |
+| Ctrl+Shift+Backspace | Delete the table row the cursor is in (asks to confirm) |
 | Alt+← | Back (up one level: case/follow-up → dashboard → list → Today) |
 | Ctrl+= / Ctrl+- | Zoom text and layout in / out |
 | Ctrl+0 | Reset zoom |
