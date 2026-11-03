@@ -67,6 +67,9 @@ R3
 1. Record a detailed chronic case with the default template; kill the app
    mid-typing; reopen; nothing lost.
 2. Add a follow-up with complaint statuses and improvement %.
+   (As delivered: the product owner replaced the structured status and
+   improvement % controls with dated follow-up entries in the case record,
+   ADR 0019. The R3 regression runs the follow-up entry flow instead.)
 3. Set next follow-up; the patient appears on Today on that date (test clock)
    and under overdue after it.
 4. Upgrade install over R2 keeps all patients.
