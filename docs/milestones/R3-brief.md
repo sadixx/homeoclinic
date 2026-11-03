@@ -91,3 +91,23 @@ sections for case taking and visits):
 - Exit: the R3 demo passes as an E2E run tagged `@tier regression` on Windows
   and Linux, the R0-R2 demos still pass, and an upgrade install over R2 keeps
   all patients (R-DEL-004 / R-DEL-005; harness HC-MVP1-226).
+
+## Close-out (2026-11-03)
+
+- Demo step 2 as delivered: the product owner replaced the structured
+  complaint status / improvement % controls (S09) with dated follow-up
+  entries in the one case record (ADR 0018, ADR 0019). The R3 regression
+  (`tests/e2e/specs/release/r3-demo.e2e.ts`) runs that flow.
+- R3 demo (HC-MVP1-217): passes as `@tier regression` on Linux (build-22,
+  two full passes, 26 specs / 51 tests, 0 fail), with R0-R2 demos green.
+- Upgrade (HC-MVP1-226): `upgrade-path.e2e.ts` hops R0->R1, R1->R3 and
+  R2->R3 pass. R2->R3 moves a genuine R2 install (201 patients) from schema
+  7 to 11 at unlock with a pre-migration backup; all 201 patients, the PIN,
+  the profile and the R2 backup survive. This harness found and fixed a
+  release blocker: unlock did not run migrations (commit d209b75).
+- Backup preview now shows real patient/visit counts (commit b3a2ea8).
+- CI on `staging-main`: lint, unit tests, cargo/npm audit, Linux and
+  Windows builds, performance gate and E2E all green.
+- Not met: the regression E2E runs on Linux only. Windows is built and unit
+  tested in CI but has no E2E runner yet (same as R0-R2).
+- Deferred P1 tasks: HC-MVP1-065, 066, 067, 073, 074.
