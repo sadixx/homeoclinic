@@ -58,6 +58,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::backup::get_backup_status,
                 commands::backup::set_auto_backup,
                 commands::backup::list_removable_drives,
+                // Typed async .hcbak file picker for S17 restore Step 1
+                // (BAK-003, b23-n1-d1); same non-blocking pattern as
+                // visit_pick_report_file.
+                commands::backup::backup_pick_restore_file,
                 commands::backup::backup_now,
                 commands::backup::restore_preview,
                 commands::backup::restore_apply,
@@ -133,6 +137,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::backup::get_backup_status,
                 commands::backup::set_auto_backup,
                 commands::backup::list_removable_drives,
+                // Typed async .hcbak file picker for S17 restore Step 1
+                // (BAK-003, b23-n1-d1); same non-blocking pattern as
+                // visit_pick_report_file.
+                commands::backup::backup_pick_restore_file,
                 commands::backup::backup_now,
                 commands::backup::restore_preview,
                 commands::backup::restore_apply,

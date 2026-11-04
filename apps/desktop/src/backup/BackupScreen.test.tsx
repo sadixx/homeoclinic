@@ -18,6 +18,7 @@ const {
   backupNow,
   restorePreview,
   restoreApply,
+  pickRestoreFile,
 } = vi.hoisted(() => ({
   getStatus: vi.fn(),
   setAuto: vi.fn(),
@@ -25,6 +26,7 @@ const {
   backupNow: vi.fn(),
   restorePreview: vi.fn(),
   restoreApply: vi.fn(),
+  pickRestoreFile: vi.fn(),
 }));
 
 vi.mock('@/bindings', () => ({
@@ -35,11 +37,15 @@ vi.mock('@/bindings', () => ({
     backupNow,
     restorePreview,
     restoreApply,
+    backupPickRestoreFile: pickRestoreFile,
   },
 }));
 
 import en from '@/locales/en.json';
 import { BackupScreen } from './BackupScreen';
+
+/** The .hcbak the typed restore picker returns by default (b23-n1-d1). */
+const CHOSEN_HCBAK = '/run/media/doc/USB/patients-2026-10-16.hcbak';
 
 /** A healthy, recent, auto-on status with a prior backup (not first-time). */
 function healthyStatus(overrides: Record<string, unknown> = {}) {
@@ -72,6 +78,8 @@ beforeEach(() => {
   });
   restorePreview.mockReset();
   restoreApply.mockReset();
+  pickRestoreFile.mockReset();
+  pickRestoreFile.mockResolvedValue({ sourcePath: CHOSEN_HCBAK });
 });
 
 describe('BackupScreen (S17) — health', () => {
@@ -330,14 +338,99 @@ describe('BackupScreen (S17) — restore wizard', () => {
     await user.click(screen.getByTestId('backup-restore-confirm'));
 
     await waitFor(() =>
-      expect(restoreApply).toHaveBeenCalledWith(
-        '/run/media/doc/USB',
-        'longenough1',
-      ),
+      expect(restoreApply).toHaveBeenCalledWith(CHOSEN_HCBAK, 'longenough1'),
     );
     expect(await screen.findByTestId('backup-restore-done')).toHaveTextContent(
       en['backup.restore.done'],
     );
+  });
+
+  // b23-n1-d1: Step 1 used to take the first removable drive's FOLDER from
+  // listRemovableDrives, so restore_preview got a directory and failed. The
+  // chooser must call the typed .hcbak picker and pass THAT file on.
+  it('Choose backup file uses the typed .hcbak picker and previews THAT file (BAK-003, b23-n1-d1)', async () => {
+    restorePreview.mockResolvedValue({
+      patientCount: 3,
+      visitCount: 2,
+      lastVisitDate: '2026-10-15',
+      createdAt: '2026-10-16T09:10:00Z',
+      appVersion: '1.0.3',
+    });
+    const user = await openStep1();
+
+    expect(pickRestoreFile).toHaveBeenCalledTimes(1);
+    expect(listDrives).not.toHaveBeenCalled();
+    // The doctor sees the chosen file NAME, not a folder.
+    expect(screen.getByTestId('backup-restore-file')).toHaveTextContent(
+      'patients-2026-10-16.hcbak',
+    );
+
+    await user.type(
+      screen.getByTestId('backup-restore-password'),
+      'longenough1',
+    );
+    await user.click(screen.getByTestId('backup-restore-next'));
+
+    await screen.findByTestId('backup-restore-preview');
+    expect(restorePreview).toHaveBeenCalledWith(CHOSEN_HCBAK, 'longenough1');
+  });
+
+  it('cancelling the picker opens nothing and calls no restore command (b23-n1-d1)', async () => {
+    pickRestoreFile.mockResolvedValue({ sourcePath: null });
+    const user = userEvent.setup();
+    render(<BackupScreen />);
+    await screen.findByTestId('backup-status-last');
+
+    await user.click(screen.getByTestId('backup-restore-choose'));
+
+    await waitFor(() => expect(pickRestoreFile).toHaveBeenCalledTimes(1));
+    expect(
+      screen.queryByTestId('backup-restore-wizard'),
+    ).not.toBeInTheDocument();
+    expect(restorePreview).not.toHaveBeenCalled();
+    expect(restoreApply).not.toHaveBeenCalled();
+  });
+
+  it('cancelling a second pick keeps the already-chosen file (b23-n1-d1)', async () => {
+    const user = await openStep1();
+    await user.type(
+      screen.getByTestId('backup-restore-password'),
+      'longenough1',
+    );
+    pickRestoreFile.mockResolvedValue({ sourcePath: null });
+
+    await user.click(screen.getByTestId('backup-restore-choose'));
+
+    await waitFor(() => expect(pickRestoreFile).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId('backup-restore-file')).toHaveTextContent(
+      'patients-2026-10-16.hcbak',
+    );
+    expect(screen.getByTestId('backup-restore-password')).toHaveValue(
+      'longenough1',
+    );
+    expect(screen.getByTestId('backup-restore-next')).toBeEnabled();
+    expect(restorePreview).not.toHaveBeenCalled();
+  });
+
+  it('shows a picker failure inline in plain language, with no path (b23-n1-d1)', async () => {
+    pickRestoreFile.mockRejectedValue({
+      code: 'internal',
+      message: 'internal /home/doc/secret.hcbak',
+      suggestedAction: 'Please try again.',
+    });
+    const user = userEvent.setup();
+    render(<BackupScreen />);
+    await screen.findByTestId('backup-status-last');
+
+    await user.click(screen.getByTestId('backup-restore-choose'));
+
+    const err = await screen.findByTestId('backup-restore-choose-error');
+    expect(err).toHaveTextContent(en['backup.error.generic']);
+    expect(err).not.toHaveTextContent('/home/doc');
+    expect(
+      screen.queryByTestId('backup-restore-wizard'),
+    ).not.toBeInTheDocument();
+    expect(restorePreview).not.toHaveBeenCalled();
   });
 });
 

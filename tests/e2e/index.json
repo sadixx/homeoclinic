@@ -177,7 +177,8 @@
     {
       "path": "tests/e2e/specs/case/real-picker-smoke.e2e.ts",
       "reqs": [
-        "PAT-009"
+        "PAT-009",
+        "BAK-003"
       ],
       "tier": "smoke",
       "area": "case",

@@ -112,6 +112,18 @@ pub struct RemovableDrives {
     pub drives: Vec<RemovableDrive>,
 }
 
+/// Result of `backup_pick_restore_file` (BAK-003, S17 restore Step 1): the
+/// chosen absolute `.hcbak` path, or `None` if the doctor cancelled. The UI
+/// passes it to `restore_preview` / `restore_apply` without ever constructing
+/// a filesystem path (architecture rule). The dialog grants no filesystem
+/// read; the backup engine reads the archive itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PickRestoreFileResponse {
+    /// The chosen absolute `.hcbak` path, or `None` on cancel.
+    pub source_path: Option<String>,
+}
+
 /// Result of `backup_now` (BAK-002/004, SUX-011). On success `ok` is true and
 /// the path/size/verified are set; the error path is mapped to a
 /// `UserFacingError` at the command boundary, so this struct carries no error

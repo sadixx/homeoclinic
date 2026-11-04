@@ -67,6 +67,11 @@ export class BackupPage {
     return byTestId('backup-restore-done');
   }
 
+  // ---- visible restore wizard (b23-n1 click-through) -----------------------
+  get restoreWizard(): ChainablePromiseElement {
+    return byTestId('backup-restore-wizard');
+  }
+
   get moveStart(): ChainablePromiseElement {
     return byTestId('backup-move-start');
   }

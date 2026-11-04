@@ -77,6 +77,33 @@ export const commands = {
 	 */
 	listRemovableDrives: () => typedError<RemovableDrives, UserFacingError>(__TAURI_INVOKE("list_removable_drives")),
 	/**
+	 *  (`backup_pick_restore_file`) Open the OS file-open dialog filtered to
+	 *  `.hcbak` and return the chosen archive path for S17 restore Step 1
+	 *  (BAK-003, b23-n1-d1). Lets the UI obtain a `file_path` for
+	 *  `restore_preview` / `restore_apply` without constructing a filesystem path
+	 *  (architecture rule). Gated by the `dialog:allow-open` capability only (no
+	 *  fs/shell/opener scope); the dialog grants no filesystem read. When a
+	 *  removable drive is mounted the dialog starts there (backups usually live on
+	 *  a USB stick); otherwise it uses the OS default. No DB access, so it works
+	 *  whether or not the app is unlocked. The chosen path is never logged
+	 *  (R-PRIV-001). Interactive, so E2E-tested (real-picker smoke), not
+	 *  cargo-tested.
+	 * 
+	 *  Determinism seam (DEV/E2E ONLY, feature `e2e-test-keys`, ADR 0017): the
+	 *  native GTK chooser cannot be driven by webdriver, so under the E2E-only
+	 *  build feature this command FIRST consults `HC_E2E_RESTORE_FILE`; if it
+	 *  names a path that exists, that path is returned and the dialog is skipped.
+	 *  Same pattern as `HC_E2E_REPORT_FILE` in `visit_pick_report_file`. Compiled
+	 *  OUT of the release/public build, which always opens the native picker.
+	 * 
+	 *  Threading (M3-RWv5): this MUST be an async command. A sync command runs
+	 *  inline on the GTK main thread, where a blocking dialog wait deadlocks the
+	 *  main loop. The non-blocking `pick_file(callback)` is bridged through a
+	 *  tokio oneshot and awaited on the async runtime instead; the drive lookup
+	 *  (directory reads) runs on the blocking pool.
+	 */
+	backupPickRestoreFile: () => typedError<PickRestoreFileResponse, UserFacingError>(__TAURI_INVOKE("backup_pick_restore_file")),
+	/**
 	 *  (`backup_now`) Manual backup to a chosen folder or USB with a password
 	 *  (BAK-002/004, SUX-011). The password is required and ≥ 8 chars (OQ-S17-2).
 	 *  `remember_password` is accepted for the S17 contract; persisting it to the
@@ -934,6 +961,18 @@ export type PermanentDeleteRequest = {
  */
 export type PickReportFileResponse = {
 	/**  The chosen absolute path, or `None` on cancel. */
+	sourcePath: string | null,
+};
+
+/**
+ *  Result of `backup_pick_restore_file` (BAK-003, S17 restore Step 1): the
+ *  chosen absolute `.hcbak` path, or `None` if the doctor cancelled. The UI
+ *  passes it to `restore_preview` / `restore_apply` without ever constructing
+ *  a filesystem path (architecture rule). The dialog grants no filesystem
+ *  read; the backup engine reads the archive itself.
+ */
+export type PickRestoreFileResponse = {
+	/**  The chosen absolute `.hcbak` path, or `None` on cancel. */
 	sourcePath: string | null,
 };
 
