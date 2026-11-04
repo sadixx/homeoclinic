@@ -22,6 +22,8 @@
 import { $, browser } from '@wdio/globals';
 import { Key } from 'webdriverio';
 
+import { appMainWindow, typeKeysyms } from '../helpers/x11.js';
+
 function byTestId(id: string): ChainablePromiseElement {
   return $(`[data-testid="${id}"]`);
 }
@@ -119,7 +121,9 @@ export class NextFollowupPage {
    * Set the custom date input to `iso` (YYYY-MM-DD) the way a native calendar
    * pick does: the native value setter + input/change events (WebKitWebDriver
    * setValue mangles <input type=date>, see followup.page). The production
-   * onChange then runs its own validation / commit-after-pause.
+   * onChange then runs its own validation. Nothing is saved until the field
+   * is left (blurCustomByClickingHeader) or Enter is pressed: the control
+   * commits a custom date on blur / Enter only.
    */
   async setCustom(iso: string): Promise<void> {
     await this.custom.waitForDisplayed({ timeout: 15000 });
@@ -135,6 +139,75 @@ export class NextFollowupPage {
       timeout: 10000,
       timeoutMsg: `custom follow-up date did not become ${iso}`,
     });
+  }
+
+  /** True when the custom date input has keyboard focus. */
+  async customFocused(): Promise<boolean> {
+    return browser.execute(
+      () => document.activeElement === document.querySelector('[data-testid="case-form-next-custom"]'),
+    );
+  }
+
+  /** Give the custom date input focus (as a calendar pick leaves it focused). */
+  async focusCustom(): Promise<void> {
+    await this.custom.waitForDisplayed({ timeout: 15000 });
+    await browser.execute(() => {
+      (document.querySelector('[data-testid="case-form-next-custom"]') as HTMLInputElement | null)?.focus();
+    });
+    await browser.waitUntil(async () => this.customFocused(), { timeout: 10000, timeoutMsg: 'custom date input did not take focus' });
+  }
+
+  /**
+   * Leave the custom field with a REAL click on the (non-focusable) header
+   * display, the way a doctor clicks elsewhere after picking a date.
+   */
+  async blurCustomByClickingHeader(): Promise<void> {
+    await this.display.click();
+    await browser.waitUntil(async () => !(await this.customFocused()), {
+      timeout: 10000,
+      timeoutMsg: 'custom date input kept focus after clicking the header',
+    });
+  }
+
+  /**
+   * REAL keyboard typing into the focused custom date input: XTest key
+   * presses into the app's X11 window (WebDriver key actions do not reach the
+   * WebKitGTK date segments). `keysyms` are X keysym names, e.g. '1', 'slash'
+   * (next segment), 'Left' (previous segment), 'Tab'.
+   */
+  async typeIntoCustom(keysyms: string[]): Promise<void> {
+    const w = appMainWindow('HomeoClinic');
+    if (w === null) throw new Error('app main X11 window "HomeoClinic" not found for XTest typing');
+    typeKeysyms(w.id, keysyms);
+  }
+
+  /** The custom input's current value (YYYY-MM-DD, or '' while incomplete). */
+  async customValue(): Promise<string> {
+    return browser.execute(
+      () => (document.querySelector('[data-testid="case-form-next-custom"]') as HTMLInputElement | null)?.value ?? '',
+    );
+  }
+
+  /**
+   * Two quick buttons clicked in the SAME task (no await between them): the
+   * second click is guaranteed to land while the first command is in flight.
+   * Each is a full mousedown/mouseup/click sequence on the real button.
+   */
+  async clickQuickPairSameTick(first: QuickId, second: QuickId): Promise<void> {
+    await this.quick(first).waitForClickable({ timeout: 15000 });
+    await browser.execute(
+      (a: string, b: string) => {
+        for (const id of [a, b]) {
+          const el = document.querySelector(`[data-testid="case-form-next-${id}"]`) as HTMLButtonElement | null;
+          if (el === null) throw new Error(`quick button ${id} not found`);
+          el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+          el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+          el.click();
+        }
+      },
+      first,
+      second,
+    );
   }
 
   /** Wait for the inline error and return its text + the input's aria state. */

@@ -10,6 +10,8 @@ desktop), using $DISPLAY.
 Usage:
   x11win.py close   <window-id>              # WM_DELETE_WINDOW ClientMessage
   x11win.py escape  <window-id>              # focus + XTest Escape press/release
+  x11win.py keys    <window-id> <keysym>...  # focus + XTest press/release of each keysym
+                                             # (X keysym names: 1, 2, Tab, Left, Return, ...)
   x11win.py resize  <window-id> <x> <y> <w> <h>
   x11win.py screen                           # prints "<width> <height>"
 
@@ -40,6 +42,8 @@ x11.XMoveResizeWindow.argtypes = [c_void_p, c_ulong, c_int, c_int, c_uint, c_uin
 x11.XSetInputFocus.argtypes = [c_void_p, c_ulong, c_int, c_ulong]
 x11.XKeysymToKeycode.argtypes = [c_void_p, c_ulong]
 x11.XKeysymToKeycode.restype = ctypes.c_ubyte
+x11.XStringToKeysym.argtypes = [ctypes.c_char_p]
+x11.XStringToKeysym.restype = c_ulong
 x11.XDefaultScreen.argtypes = [c_void_p]
 x11.XDisplayWidth.argtypes = [c_void_p, c_int]
 x11.XDisplayHeight.argtypes = [c_void_p, c_int]
@@ -100,6 +104,24 @@ def escape(dpy, win):
     return True
 
 
+def keys(dpy, win, names):
+    """Real keyboard input: XTest press/release of each named keysym, in order."""
+    xtst = ctypes.cdll.LoadLibrary(ctypes.util.find_library("Xtst") or "libXtst.so.6")
+    xtst.XTestFakeKeyEvent.argtypes = [c_void_p, c_uint, c_int, c_ulong]
+    x11.XSetInputFocus(dpy, win, REVERT_TO_PARENT, 0)
+    x11.XSync(dpy, 0)
+    for name in names:
+        sym = x11.XStringToKeysym(name.encode())
+        kc = x11.XKeysymToKeycode(dpy, sym) if sym else 0
+        if not kc:
+            sys.stderr.write(f"x11win: no keycode for keysym {name}\n")
+            return False
+        xtst.XTestFakeKeyEvent(dpy, kc, 1, 0)
+        xtst.XTestFakeKeyEvent(dpy, kc, 0, 0)
+        x11.XSync(dpy, 0)
+    return True
+
+
 def main(argv):
     if len(argv) < 2:
         sys.stderr.write(__doc__)
@@ -116,6 +138,8 @@ def main(argv):
             return 0 if close(dpy, win) else 1
         if cmd == "escape":
             return 0 if escape(dpy, win) else 1
+        if cmd == "keys":
+            return 0 if keys(dpy, win, argv[3:]) else 1
         if cmd == "resize":
             x, y, w, h = (int(v) for v in argv[3:7])
             x11.XMoveResizeWindow(dpy, win, x, y, w, h)

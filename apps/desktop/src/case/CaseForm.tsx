@@ -1430,6 +1430,7 @@ function HeaderBar({
           {nextText}
         </span>
         <NextFollowupControl
+          key={visitId}
           visitId={visitId}
           value={nextFollowupOn}
           onSaved={onNextFollowupSaved}

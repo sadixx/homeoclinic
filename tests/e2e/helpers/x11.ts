@@ -116,6 +116,18 @@ export function escapeWindow(id: string): void {
   run('python3', [X11WIN, 'escape', id]);
 }
 
+/** Focus a window and type the X keysyms in order through XTest (real keyboard input). */
+export function typeKeysyms(id: string, keysyms: string[]): void {
+  run('python3', [X11WIN, 'keys', id, ...keysyms]);
+}
+
+/** The app's viewable main toplevel (owned by the app pid, titled `title`), or null. */
+export function appMainWindow(title: string, binary = process.env.HC_APP_BINARY ?? ''): X11Window | null {
+  const pid = appPid(binary);
+  if (pid === null) return null;
+  return viewableWindowsOf(pid, title)[0] ?? null;
+}
+
 /** Move/resize a toplevel directly (no WM to negotiate with under Xvfb). */
 export function resizeWindow(id: string, x: number, y: number, w: number, h: number): void {
   run('python3', [X11WIN, 'resize', id, String(x), String(y), String(w), String(h)]);

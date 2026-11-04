@@ -14,6 +14,10 @@
 //     2. the 14-row physical generals table fits: no horizontal scroll on the
 //        page, the table wrapper or the editor; every minus in the viewport.
 //        Element screenshot of that table -> <HC_E2E_OUTDIR>/screenshots/.
+//        2b (b19-a1, css-1): every minus stays INSIDE its row box within
+//        0.5px (the old 1.3px crossing of the row line fails), in a
+//        single-line row and in a row wrapped onto several lines by a long
+//        cell; measured overflow logged; element + window screenshots.
 //     3. minus + Cancel keeps the row; focus returns to the editor in that row.
 //     4. minus + Confirm deletes exactly that row; caret on the row that moved up.
 //     5. Ctrl+Shift+Backspace (real WebDriver key chord) on the HEADER row:
@@ -49,6 +53,11 @@ import { evidence } from '../../helpers/evidence.js';
 const PIN = '9753';
 const PATIENT = 'Rowdel Testpatient';
 const MINUS = '\u2212';
+/** b19-a1: the minus may not cross its row line (sub-pixel rounding only). */
+const MAX_ROW_OVERFLOW_PX = 0.5;
+/** css-1: a cell long enough to wrap its row onto several lines at 1366x768. */
+const LONG_PATERNAL =
+  'Paternal grandfather had long-standing hypertension with recurrent dizziness, palpitations and ankle swelling for many years';
 const SHORTCUT_ARIA = 'Control+Shift+Backspace';
 const LABELS: Record<string, string> = {
   vitals: 'Vitals',
@@ -98,14 +107,15 @@ async function assertRowControls(what: string): Promise<number> {
       }
       const label = `Delete row ${dataNo} of ${LABELS[tbl.tableType ?? ''] ?? 'Section'}`;
       if (b.id !== `case-form-table-row-delete-${tNo}-${dataNo}`) problems.push(`t${tNo} r${dataNo} id ${b.id}`);
-      // Ownership, not pixel containment: the button is in this row's own
-      // cell (rowDeleteLayout matches by closest('tr')), its centre is inside
-      // the row, it does not overlap the previous row's button, and it pokes
-      // out of the row box by at most 2px (measured overflow is recorded).
+      // The button is in this row's own cell (rowDeleteLayout matches by
+      // closest('tr')), its centre is inside the row, it does not overlap the
+      // previous row's button, and it stays INSIDE the row box: b19-a1 (the
+      // minus crossed its row line by ~1.3px) is caught by a 0.5px bound
+      // (sub-pixel rounding only; the measured overflow is recorded).
       const cy = (b.top + b.bottom) / 2;
       const over = Math.max(0, b.row.top - b.top, b.bottom - b.row.bottom, b.row.left - b.left, b.right - b.row.right);
       maxOverflow = Math.max(maxOverflow, over);
-      if (cy < b.row.top || cy > b.row.bottom || over > 2 || b.top < prevBottom) {
+      if (cy < b.row.top || cy > b.row.bottom || over > MAX_ROW_OVERFLOW_PX || !b.inRowBox || b.top < prevBottom) {
         problems.push(
           `t${tNo} r${dataNo} button not owned by its row: btn[${b.left},${b.right}]x[${b.top},${b.bottom}] ` +
             `row ${JSON.stringify(b.row)} overflow=${over.toFixed(1)} prevBottom=${prevBottom}`,
@@ -120,7 +130,7 @@ async function assertRowControls(what: string): Promise<number> {
   });
   if (problems.length > 0) throw new Error(`${what}: row controls wrong: ${problems.join('; ')}`);
   const shape = lay.tables.map((t) => `${t.tableType}:${t.rows.filter((r) => !r.header).length}`).join(',');
-  evidence(`[rowdel] ${what}: strip=absent oldStyle=0 outsideTables=0 controls=${total} tables=[${shape}] headers have none; each in its own row cell, centred in row, no overlap, max overflow past row box ${maxOverflow.toFixed(1)}px; glyph/name/keys/title ok`);
+  evidence(`[rowdel] ${what}: strip=absent oldStyle=0 outsideTables=0 controls=${total} tables=[${shape}] headers have none; each in its own row cell, centred in row, no overlap, inside row box (bound ${MAX_ROW_OVERFLOW_PX}px), max overflow past row box ${maxOverflow.toFixed(2)}px; glyph/name/keys/title ok`);
   return total;
 }
 
@@ -187,6 +197,45 @@ describe('M3ux inline row delete PHASE A: per-row minus, shortcut, confirm/cance
     expect(fit.editorOverflowX).toBeLessThanOrEqual(1);
     expect(fit.buttonsOutsideViewport).toBe(0);
     expect(fit.tableRight).toBeLessThanOrEqual(fit.viewport);
+
+    // ---- 2b. b19-a1 / css-1: the minus inside a single-line AND a wrapped row
+    // Make family row 1 wrap onto several lines (long Paternal cell); the
+    // minus must stay inside that taller row too (it is centred in the cell).
+    const famHeaders = (await caseRichPage.tableByType('family_history'))?.headers ?? [];
+    const pi = famHeaders.indexOf('Paternal');
+    expect(pi).toBeGreaterThanOrEqual(0);
+    await caseRichPage.editTableCell('family_history', 0, pi, LONG_PATERNAL);
+    await browser.waitUntil(
+      async () => ((await caseRichPage.tableByType('family_history'))?.rows[0]?.[pi] ?? '').includes('ankle swelling'),
+      { timeout: 15000, timeoutMsg: 'long Paternal text did not land in family row 1' },
+    );
+    const wrapLay = await caseRichPage.rowDeleteLayout();
+    const famIdx = wrapLay.tables.findIndex((t) => t.tableType === 'family_history');
+    const famRows = (wrapLay.tables[famIdx]?.rows ?? []).filter((r) => !r.header);
+    const wrapBtn = famRows[0]?.buttons[0];
+    const oneLineBtn = famRows[1]?.buttons[0];
+    expect(wrapBtn).toBeDefined();
+    expect(oneLineBtn).toBeDefined();
+    const wrapH = (wrapBtn?.row.bottom ?? 0) - (wrapBtn?.row.top ?? 0);
+    const oneH = (oneLineBtn?.row.bottom ?? 0) - (oneLineBtn?.row.top ?? 0);
+    const rowOver = (b: NonNullable<typeof wrapBtn>): number =>
+      Math.max(0, b.row.top - b.top, b.bottom - b.row.bottom, b.row.left - b.left, b.right - b.row.right);
+    await caseRichPage.screenshotTable('family_history', path.join(shots, 'family-history-wrapped-minus-1366x768.png'));
+    await browser.saveScreenshot(path.join(shots, 'case-form-wrapped-1366x768.png'));
+    evidence(
+      `[rowdel] b19-a1 1366x768 single-line row: h=${oneH.toFixed(1)} btn=[${oneLineBtn?.top},${oneLineBtn?.bottom}] row=[${oneLineBtn?.row.top},${oneLineBtn?.row.bottom}] ` +
+        `inRowBox=${String(oneLineBtn?.inRowBox)} overflow=${oneLineBtn ? rowOver(oneLineBtn).toFixed(2) : 'n/a'}px; ` +
+        `wrapped row: h=${wrapH.toFixed(1)} btn=[${wrapBtn?.top},${wrapBtn?.bottom}] row=[${wrapBtn?.row.top},${wrapBtn?.row.bottom}] ` +
+        `inRowBox=${String(wrapBtn?.inRowBox)} overflow=${wrapBtn ? rowOver(wrapBtn).toFixed(2) : 'n/a'}px; ` +
+        `screenshots=screenshots/family-history-wrapped-minus-1366x768.png,screenshots/case-form-wrapped-1366x768.png`,
+    );
+    // The long cell really wrapped (row taller than 1.5 single-line rows).
+    expect(wrapH).toBeGreaterThan(oneH * 1.5);
+    expect(wrapBtn?.inRowBox).toBe(true);
+    expect(oneLineBtn?.inRowBox).toBe(true);
+    expect(rowOver(wrapBtn as NonNullable<typeof wrapBtn>)).toBeLessThanOrEqual(MAX_ROW_OVERFLOW_PX);
+    expect(rowOver(oneLineBtn as NonNullable<typeof oneLineBtn>)).toBeLessThanOrEqual(MAX_ROW_OVERFLOW_PX);
+    await assertRowControls('wrapped family row');
 
     // ---- 3. minus + Cancel keeps the row, focus back in that row ---------
     const famNo = await caseRichPage.tableNumber('family_history');

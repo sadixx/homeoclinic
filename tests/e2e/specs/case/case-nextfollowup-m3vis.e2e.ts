@@ -28,6 +28,15 @@
 //       real today it is neither due nor overdue.
 //     Kill/relaunch -> the follow-up's date is still today+7 in the header and
 //       read back, and the patient is still Overdue under the test clock.
+//   PHASE C (R5 leftovers, review data-2 / data-3, same follow-up visit):
+//     Custom date typed DIGIT BY DIGIT with real XTest key presses (mm/dd/yyyy
+//       segments), passing through a complete VALID intermediate date, then the
+//       day re-typed: no save while typing (bounded window), Tab out -> exactly
+//       ONE visit_set_next_followup carrying the FINAL date; header + read-back.
+//     Rapid "7 days" then "1 month" (two real clicks back to back, and a
+//       same-tick pair that must queue behind the in-flight save): the header
+//       and the saved value end on 1 month, last spied call = 1 month;
+//       kill/relaunch -> still 1 month in the header and read back.
 //
 // The test clock shifts only argument-less `new Date()` in the webview (see
 // pages/next-followup.page.ts); Today anchors today_get_overview on it, so a
@@ -53,14 +62,14 @@ import { todayPage } from '../../pages/today.page.js';
 import { provisionAndEnterApp } from '../../helpers/setup-flow.js';
 import { relaunchInto } from '../../helpers/launch.js';
 import { evidence } from '../../helpers/evidence.js';
-import { isoPlusDays, todayIso } from '../../helpers/dates.js';
+import { isoDayOfMonthAhead, isoPlusDays, isoPlusMonths, todayIso } from '../../helpers/dates.js';
 
 const PIN = '2468';
 const PATIENT = 'Vista Nextpatient';
 const NONE = 'Next F/U: —';
 const SET_CMD = 'visit_set_next_followup';
 const SAVE_CMD = 'case_visit_autosave';
-/** Longer than the control's commit pause (800 ms) with margin. */
+/** Bounded no-write window: well over the retired 800 ms commit pause (review data-2). */
 const NO_COMMIT_WINDOW_MS = 2500;
 /** Longer than the autosave debounce (2000 ms) with margin. */
 const NO_EXTRA_SAVE_WINDOW_MS = 3000;
@@ -249,8 +258,17 @@ describe('M3vis next follow-up PHASE A: first case scheduler, Today due, Ctrl+S,
     const lab = await nf.customLabelInfo();
     expect(lab).toEqual({ text: 'Custom date', displayed: true, wrapsInput: true });
     const today = todayIso();
+    // ux-1: a calendar pick (value set while the field has focus) is saved
+    // only when the doctor leaves the field: nothing is sent while focused,
+    // then a real click elsewhere commits it exactly once.
+    await nf.focusCustom();
     await nf.setCustom(today);
+    expect(await noMoreCalls(SET_CMD, 1, NO_COMMIT_WINDOW_MS)).toBe(true);
+    expect(await nf.displayText()).toBe(`Next F/U: ${dash(plus7)}`);
+    await nf.blurCustomByClickingHeader();
     await nf.waitDisplay(`Next F/U: ${dash(today)}`, 'custom today');
+    expect(await noMoreCalls(SET_CMD, 2, NO_COMMIT_WINDOW_MS)).toBe(true);
+    evidence(`[m3vis] ux-1 calendar-pick ${today} with focus: ${SET_CMD} still x1 for ${NO_COMMIT_WINDOW_MS} ms; click elsewhere -> header "Next F/U: ${dash(today)}", ${SET_CMD} x2 (exactly one new save)`);
     await browser.waitUntil(async () => !(await nf.error.isExisting()), { timeout: 10000, timeoutMsg: 'past-date alert did not clear' });
     const set2 = await nf.waitCalls(SET_CMD, 2, 'custom today');
     expect(JSON.stringify(set2[1]?.args)).toContain(today);
@@ -384,5 +402,115 @@ describe('M3vis next follow-up PHASE B: F5 follow-up, follow-up visit scheduler,
     }
     expect(rel.overdue.some((x) => x.includes(PATIENT))).toBe(true);
     evidence(`[m3vis] after kill/relaunch: header "Next F/U: ${dash(plus7)}"; follow-up ${JSON.stringify(relFu)}; clock ${shifted2} overdue=${JSON.stringify(rel.overdue)}`);
+  });
+});
+
+describe('M3vis next follow-up PHASE C: custom date typed digit by digit saves once; rapid quick clicks keep the last (review data-2/data-3)', () => {
+  after(() => {
+    delete process.env.GDK_BACKEND;
+  });
+
+  it('M3vis R5: digit-by-digit custom date saves once with the final date; 7 days then 1 month rapidly ends on 1 month after relaunch', async () => {
+    await caseRichPage.openFollowupVisit(patientId, followupVisitId);
+    await nf.waitDisplay(`Next F/U: ${dash(isoPlusDays(7))}`, 'PHASE C open follow-up');
+    await nf.installIpcSpy([SET_CMD]);
+    const n0 = (await nf.spiedCalls(SET_CMD)).length;
+
+    // ---- data-2: digit-by-digit typing, one save with the final date --------
+    // Next month, day 10 (intermediate) then day 20 (final): both complete,
+    // valid, future dates, so a pause/timer commit would have saved day 10.
+    const inter = isoDayOfMonthAhead(1, 10);
+    const final = isoDayOfMonthAhead(1, 20);
+    const [fy, fm] = final.split('-') as [string, string, string];
+    await nf.focusCustom();
+    const seen: string[] = [];
+    const type = async (keys: string[]): Promise<void> => {
+      await nf.typeIntoCustom(keys);
+      seen.push(`${keys.join('')}=>${JSON.stringify(await nf.customValue())}`);
+    };
+    // mm / dd / yyyy, one key press per digit; 'slash' moves to the next segment.
+    for (const d of fm) await type([d]);
+    await type(['slash']);
+    for (const d of '10') await type([d]);
+    await type(['slash']);
+    for (const d of fy) await type([d]);
+    await browser.waitUntil(async () => (await nf.customValue()) === inter, {
+      timeout: 10000,
+      timeoutMsg: `typed intermediate date did not read ${inter} (seen ${seen.join(' ')})`,
+    });
+    // Pause on the complete, valid intermediate date: nothing may be saved.
+    expect(await noMoreCalls(SET_CMD, n0, NO_COMMIT_WINDOW_MS)).toBe(true);
+    // Back to the day segment and re-type it, digit by digit.
+    await type(['Left']);
+    for (const d of '20') await type([d]);
+    await browser.waitUntil(async () => (await nf.customValue()) === final, {
+      timeout: 10000,
+      timeoutMsg: `re-typed date did not read ${final} (seen ${seen.join(' ')})`,
+    });
+    expect(await noMoreCalls(SET_CMD, n0, NO_COMMIT_WINDOW_MS)).toBe(true);
+    expect(await nf.displayText()).toBe(`Next F/U: ${dash(isoPlusDays(7))}`);
+    // Keyboard Tab out of the field (Tab steps through the remaining segment first).
+    for (let i = 0; i < 3 && (await nf.customFocused()); i++) await type(['Tab']);
+    expect(await nf.customFocused()).toBe(false);
+    await nf.waitDisplay(`Next F/U: ${dash(final)}`, 'typed custom date after Tab out');
+    const typed = await nf.waitCalls(SET_CMD, n0 + 1, 'typed custom date');
+    expect(await noMoreCalls(SET_CMD, n0 + 1, NO_COMMIT_WINDOW_MS)).toBe(true);
+    const typedCalls = (await nf.spiedCalls(SET_CMD)).slice(n0);
+    expect(typedCalls.length).toBe(1);
+    expect(JSON.stringify(typed[n0]?.args)).toContain(final);
+    expect(JSON.stringify(typed[n0]?.args)).not.toContain(inter);
+    const typedSaved = await nf.savedNextFollowup(patientId, 'follow_up');
+    expect(typedSaved).toEqual({ visitId: followupVisitId, nextFollowupOn: final });
+    evidence(
+      `[m3vis-r5] data-2 typed digit by digit (XTest): ${seen.join(' ')}; 0 saves while typing (incl. ${NO_COMMIT_WINDOW_MS} ms on valid ${inter}); ` +
+        `Tab out -> ${SET_CMD} x${typedCalls.length} args=${JSON.stringify(typedCalls[0]?.args)}; header "Next F/U: ${dash(final)}"; read-back ${JSON.stringify(typedSaved)}`,
+    );
+
+    // ---- data-3: rapid 7 days then 1 month ---------------------------------
+    const plus7 = isoPlusDays(7);
+    const plus1m = isoPlusMonths(1);
+    expect(plus1m).not.toBe(plus7);
+    // (a) two real WebDriver clicks back to back.
+    const n1 = (await nf.spiedCalls(SET_CMD)).length;
+    await nf.clickQuick('7d');
+    await nf.clickQuick('1m');
+    await nf.waitDisplay(`Next F/U: ${dash(plus1m)}`, 'real clicks 7 days then 1 month');
+    await browser.waitUntil(async () => {
+      const c = (await nf.spiedCalls(SET_CMD)).slice(n1);
+      return c.length >= 1 && JSON.stringify(c[c.length - 1]?.args).includes(plus1m);
+    }, { timeout: 15000, timeoutMsg: 'last spied call after real clicks is not 1 month' });
+    expect(await nf.displayStays(`Next F/U: ${dash(plus1m)}`, NO_COMMIT_WINDOW_MS)).toBe(true);
+    const realCalls = (await nf.spiedCalls(SET_CMD)).slice(n1).map((c) => JSON.stringify(c.args));
+    expect((await nf.savedNextFollowup(patientId, 'follow_up')).nextFollowupOn).toBe(plus1m);
+    evidence(`[m3vis-r5] data-3 real clicks 7d,1m: header "Next F/U: ${dash(plus1m)}" (stable ${NO_COMMIT_WINDOW_MS} ms); calls ${JSON.stringify(realCalls)}; read-back ${plus1m}`);
+
+    // (b) same-tick pair: Clear first so both choices are real changes, then
+    // 7 days and 1 month in ONE task — 1 month must queue behind 7 days.
+    await nf.clickClear();
+    await nf.waitDisplay(NONE, 'clear before same-tick pair');
+    const n2 = (await nf.spiedCalls(SET_CMD)).length;
+    await nf.clickQuickPairSameTick('7d', '1m');
+    await nf.waitDisplay(`Next F/U: ${dash(plus1m)}`, 'same-tick 7 days + 1 month');
+    await browser.waitUntil(async () => (await nf.spiedCalls(SET_CMD)).length >= n2 + 2, {
+      timeout: 15000,
+      timeoutMsg: 'same-tick pair did not send both choices in order',
+    });
+    expect(await nf.displayStays(`Next F/U: ${dash(plus1m)}`, NO_COMMIT_WINDOW_MS)).toBe(true);
+    const pairCalls = (await nf.spiedCalls(SET_CMD)).slice(n2).map((c) => JSON.stringify(c.args));
+    expect(pairCalls.length).toBe(2);
+    expect(pairCalls[0]).toContain(plus7);
+    expect(pairCalls[1]).toContain(plus1m);
+    const pairSaved = await nf.savedNextFollowup(patientId, 'follow_up');
+    expect(pairSaved).toEqual({ visitId: followupVisitId, nextFollowupOn: plus1m });
+    evidence(`[m3vis-r5] data-3 same-tick 7d+1m: calls in order ${JSON.stringify(pairCalls)}; header "Next F/U: ${dash(plus1m)}" (stable ${NO_COMMIT_WINDOW_MS} ms); read-back ${JSON.stringify(pairSaved)}`);
+
+    // ---- kill/relaunch: 1 month persisted ----------------------------------
+    await relaunchInto('main');
+    await unlockAfterRelaunch();
+    await caseRichPage.openFollowupVisit(patientId, followupVisitId);
+    await nf.waitDisplay(`Next F/U: ${dash(plus1m)}`, 'after relaunch (1 month)');
+    const relSaved = await nf.savedNextFollowup(patientId, 'follow_up');
+    expect(relSaved).toEqual({ visitId: followupVisitId, nextFollowupOn: plus1m });
+    evidence(`[m3vis-r5] after kill/relaunch: header "Next F/U: ${dash(plus1m)}"; read-back ${JSON.stringify(relSaved)}`);
   });
 });
