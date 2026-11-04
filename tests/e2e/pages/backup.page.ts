@@ -72,6 +72,79 @@ export class BackupPage {
     return byTestId('backup-restore-wizard');
   }
 
+  get restoreStep1Title(): ChainablePromiseElement {
+    return byTestId('backup-restore-step1-title');
+  }
+
+  get restoreStep2Title(): ChainablePromiseElement {
+    return byTestId('backup-restore-step2-title');
+  }
+
+  get restoreFile(): ChainablePromiseElement {
+    return byTestId('backup-restore-file');
+  }
+
+  get restorePassword(): ChainablePromiseElement {
+    return byTestId('backup-restore-password');
+  }
+
+  get restorePasswordError(): ChainablePromiseElement {
+    return byTestId('backup-restore-password-error');
+  }
+
+  get restoreNext(): ChainablePromiseElement {
+    return byTestId('backup-restore-next');
+  }
+
+  get restoreCancel(): ChainablePromiseElement {
+    return byTestId('backup-restore-cancel');
+  }
+
+  get restoreStep3Title(): ChainablePromiseElement {
+    return byTestId('backup-restore-step3-title');
+  }
+
+  /** Step 3 "Restore" (applies the archive). */
+  get restoreConfirm(): ChainablePromiseElement {
+    return byTestId('backup-restore-confirm');
+  }
+
+  /** Closes the wizard once the restore is done. */
+  get restoreClose(): ChainablePromiseElement {
+    return byTestId('backup-restore-close');
+  }
+
+  get restoreError(): ChainablePromiseElement {
+    return byTestId('backup-restore-error');
+  }
+
+  get restoreErrorDetails(): ChainablePromiseElement {
+    return byTestId('backup-restore-error-details');
+  }
+
+  /** One field of the Step 2 preview panel (rendered text, trimmed). */
+  async restorePreviewField(
+    field: 'patients' | 'visits' | 'lastvisit' | 'made' | 'version',
+  ): Promise<string> {
+    const el = byTestId(`backup-restore-preview-${field}`);
+    await el.waitForDisplayed({ timeout: 15000 });
+    return (await el.getText()).trim();
+  }
+
+  /** Real list_removable_drives (where the Step 1 picker starts, if any). */
+  async listRemovableDrives(): Promise<unknown> {
+    return browser.executeAsync((done: (v: unknown) => void) => {
+      const i = (
+        window as unknown as { __TAURI_INTERNALS__?: { invoke: (c: string) => Promise<unknown> } }
+      ).__TAURI_INTERNALS__;
+      if (i === undefined) {
+        done({ error: 'no __TAURI_INTERNALS__' });
+        return;
+      }
+      i.invoke('list_removable_drives').then(done, (e) => done({ error: String(e) }));
+    });
+  }
+
   get moveStart(): ChainablePromiseElement {
     return byTestId('backup-move-start');
   }

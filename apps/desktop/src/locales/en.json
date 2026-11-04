@@ -187,6 +187,7 @@
   "backup.error.tooNew": "This backup was made by a newer version of the app.",
   "backup.error.destUnavailable": "The backup location is not available. Reconnect the drive and try again.",
   "backup.error.outOfSpace": "There is not enough space on the backup location.",
+  "backup.error.reopenFailed": "The app was locked to finish the restore safely. Unlock with your PIN.",
   "backup.error.generic": "Something went wrong. Check the details and try again.",
   "setup.backup.link": "Set up your first backup",
   "common.cancel": "Cancel",

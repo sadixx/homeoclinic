@@ -19,9 +19,9 @@ use tauri::State;
 use hc_storage::clock::SystemClock;
 
 use crate::backup::{
-    list_removable_drives as enumerate_drives, BackupNowResponse, BackupService, BackupStatus,
-    PickRestoreFileResponse, RemovableDrives, RestoreApplyResponse, RestorePreview,
-    SetAutoBackupResponse, VerifyBackupResponse, MOVE_TO_NEW_COMPUTER_ENABLED,
+    list_removable_drives as enumerate_drives, restore_apply_in_state, BackupNowResponse,
+    BackupService, BackupStatus, PickRestoreFileResponse, RemovableDrives, RestoreApplyResponse,
+    RestorePreview, SetAutoBackupResponse, VerifyBackupResponse, MOVE_TO_NEW_COMPUTER_ENABLED,
 };
 use crate::error::{map_error, to_user_result, AppError, UserFacingError};
 use crate::state::AppState;
@@ -179,6 +179,12 @@ pub fn restore_preview(
 /// re-key under THIS install's DEK → migrate-if-older. Requires the app to be
 /// unlocked so the retained target DEK is available (design §5 / ADR 0014); a
 /// wrong backup password is refused before anything live changes (AC4).
+///
+/// The session continues on the restored data (b23-n1-d2): the old pool is
+/// closed before the swap and a migrated pool on the restored `clinic.db` is
+/// stored back in [`AppState`]. If the restored DB cannot be reopened, the app
+/// is locked and `restore_reopen_failed` is returned so the UI routes to the
+/// unlock screen. See [`restore_apply_in_state`].
 #[tauri::command]
 #[specta::specta]
 pub fn restore_apply(
@@ -186,23 +192,12 @@ pub fn restore_apply(
     file_path: String,
     password: String,
 ) -> Result<RestoreApplyResponse, UserFacingError> {
-    // Clone a handle to the retained DEK provider out from under the lock so the
-    // engine can borrow it as `&dyn KeyProvider` without holding the mutex
-    // across the whole restore. A sealed app (no key) is a generic error.
-    let (pool_present, key) = {
-        let lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
-        (lock.pool.is_some(), lock.key.clone())
-    };
-    if !pool_present {
-        return Err(map_error(&AppError::NotFound));
-    }
-    let key = match key {
-        Some(k) => k,
-        None => return Err(map_error(&AppError::NotFound)),
-    };
-    to_user_result(with_service(&state, |svc| {
-        svc.restore_apply(&file_path, &password, key.as_ref())
-    }))
+    to_user_result(restore_apply_in_state(
+        &state,
+        &SystemClock,
+        &file_path,
+        &password,
+    ))
 }
 
 /// (`verify_backup`) Checksum + decrypt-test an existing archive (BAK-004).

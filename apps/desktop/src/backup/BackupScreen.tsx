@@ -22,6 +22,7 @@ import { commands, type BackupStatus, type RestorePreview } from '@/bindings';
 import {
   backupErrorDetails,
   backupErrorMessage,
+  isRestoreReopenFailed,
   isWrongBackupPassword,
 } from '@/backup/backupErrors';
 import { run } from '@/shared/command';
@@ -278,7 +279,11 @@ export function BackupScreen(): JSX.Element {
       setRestoreDone(true);
       await refreshStatus();
     } catch (err) {
-      if (isWrongBackupPassword(err)) {
+      if (isRestoreReopenFailed(err)) {
+        // The backend locked the app (b23-n1-d2): go to the unlock screen.
+        // Hash route, so this works without a router context.
+        window.location.hash = '#/lock';
+      } else if (isWrongBackupPassword(err)) {
         setRestoreStep(1);
         setRestorePasswordError(backupErrorMessage(err));
       } else {

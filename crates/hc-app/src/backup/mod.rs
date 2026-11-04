@@ -25,12 +25,13 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use hc_storage::backup::{BackupEngine, BackupStatus as EngineStatus};
+use hc_storage::backup::{BackupEngine, BackupStatus as EngineStatus, PreparedRestore};
 use hc_storage::clock::Clock;
 use hc_storage::key::KeyProvider;
 use hc_storage::Pool;
 
 use crate::error::AppError;
+use crate::state::AppState;
 
 /// `app_setting` key recording whether the automatic daily backup is on
 /// (BAK-001). Config value, never patient data (R-PRIV-001).
@@ -318,6 +319,21 @@ impl<'a> BackupService<'a> {
         })
     }
 
+    /// Phase 1 of a live restore (b23-n1-d2): validate the header and the
+    /// password and stage the re-keyed DB under `target_key`, WITHOUT touching
+    /// live data or this service's pool. The caller drops its live pool, then
+    /// calls [`PreparedRestore::commit`]. See [`restore_apply_in_state`].
+    pub fn restore_prepare(
+        &self,
+        file_path: &str,
+        password: &str,
+        target_key: &dyn KeyProvider,
+    ) -> Result<PreparedRestore, AppError> {
+        Ok(self
+            .engine()
+            .restore_prepare(Path::new(file_path), password, target_key)?)
+    }
+
     /// (`verify_backup`) Checksum + decrypt-test an existing archive (BAK-004).
     pub fn verify_backup(
         &self,
@@ -425,4 +441,69 @@ fn platform_removable_drives() -> Vec<RemovableDrive> {
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
 fn platform_removable_drives() -> Vec<RemovableDrive> {
     Vec::new()
+}
+
+/// (`restore_apply` command body, BAK-003, b23-n1-d2) Restore `file_path` into
+/// the RUNNING session held by `state` and continue on the restored data.
+///
+/// Holds the state lock for the whole operation so no other command can use
+/// the pool mid-swap. Order:
+///
+/// 1. Requires the app to be unlocked (open pool + retained DEK), else
+///    [`AppError::NotFound`] (generic, nothing touched).
+/// 2. [`BackupService::restore_prepare`]: header, password and staging. Any
+///    error here (wrong password, bad or too-new archive) returns with the old
+///    pool still in place and working (AC4).
+/// 3. Drops the old pool BEFORE the swap, so no connection keeps the live file
+///    open while the engine moves it to `pre-restore-*` (Windows cannot
+///    rename an open file; on Linux an open pool would follow the moved file
+///    and writes after the restore would land in the safety copy).
+/// 4. Commits the swap and stores the reopened, migrated pool on the live
+///    `clinic.db` (retained DEK) back in the state.
+///
+/// If the commit fails, the app is LOCKED (pool and key dropped, which
+/// zeroizes the DEK, R-SEC-006) and [`AppError::RestoreReopenFailed`] is
+/// returned so the UI routes to the unlock screen. PIN unlock then reopens
+/// and migrates whatever `clinic.db` is live. A pool is never left pointing at
+/// the moved file. `clock` stamps the safety-copy dir. Nothing is logged.
+pub fn restore_apply_in_state(
+    state: &AppState,
+    clock: &dyn Clock,
+    file_path: &str,
+    password: &str,
+) -> Result<RestoreApplyResponse, AppError> {
+    let mut lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
+    let key = lock.key.clone().ok_or(AppError::NotFound)?;
+    let prepared = {
+        let pool = lock.pool.as_ref().ok_or(AppError::NotFound)?;
+        BackupService::new(pool, &state.data_dir, clock).restore_prepare(
+            file_path,
+            password,
+            key.as_ref(),
+        )?
+    };
+
+    // Close every connection on the live file before the engine moves it.
+    drop(lock.pool.take());
+
+    match prepared.commit(key.as_ref()) {
+        Ok((outcome, pool)) => {
+            lock.pool = Some(pool);
+            lock.locked = false;
+            Ok(RestoreApplyResponse {
+                ok: true,
+                pre_restore_backup_path: outcome
+                    .pre_restore_backup_path
+                    .to_string_lossy()
+                    .into_owned(),
+            })
+        }
+        Err(_) => {
+            // Seal: no pool, no key. The doctor unlocks with the PIN.
+            lock.pool = None;
+            lock.key = None;
+            lock.locked = true;
+            Err(AppError::RestoreReopenFailed)
+        }
+    }
 }

@@ -345,6 +345,39 @@ describe('BackupScreen (S17) — restore wizard', () => {
     );
   });
 
+  // b23-n1-d2: if the backend could not reopen the restored database it LOCKS
+  // the app and returns `restore_reopen_failed`. The screen must send the
+  // doctor to the unlock screen (the PIN unlock reopens the live DB), not
+  // leave them on a screen whose commands would all fail.
+  it('routes to the lock screen when the restored DB could not be reopened (b23-n1-d2)', async () => {
+    window.location.hash = '#/backup';
+    restorePreview.mockResolvedValue({
+      patientCount: 3,
+      visitCount: 2,
+      lastVisitDate: '2026-10-15',
+      createdAt: '2026-10-16T09:10:00Z',
+      appVersion: '1.0.3',
+    });
+    restoreApply.mockRejectedValue({
+      code: 'restore_reopen_failed',
+      message: 'internal',
+      suggestedAction: 'Unlock with your PIN, then check your patients.',
+    });
+    const user = await openStep1();
+    await user.type(
+      screen.getByTestId('backup-restore-password'),
+      'longenough1',
+    );
+    await user.click(screen.getByTestId('backup-restore-next'));
+    await screen.findByTestId('backup-restore-preview');
+    await user.click(screen.getByTestId('backup-restore-next'));
+    await screen.findByTestId('backup-restore-step3-title');
+    await user.click(screen.getByTestId('backup-restore-confirm'));
+
+    await waitFor(() => expect(window.location.hash).toBe('#/lock'));
+    expect(screen.queryByTestId('backup-restore-done')).not.toBeInTheDocument();
+  });
+
   // b23-n1-d1: Step 1 used to take the first removable drive's FOLDER from
   // listRemovableDrives, so restore_preview got a directory and failed. The
   // chooser must call the typed .hcbak picker and pass THAT file on.

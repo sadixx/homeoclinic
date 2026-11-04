@@ -121,6 +121,12 @@ export const commands = {
 	 *  re-key under THIS install's DEK → migrate-if-older. Requires the app to be
 	 *  unlocked so the retained target DEK is available (design §5 / ADR 0014); a
 	 *  wrong backup password is refused before anything live changes (AC4).
+	 * 
+	 *  The session continues on the restored data (b23-n1-d2): the old pool is
+	 *  closed before the swap and a migrated pool on the restored `clinic.db` is
+	 *  stored back in [`AppState`]. If the restored DB cannot be reopened, the app
+	 *  is locked and `restore_reopen_failed` is returned so the UI routes to the
+	 *  unlock screen. See [`restore_apply_in_state`].
 	 */
 	restoreApply: (filePath: string, password: string) => typedError<RestoreApplyResponse, UserFacingError>(__TAURI_INVOKE("restore_apply", { filePath, password })),
 	/**  (`verify_backup`) Checksum + decrypt-test an existing archive (BAK-004). */
@@ -599,6 +605,13 @@ export type ErrorCode =
  *  backup is kept intact (OQ-S17-5; HC-MVP1-032).
  */
 "backup_out_of_space" | 
+/**
+ *  A restore swapped the database but the app could not reopen it under
+ *  this install's key, so the app was LOCKED to stay safe (b23-n1-d2).
+ *  The UI routes to the unlock screen; the PIN unlock reopens and
+ *  migrates the live `clinic.db`. Never leaves a pool on the moved file.
+ */
+"restore_reopen_failed" | 
 /**
  *  A boot-time command read (`setup_get_state` / `auth_get_lock_state`)
  *  failed at the IPC transport/serialisation layer rather than returning a

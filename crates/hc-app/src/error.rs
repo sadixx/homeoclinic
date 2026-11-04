@@ -51,6 +51,11 @@ pub enum ErrorCode {
     /// The backup destination ran out of space mid-write; the previous good
     /// backup is kept intact (OQ-S17-5; HC-MVP1-032).
     BackupOutOfSpace,
+    /// A restore swapped the database but the app could not reopen it under
+    /// this install's key, so the app was LOCKED to stay safe (b23-n1-d2).
+    /// The UI routes to the unlock screen; the PIN unlock reopens and
+    /// migrates the live `clinic.db`. Never leaves a pool on the moved file.
+    RestoreReopenFailed,
     /// A boot-time command read (`setup_get_state` / `auth_get_lock_state`)
     /// failed at the IPC transport/serialisation layer rather than returning a
     /// mapped `UserFacingError` (SET-001, SET-004; handoff 46). Produced by the
@@ -131,6 +136,11 @@ pub enum AppError {
     /// `StorageError::OutOfSpace`); the previous good backup is kept (OQ-S17-5).
     #[error("backup out of space")]
     BackupOutOfSpace,
+    /// The restored database could not be reopened after the swap; the app
+    /// was locked (pool + key dropped) so the doctor unlocks with the PIN
+    /// (b23-n1-d2). Distinct so the UI routes to `/lock`.
+    #[error("restore reopen failed")]
+    RestoreReopenFailed,
 }
 
 /// Map any internal error to the UI-facing value.
@@ -198,6 +208,11 @@ pub fn map_error(err: &AppError) -> UserFacingError {
             message: "There is not enough space at the backup location.".to_string(),
             suggested_action: "Free up space or choose another location, then try again."
                 .to_string(),
+        },
+        AppError::RestoreReopenFailed => UserFacingError {
+            code: ErrorCode::RestoreReopenFailed,
+            message: "The app was locked to finish the restore safely.".to_string(),
+            suggested_action: "Unlock with your PIN, then check your patients.".to_string(),
         },
     }
 }
