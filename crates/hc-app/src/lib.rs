@@ -13,10 +13,12 @@ pub mod auth;
 pub mod backup;
 pub mod clock;
 pub mod commands;
+pub mod data_folder;
 pub mod error;
 pub mod licence;
 pub mod logging;
 pub mod patient;
+pub mod settings;
 pub mod setup;
 pub mod state;
 pub mod visit;
@@ -115,7 +117,14 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::attachment::patient_list_attachments,
                 commands::attachment::visit_open_attachment,
                 commands::attachment::visit_delete_attachment,
-                commands::attachment::visit_pick_report_file
+                commands::attachment::visit_pick_report_file,
+                // S18 Settings (MS, SET-002..007).
+                commands::settings::settings_get,
+                commands::settings::settings_save_general,
+                commands::settings::settings_pick_data_folder,
+                commands::settings::settings_move_data_folder,
+                commands::settings::settings_recheck_data_folder,
+                commands::settings::settings_forget_data_folder
             ]
         };
         (with_e2e) => {
@@ -184,6 +193,13 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::attachment::visit_open_attachment,
                 commands::attachment::visit_delete_attachment,
                 commands::attachment::visit_pick_report_file,
+                // S18 Settings (MS, SET-002..007).
+                commands::settings::settings_get,
+                commands::settings::settings_save_general,
+                commands::settings::settings_pick_data_folder,
+                commands::settings::settings_move_data_folder,
+                commands::settings::settings_recheck_data_folder,
+                commands::settings::settings_forget_data_folder,
                 // DEV/E2E ONLY (feature e2e-test-keys): synthetic fixture
                 // import through the real create path (OPTION A seeding).
                 commands::patient::patient_import_fixture

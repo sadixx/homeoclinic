@@ -9,4 +9,5 @@ pub mod age;
 pub mod app_info;
 pub mod attachment;
 pub mod error;
+pub mod patient_code;
 pub mod vitals;

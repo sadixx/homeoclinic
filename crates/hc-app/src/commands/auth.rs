@@ -10,15 +10,11 @@
 use tauri::State;
 
 use crate::auth::{
-    AuthService, LockState, RecoverRequest, RecoverResponse, UnlockRequest, UnlockResponse,
+    unlock_in_state, AuthService, LockState, RecoverRequest, RecoverResponse, UnlockRequest,
+    UnlockResponse,
 };
 use crate::error::{to_user_result, UserFacingError};
 use crate::state::AppState;
-
-/// Build an [`AuthService`] over the managed state's keystore + data dir.
-fn service(state: &AppState) -> AuthService<'_> {
-    AuthService::new(state.keystore.as_ref(), &state.data_dir)
-}
 
 /// Report the current lock state (`auth_get_lock_state`).
 #[tauri::command]
@@ -40,27 +36,7 @@ pub fn auth_unlock(
     state: State<'_, AppState>,
     req: UnlockRequest,
 ) -> Result<UnlockResponse, UserFacingError> {
-    let pool = to_user_result(service(&state).unlock(&req.pin))?;
-    // Re-derive the DEK provider from the keystore so a later restore can re-key
-    // the restored DB under THIS install's own DEK without a second PIN prompt
-    // (design §5 / ADR 0014, SUX-011). This is the unlock path (not the hot
-    // path), so one extra Argon2id unwrap is acceptable; the DEK never leaves
-    // the process and is never logged (R-SEC-006, R-PRIV-001). A key that
-    // cannot be re-derived leaves `key = None`; restore then reports a generic
-    // error rather than failing unlock.
-    let key = hc_storage::key::KeyHierarchy::new(state.keystore.as_ref())
-        .unlock_with_pin(&req.pin)
-        .ok()
-        .map(std::sync::Arc::new);
-    let mut lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
-    lock.locked = false;
-    lock.pool = Some(pool);
-    lock.key = key;
-    Ok(UnlockResponse {
-        ok: true,
-        // Advisory only; there is no hard lockout (SUX-005).
-        attempts_remaining: 0,
-    })
+    to_user_result(unlock_in_state(&state, &req.pin))
 }
 
 /// Lock the app (`auth_lock`): drop the open pool, sealing the DB and zeroizing
@@ -84,6 +60,13 @@ pub fn auth_recover_with_code(
     state: State<'_, AppState>,
     req: RecoverRequest,
 ) -> Result<RecoverResponse, UserFacingError> {
-    to_user_result(service(&state).recover(&req.recovery_code, &req.new_pin, &req.confirm_pin))?;
+    let data_dir = state.data_dir();
+    to_user_result(
+        AuthService::new(state.keystore.as_ref(), &data_dir).recover(
+            &req.recovery_code,
+            &req.new_pin,
+            &req.confirm_pin,
+        ),
+    )?;
     Ok(RecoverResponse { ok: true })
 }

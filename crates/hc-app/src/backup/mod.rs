@@ -474,9 +474,10 @@ pub fn restore_apply_in_state(
 ) -> Result<RestoreApplyResponse, AppError> {
     let mut lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
     let key = lock.key.clone().ok_or(AppError::NotFound)?;
+    let data_dir = state.data_dir();
     let prepared = {
         let pool = lock.pool.as_ref().ok_or(AppError::NotFound)?;
-        BackupService::new(pool, &state.data_dir, clock).restore_prepare(
+        BackupService::new(pool, &data_dir, clock).restore_prepare(
             file_path,
             password,
             key.as_ref(),
@@ -488,6 +489,8 @@ pub fn restore_apply_in_state(
 
     match prepared.commit(key.as_ref()) {
         Ok((outcome, pool)) => {
+            // The restored data carries its own auto-lock setting (F5).
+            lock.autolock_minutes = crate::auth::persisted_autolock(&pool);
             lock.pool = Some(pool);
             lock.locked = false;
             Ok(RestoreApplyResponse {

@@ -25,6 +25,8 @@ pub mod migrate;
 pub mod patient;
 pub mod pool;
 pub mod profile;
+pub mod relocate;
+pub mod settings;
 pub mod visit;
 pub(crate) mod wrap;
 

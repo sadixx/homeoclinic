@@ -12,6 +12,7 @@ Priority: P0 = must ship, P1 = should ship in MVP1, P2 = can slip to MVP2.
 | SET-004 | P0 | App PIN/password set at first run. Locks app after N minutes idle (default 15, configurable). Forgot-PIN recovery via recovery code shown once at setup and printed. |
 | SET-005 | P1 | Font size setting (Normal / Large / Extra large) applied globally. |
 | SET-006 | P1 | Data folder location chooser (default per OS app data dir). |
+| SET-007 | P1 | Camera device selection: Settings lists the camera devices the computer exposes (by name, e.g. the laptop's built-in webcam) and lets the doctor choose the default camera for patient photo capture (S06); the choice is remembered. If the chosen camera is no longer present, capture uses the system default camera; when no camera is available the picker says so and choosing a photo from a file always remains possible. Fully offline. |
 
 ## 2. Patients (PAT)
 

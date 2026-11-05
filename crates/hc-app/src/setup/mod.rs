@@ -41,6 +41,10 @@ pub struct SetupState {
     pub current_step: u8,
     /// The resolved data directory (display only; UI never builds paths).
     pub data_dir: String,
+    /// MS (ADR 0020 §7): the pointed data folder when it is NOT present at
+    /// boot (display only). `None` normally. The UI shows the "data folder
+    /// not available" screen before anything else when it is set.
+    pub data_folder_missing: Option<String>,
 }
 
 /// Doctor profile input (SET-002).
@@ -218,7 +222,7 @@ pub struct SetupService<'a> {
 }
 
 /// Trim-and-require: a field that is empty after trimming is a validation error.
-fn require(value: &str) -> Result<String, AppError> {
+pub(crate) fn require(value: &str) -> Result<String, AppError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         Err(AppError::Validation(hc_domain::error::DomainError::Invalid))
@@ -228,7 +232,7 @@ fn require(value: &str) -> Result<String, AppError> {
 }
 
 /// Optional field: trim, treat an all-whitespace/empty value as absent.
-fn optional(value: Option<String>) -> Option<String> {
+pub(crate) fn optional(value: Option<String>) -> Option<String> {
     value
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
@@ -270,6 +274,7 @@ impl<'a> SetupService<'a> {
             completed,
             current_step: 1,
             data_dir: self.data_dir.display().to_string(),
+            data_folder_missing: None,
         })
     }
 

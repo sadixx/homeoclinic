@@ -10,8 +10,6 @@
 //! No hard lockout (SUX-005): a wrong PIN returns a mapped `WrongPin` error and
 //! never restricts a later correct attempt.
 //!
-//! STUB STATE (Slice C red): returns `Err`/defaults so tests fail on
-//! assertions. `hc-core-dev` implements to green.
 
 use std::path::{Path, PathBuf};
 
@@ -137,4 +135,53 @@ impl<'a> AuthService<'a> {
     fn db_path(&self) -> PathBuf {
         self.data_dir.join("clinic.db")
     }
+}
+
+/// The idle auto-lock minutes used when none was ever saved.
+pub const DEFAULT_AUTOLOCK_MINUTES: u16 = 15;
+
+/// MS (F5): the persisted `autolock_minutes` of the open DB, or
+/// [`DEFAULT_AUTOLOCK_MINUTES`] when unset or unreadable (a read error never
+/// fails the caller's unlock / restore / move).
+pub fn persisted_autolock(pool: &Pool) -> u16 {
+    pool.with_reader(hc_storage::settings::read_autolock_minutes)
+        .ok()
+        .flatten()
+        .unwrap_or(DEFAULT_AUTOLOCK_MINUTES)
+}
+
+/// MS (design §3.2, F5): the `auth_unlock` command body over the managed
+/// state — open + migrate the DB at the CURRENT data folder, retain the DEK,
+/// and restore the persisted `autolock_minutes` into the lock flag (15 when
+/// unset or unreadable). A wrong PIN leaves the app locked (SUX-005: no
+/// lockout, the next correct attempt works).
+pub fn unlock_in_state(
+    state: &crate::state::AppState,
+    pin: &str,
+) -> Result<UnlockResponse, AppError> {
+    let data_dir = state.data_dir();
+    let pool = AuthService::new(state.keystore.as_ref(), &data_dir).unlock(pin)?;
+    // Re-derive the DEK provider from the keystore so a later restore or
+    // data-folder move can re-key / verify under THIS install's own DEK
+    // without a second PIN prompt (design §5 / ADR 0014, SUX-011). This is the
+    // unlock path (not the hot path), so one extra Argon2id unwrap is
+    // acceptable; the DEK never leaves the process and is never logged
+    // (R-SEC-006, R-PRIV-001). A key that cannot be re-derived leaves
+    // `key = None`; restore / move then report a generic error rather than
+    // failing unlock.
+    let key = KeyHierarchy::new(state.keystore.as_ref())
+        .unlock_with_pin(pin)
+        .ok()
+        .map(std::sync::Arc::new);
+    let autolock = persisted_autolock(&pool);
+    let mut lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
+    lock.locked = false;
+    lock.pool = Some(pool);
+    lock.key = key;
+    lock.autolock_minutes = autolock;
+    Ok(UnlockResponse {
+        ok: true,
+        // Advisory only; there is no hard lockout (SUX-005).
+        attempts_remaining: 0,
+    })
 }

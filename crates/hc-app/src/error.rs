@@ -56,6 +56,18 @@ pub enum ErrorCode {
     /// The UI routes to the unlock screen; the PIN unlock reopens and
     /// migrates the live `clinic.db`. Never leaves a pool on the moved file.
     RestoreReopenFailed,
+    /// MS (LIC-006): a change to the licence-bound identity (name, reg no,
+    /// council) was refused because a real licence binds them.
+    IdentityLocked,
+    /// MS (SET-006): the chosen data folder is not usable (inline in the move
+    /// dialog).
+    DataFolderInvalid,
+    /// MS (SET-006): copying the data failed; nothing changed, the old folder
+    /// is still in use.
+    DataFolderMoveFailed,
+    /// MS (SET-006): the data was moved but the app could not reopen it, so it
+    /// was locked; the PIN unlock opens the new folder.
+    DataFolderReopenFailed,
     /// A boot-time command read (`setup_get_state` / `auth_get_lock_state`)
     /// failed at the IPC transport/serialisation layer rather than returning a
     /// mapped `UserFacingError` (SET-001, SET-004; handoff 46). Produced by the
@@ -141,6 +153,18 @@ pub enum AppError {
     /// (b23-n1-d2). Distinct so the UI routes to `/lock`.
     #[error("restore reopen failed")]
     RestoreReopenFailed,
+    /// MS (LIC-006): identity change refused while a licence binds it.
+    #[error("identity locked")]
+    IdentityLocked,
+    /// MS (SET-006): the chosen data folder is not usable.
+    #[error("data folder invalid")]
+    DataFolderInvalid,
+    /// MS (SET-006): the copy failed; the old folder is still in use.
+    #[error("data folder move failed")]
+    DataFolderMoveFailed,
+    /// MS (SET-006): moved, but the reopen failed; the app was locked.
+    #[error("data folder reopen failed")]
+    DataFolderReopenFailed,
 }
 
 /// Map any internal error to the UI-facing value.
@@ -214,6 +238,34 @@ pub fn map_error(err: &AppError) -> UserFacingError {
             message: "The app was locked to finish the restore safely.".to_string(),
             suggested_action: "Unlock with your PIN, then check your patients.".to_string(),
         },
+        // MS (design §1.3). No path, SQL or OS text in any message (NFR-033).
+        AppError::IdentityLocked => UserFacingError {
+            code: ErrorCode::IdentityLocked,
+            message: "Your name and registration number come from your licence and cannot be \
+                      changed here."
+                .to_string(),
+            suggested_action: "Keep the licensed values. Other details can still be changed."
+                .to_string(),
+        },
+        AppError::DataFolderInvalid => UserFacingError {
+            code: ErrorCode::DataFolderInvalid,
+            message: "Choose an empty folder on this computer that is not inside the current \
+                      data folder."
+                .to_string(),
+            suggested_action: "Pick a different folder and try again.".to_string(),
+        },
+        AppError::DataFolderMoveFailed => UserFacingError {
+            code: ErrorCode::DataFolderMoveFailed,
+            message: "The data could not be moved. Nothing was changed; your data is still in \
+                      the old folder."
+                .to_string(),
+            suggested_action: "Check the folder has enough free space, then try again.".to_string(),
+        },
+        AppError::DataFolderReopenFailed => UserFacingError {
+            code: ErrorCode::DataFolderReopenFailed,
+            message: "Your data was moved. Unlock HomeoClinic to continue.".to_string(),
+            suggested_action: "Unlock with your PIN, then check your patients.".to_string(),
+        },
     }
 }
 
@@ -251,6 +303,9 @@ impl From<hc_storage::StorageError> for AppError {
                 AppError::BackupDestinationUnavailable
             }
             hc_storage::StorageError::OutOfSpace => AppError::BackupOutOfSpace,
+            // MS (SET-006, ADR 0020): relocation errors are routed by the UI.
+            hc_storage::StorageError::RelocateTarget(_) => AppError::DataFolderInvalid,
+            hc_storage::StorageError::RelocateCopyFailed => AppError::DataFolderMoveFailed,
             other => AppError::Storage(Box::new(other)),
         }
     }

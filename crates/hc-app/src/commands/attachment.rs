@@ -63,9 +63,11 @@ pub fn visit_attach_report(
     state: State<'_, AppState>,
     req: AttachReportRequest,
 ) -> Result<AttachReportResponse, UserFacingError> {
-    let data_dir = state.data_dir.clone();
+    // Read the data folder while holding the session lock (inside
+    // `with_pool_and_key`) so a concurrent data-folder move cannot switch it
+    // between the read and the blob IO (ms-review-5).
     with_pool_and_key(&state, |pool, key| {
-        service(&state).attach_report(pool, key, &data_dir, req)
+        service(&state).attach_report(pool, key, &state.data_dir(), req)
     })
 }
 
@@ -100,9 +102,11 @@ pub fn visit_open_attachment(
     state: State<'_, AppState>,
     req: OpenAttachmentRequest,
 ) -> Result<OpenAttachmentResponse, UserFacingError> {
-    let data_dir = state.data_dir.clone();
+    // Read the data folder while holding the session lock (inside
+    // `with_pool_and_key`) so a concurrent data-folder move cannot switch it
+    // between the read and the blob IO (ms-review-5).
     with_pool_and_key(&state, |pool, key| {
-        service(&state).open_attachment(pool, key, &data_dir, req)
+        service(&state).open_attachment(pool, key, &state.data_dir(), req)
     })
 }
 
@@ -113,9 +117,11 @@ pub fn visit_delete_attachment(
     state: State<'_, AppState>,
     req: DeleteAttachmentRequest,
 ) -> Result<DeleteAttachmentResponse, UserFacingError> {
-    let data_dir = state.data_dir.clone();
+    // Read the data folder while holding the session lock (inside
+    // `with_pool_and_key`) so a concurrent data-folder move cannot switch it
+    // between the read and the blob IO (ms-review-5).
     with_pool_and_key(&state, |pool, key| {
-        service(&state).delete_attachment(pool, key, &data_dir, req)
+        service(&state).delete_attachment(pool, key, &state.data_dir(), req)
     })
 }
 

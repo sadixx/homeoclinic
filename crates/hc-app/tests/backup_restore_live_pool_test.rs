@@ -76,7 +76,7 @@ fn add_patient(state: &AppState, name: &str) {
     PatientService::new(
         state.keystore.as_ref(),
         state.clock.as_ref(),
-        &state.data_dir,
+        &state.data_dir(),
     )
     .create(pool, patient(name))
     .expect("create patient");
@@ -87,7 +87,7 @@ fn names_in(state: &AppState, pool: &Pool) -> Vec<String> {
     let resp = PatientService::new(
         state.keystore.as_ref(),
         state.clock.as_ref(),
-        &state.data_dir,
+        &state.data_dir(),
     )
     .list_query(
         pool,
@@ -123,7 +123,7 @@ fn backup(state: &AppState, out: &Path) -> String {
     let lock = state.lock.lock().unwrap();
     let pool = lock.pool.as_ref().expect("app is unlocked");
     let clock = fake_clock();
-    BackupService::new(pool, &state.data_dir, &clock)
+    BackupService::new(pool, &state.data_dir(), &clock)
         .backup_now(out.to_str().unwrap(), TEST_BACKUP_PASSWORD)
         .expect("backup_now")
         .file_path

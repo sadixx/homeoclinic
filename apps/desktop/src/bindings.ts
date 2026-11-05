@@ -247,6 +247,30 @@ export const commands = {
 	 *  through a tokio oneshot and awaited on the async runtime instead.
 	 */
 	visitPickReportFile: () => typedError<PickReportFileResponse, UserFacingError>(__TAURI_INVOKE("visit_pick_report_file")),
+	/**  Read the S18 General values (`settings_get`). */
+	settingsGet: () => typedError<SettingsView, UserFacingError>(__TAURI_INVOKE("settings_get")),
+	/**
+	 *  Save the whole S18 General form: one transaction, one audit row
+	 *  (`settings_save_general`).
+	 */
+	settingsSaveGeneral: (req: SaveGeneralSettingsRequest) => typedError<SaveGeneralSettingsResponse, UserFacingError>(__TAURI_INVOKE("settings_save_general", { req })),
+	/**
+	 *  Open the OS folder picker for a new data-folder parent
+	 *  (`settings_pick_data_folder`). `None` = cancelled.
+	 */
+	settingsPickDataFolder: () => typedError<PickDataFolderResponse, UserFacingError>(__TAURI_INVOKE("settings_pick_data_folder")),
+	/**  Move the data folder to `<parent>/HomeoClinic` (`settings_move_data_folder`). */
+	settingsMoveDataFolder: (req: MoveDataFolderRequest) => typedError<MoveDataFolderResponse, UserFacingError>(__TAURI_INVOKE("settings_move_data_folder", { req })),
+	/**
+	 *  Check again whether the pointed data folder is present
+	 *  (`settings_recheck_data_folder`).
+	 */
+	settingsRecheckDataFolder: () => typedError<DataFolderCheck, UserFacingError>(__TAURI_INVOKE("settings_recheck_data_folder")),
+	/**
+	 *  Forget the missing pointed folder and use the default location
+	 *  (`settings_forget_data_folder`).
+	 */
+	settingsForgetDataFolder: () => typedError<null, UserFacingError>(__TAURI_INVOKE("settings_forget_data_folder")),
 };
 
 /* Types */
@@ -264,6 +288,18 @@ export type AppInfo = {
 	version: string,
 	/**  Build profile the binary was compiled in. */
 	build_profile: BuildProfile,
+};
+
+/**  App preferences of the General form. */
+export type AppPrefs = {
+	/**  Patient-ID prefix (PAT-002). */
+	idPrefix: string,
+	/**  Idle auto-lock minutes (SET-004). */
+	autolockMinutes: number,
+	/**  Font size (SET-005). */
+	fontSize: FontSize,
+	/**  Remembered camera, or `None` = system default (SET-007). */
+	defaultCamera: CameraChoice | null,
 };
 
 /**
@@ -383,6 +419,17 @@ export type BuildProfile =
 /**  Compiled in release mode (an optimised, shipped build). */
 "release";
 
+/**
+ *  A remembered camera choice (SET-007). `device_id` is the webview
+ *  `MediaDeviceInfo.deviceId`; `label` is kept to re-match when the id changes.
+ */
+export type CameraChoice = {
+	/**  Webview device id. */
+	deviceId: string,
+	/**  Device label at the time it was chosen. */
+	label: string,
+};
+
 /**  `case_visit_autosave` request (CASE-005). */
 export type CaseAutosaveRequest = {
 	/**  Visit to update. */
@@ -410,6 +457,22 @@ export type CheckDuplicateRequest = {
 export type CheckDuplicateResponse = {
 	/**  The candidate matches (empty = no duplicate warning). */
 	matches: DuplicateMatch[],
+};
+
+/**  Clinic section of the General form. Fees are integer paise. */
+export type ClinicSettings = {
+	/**  Clinic name. */
+	name: string,
+	/**  Clinic address. */
+	address: string,
+	/**  `ClinicTimingsInput` output string (or legacy text). */
+	timings: string | null,
+	/**  GSTIN. */
+	gstin: string | null,
+	/**  Default consultation fee, integer paise. */
+	feeFirstPaise: number,
+	/**  Default follow-up fee, integer paise. */
+	feeFollowupPaise: number,
 };
 
 /**  Result of completing setup. */
@@ -492,6 +555,14 @@ export type CreatePatientResponse = {
 	code: string,
 };
 
+/**  `settings_recheck_data_folder` response. */
+export type DataFolderCheck = {
+	/**  Whether the pointed folder is present now. */
+	available: boolean,
+	/**  The pointed folder (display only). */
+	dataFolder: string,
+};
+
 /**  `case_template_get_default` response — the default template (CASE-004). */
 export type DefaultTemplateResponse = {
 	/**  Template id (the fixed default id). */
@@ -537,6 +608,22 @@ export type Demographics = {
 	 *  kept so the edit form can show them and never wipe them), or `None`.
 	 */
 	maritalStatus: string | null,
+};
+
+/**  Doctor section of the General form. */
+export type DoctorSettings = {
+	/**  Full name (identity-locked under a licence). */
+	name: string,
+	/**  Qualification. */
+	qualification: string,
+	/**  Registration number (identity-locked under a licence). */
+	regNo: string,
+	/**  Registration council (identity-locked under a licence). */
+	regCouncil: string,
+	/**  Phone, asked once; also saved as the clinic phone. */
+	phone: string | null,
+	/**  Email. */
+	email: string | null,
 };
 
 /**  One candidate duplicate (PAT-004). */
@@ -612,6 +699,26 @@ export type ErrorCode =
  *  migrates the live `clinic.db`. Never leaves a pool on the moved file.
  */
 "restore_reopen_failed" | 
+/**
+ *  MS (LIC-006): a change to the licence-bound identity (name, reg no,
+ *  council) was refused because a real licence binds them.
+ */
+"identity_locked" | 
+/**
+ *  MS (SET-006): the chosen data folder is not usable (inline in the move
+ *  dialog).
+ */
+"data_folder_invalid" | 
+/**
+ *  MS (SET-006): copying the data failed; nothing changed, the old folder
+ *  is still in use.
+ */
+"data_folder_move_failed" | 
+/**
+ *  MS (SET-006): the data was moved but the app could not reopen it, so it
+ *  was locked; the PIN unlock opens the new folder.
+ */
+"data_folder_reopen_failed" | 
 /**
  *  A boot-time command read (`setup_get_state` / `auth_get_lock_state`)
  *  failed at the IPC transport/serialisation layer rather than returning a
@@ -808,6 +915,20 @@ export type LockState = {
 	autolockMinutes: number,
 };
 
+/**  `settings_move_data_folder` request. */
+export type MoveDataFolderRequest = {
+	/**  The parent folder returned by the picker. */
+	parentPath: string,
+};
+
+/**  `settings_move_data_folder` response. */
+export type MoveDataFolderResponse = {
+	/**  `<parent>/HomeoClinic`, now live. */
+	dataFolder: string,
+	/**  `<old>/moved-out-<stamp>`, or the old folder if retiring failed. */
+	safetyCopyFolder: string,
+};
+
 /**
  *  Preview of the next patient code (`patient_next_code`, PAT-002). The
  *  sequence is consumed only on create, so Cancel leaves no gap (S06 open-Q).
@@ -964,6 +1085,12 @@ export type PermanentDeleteRequest = {
 	patientId: string,
 	/**  The app PIN, re-verified before the hard delete (PAT-008, R-DATA-003). */
 	pin: string,
+};
+
+/**  `settings_pick_data_folder` response (`None` = cancelled). */
+export type PickDataFolderResponse = {
+	/**  The chosen parent folder. */
+	parentPath: string | null,
 };
 
 /**
@@ -1175,6 +1302,24 @@ export type SaveDoctorProfileResponse = {
 	doctorId: string,
 };
 
+/**  `settings_save_general` request: the whole General form. */
+export type SaveGeneralSettingsRequest = {
+	/**  Doctor section. */
+	doctor: DoctorSettings,
+	/**  Clinic section. */
+	clinic: ClinicSettings,
+	/**  App preferences. */
+	app: AppPrefs,
+};
+
+/**  `settings_save_general` response. */
+export type SaveGeneralSettingsResponse = {
+	/**  Fresh settings after the save. */
+	settings: SettingsView,
+	/**  `false` = nothing differed; no row and no audit row was written. */
+	changed: boolean,
+};
+
 /**
  *  Global-search input (`patient_search`, PSR-001..004). `query` is the single
  *  free-text box; `cursor` pages forward (PSR-005).
@@ -1292,6 +1437,22 @@ export type SetVisibilityRequest = {
 	hidden: boolean,
 };
 
+/**  `settings_get` response. */
+export type SettingsView = {
+	/**  Doctor section. */
+	doctor: DoctorSettings,
+	/**  Clinic section. */
+	clinic: ClinicSettings,
+	/**  App preferences. */
+	app: AppPrefs,
+	/**  Next running number, 6-digit zero-padded, e.g. `"000124"`. */
+	nextNumber: string,
+	/**  Current data folder, display only. */
+	dataFolder: string,
+	/**  LIC-006: name / reg no / council read-only when true. */
+	identityLocked: boolean,
+};
+
 /**  Wizard progress snapshot (`setup_get_state`). */
 export type SetupState = {
 	/**  Whether first-run setup has completed. */
@@ -1300,6 +1461,12 @@ export type SetupState = {
 	currentStep: number,
 	/**  The resolved data directory (display only; UI never builds paths). */
 	dataDir: string,
+	/**
+	 *  MS (ADR 0020 §7): the pointed data folder when it is NOT present at
+	 *  boot (display only). `None` normally. The UI shows the "data folder
+	 *  not available" screen before anything else when it is set.
+	 */
+	dataFolderMissing: string | null,
 };
 
 /**  Soft-delete input (`patient_soft_delete`, PAT-008). */

@@ -36,7 +36,8 @@ fn with_service<T>(
     let lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
     let pool = lock.pool.as_ref().ok_or(AppError::NotFound)?;
     let clock = SystemClock;
-    let svc = BackupService::new(pool, &state.data_dir, &clock);
+    let data_dir = state.data_dir();
+    let svc = BackupService::new(pool, &data_dir, &clock);
     f(&svc)
 }
 

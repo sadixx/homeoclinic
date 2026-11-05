@@ -91,4 +91,12 @@ pub enum StorageError {
     /// previous good backup is kept intact. HC-MVP1-032.
     #[error("not enough space on the backup destination")]
     OutOfSpace,
+    /// The chosen data-folder target is not usable (SET-006, ADR 0020). The
+    /// payload names the rule that failed; it carries no path (R-PRIV-001).
+    #[error("the chosen data folder is not usable")]
+    RelocateTarget(crate::relocate::TargetProblem),
+    /// Copying or verifying the data into the new folder failed; the partial
+    /// copy was removed and the current folder was not modified (ADR 0020).
+    #[error("the data could not be copied to the new folder")]
+    RelocateCopyFailed,
 }

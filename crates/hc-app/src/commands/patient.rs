@@ -20,23 +20,18 @@ use crate::patient::{
 };
 use crate::state::AppState;
 
-/// Build a [`PatientService`] over the managed state's injected dependencies.
-fn service(state: &AppState) -> PatientService<'_> {
-    PatientService::new(
-        state.keystore.as_ref(),
-        state.clock.as_ref(),
-        &state.data_dir,
-    )
-}
-
-/// Run `f` with the open pool from the lock flag, or `NotFound` if sealed.
+/// Run `f` with a [`PatientService`] over the managed state's injected
+/// dependencies and the CURRENT data folder, plus the open pool from the lock
+/// flag, or `NotFound` if sealed.
 fn with_pool<T>(
     state: &AppState,
-    f: impl FnOnce(&hc_storage::Pool) -> Result<T, AppError>,
+    f: impl FnOnce(&PatientService<'_>, &hc_storage::Pool) -> Result<T, AppError>,
 ) -> Result<T, UserFacingError> {
     let lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
+    let data_dir = state.data_dir();
+    let svc = PatientService::new(state.keystore.as_ref(), state.clock.as_ref(), &data_dir);
     match lock.pool.as_ref() {
-        Some(pool) => to_user_result(f(pool)),
+        Some(pool) => to_user_result(f(&svc, pool)),
         None => Err(map_error(&AppError::NotFound)),
     }
 }
@@ -45,7 +40,7 @@ fn with_pool<T>(
 #[tauri::command]
 #[specta::specta]
 pub fn patient_next_code(state: State<'_, AppState>) -> Result<NextCodeResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).next_code(pool))
+    with_pool(&state, |svc, pool| svc.next_code(pool))
 }
 
 /// Check for duplicate patients on name + mobile / name + DOB (PAT-004).
@@ -55,7 +50,7 @@ pub fn patient_check_duplicate(
     state: State<'_, AppState>,
     req: CheckDuplicateRequest,
 ) -> Result<CheckDuplicateResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).check_duplicate(pool, req))
+    with_pool(&state, |svc, pool| svc.check_duplicate(pool, req))
 }
 
 /// Register a new patient (PAT-001/002).
@@ -65,7 +60,7 @@ pub fn patient_create(
     state: State<'_, AppState>,
     req: CreatePatientRequest,
 ) -> Result<CreatePatientResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).create(pool, req))
+    with_pool(&state, |svc, pool| svc.create(pool, req))
 }
 
 /// Edit an existing patient (PAT-001).
@@ -75,7 +70,7 @@ pub fn patient_update(
     state: State<'_, AppState>,
     req: UpdatePatientRequest,
 ) -> Result<(), UserFacingError> {
-    with_pool(&state, |pool| service(&state).update(pool, req))
+    with_pool(&state, |svc, pool| svc.update(pool, req))
 }
 
 /// Load the single-patient dashboard (PAT-005).
@@ -85,7 +80,7 @@ pub fn patient_get_dashboard(
     state: State<'_, AppState>,
     req: GetDashboardRequest,
 ) -> Result<PatientDashboard, UserFacingError> {
-    with_pool(&state, |pool| service(&state).get_dashboard(pool, req))
+    with_pool(&state, |svc, pool| svc.get_dashboard(pool, req))
 }
 
 /// Move a patient to the 30-day recycle bin (PAT-008).
@@ -95,7 +90,7 @@ pub fn patient_soft_delete(
     state: State<'_, AppState>,
     req: SoftDeleteRequest,
 ) -> Result<SoftDeleteResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).soft_delete(pool, req))
+    with_pool(&state, |svc, pool| svc.soft_delete(pool, req))
 }
 
 /// Restore a patient from the recycle bin (PAT-008).
@@ -105,7 +100,7 @@ pub fn patient_restore(
     state: State<'_, AppState>,
     req: RestoreRequest,
 ) -> Result<(), UserFacingError> {
-    with_pool(&state, |pool| service(&state).restore(pool, req))
+    with_pool(&state, |svc, pool| svc.restore(pool, req))
 }
 
 /// Permanently delete a patient, re-verifying the PIN (PAT-008, R-DATA-003).
@@ -115,7 +110,7 @@ pub fn patient_permanent_delete(
     state: State<'_, AppState>,
     req: PermanentDeleteRequest,
 ) -> Result<(), UserFacingError> {
-    with_pool(&state, |pool| service(&state).permanent_delete(pool, req))
+    with_pool(&state, |svc, pool| svc.permanent_delete(pool, req))
 }
 
 /// Link a family member (PAT-006).
@@ -125,7 +120,7 @@ pub fn patient_link_family(
     state: State<'_, AppState>,
     req: LinkFamilyRequest,
 ) -> Result<LinkFamilyResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).link_family(pool, req))
+    with_pool(&state, |svc, pool| svc.link_family(pool, req))
 }
 
 /// Export the single patient as PDF (PAT-011).
@@ -135,7 +130,7 @@ pub fn patient_export_pdf(
     state: State<'_, AppState>,
     req: ExportRequest,
 ) -> Result<ExportResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).export_pdf(pool, req))
+    with_pool(&state, |svc, pool| svc.export_pdf(pool, req))
 }
 
 /// Export the single patient as JSON (PAT-011).
@@ -145,7 +140,7 @@ pub fn patient_export_json(
     state: State<'_, AppState>,
     req: ExportRequest,
 ) -> Result<ExportResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).export_json(pool, req))
+    with_pool(&state, |svc, pool| svc.export_json(pool, req))
 }
 
 /// Global patient search (HC-MVP1-050, PSR-001..005): ranked, keyset-paginated.
@@ -155,7 +150,7 @@ pub fn patient_search(
     state: State<'_, AppState>,
     req: SearchRequest,
 ) -> Result<SearchResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).patient_search(pool, req))
+    with_pool(&state, |svc, pool| svc.patient_search(pool, req))
 }
 
 /// Recently-opened patients for the empty search box (HC-MVP1-050, PSR-007).
@@ -165,7 +160,7 @@ pub fn patient_recent(
     state: State<'_, AppState>,
     req: RecentRequest,
 ) -> Result<RecentResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).patient_recent(pool, req))
+    with_pool(&state, |svc, pool| svc.patient_recent(pool, req))
 }
 
 /// Record that a patient was opened (HC-MVP1-050, PSR-007).
@@ -175,7 +170,7 @@ pub fn patient_touch_recent(
     state: State<'_, AppState>,
     req: TouchRecentRequest,
 ) -> Result<(), UserFacingError> {
-    with_pool(&state, |pool| service(&state).touch_recent(pool, req))
+    with_pool(&state, |svc, pool| svc.touch_recent(pool, req))
 }
 
 /// Filtered, sorted, keyset-paginated patient list (HC-MVP1-052, PSR-008).
@@ -185,7 +180,7 @@ pub fn patient_list_query(
     state: State<'_, AppState>,
     req: ListQueryRequest,
 ) -> Result<ListQueryResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).list_query(pool, req))
+    with_pool(&state, |svc, pool| svc.list_query(pool, req))
 }
 
 /// Export the current filtered, sorted list as a CSV (HC-MVP1-052, PSR-011).
@@ -195,7 +190,7 @@ pub fn patient_list_export_csv(
     state: State<'_, AppState>,
     req: ListExportCsvRequest,
 ) -> Result<ExportResponse, UserFacingError> {
-    with_pool(&state, |pool| service(&state).list_export_csv(pool, req))
+    with_pool(&state, |svc, pool| svc.list_export_csv(pool, req))
 }
 
 /// Import a SYNTHETIC JSONL fixture through the real create path (DEV/E2E ONLY,
@@ -211,5 +206,5 @@ pub fn patient_import_fixture(
     req: crate::patient::ImportFixtureRequest,
 ) -> Result<crate::patient::ImportFixtureResponse, UserFacingError> {
     let path = std::path::PathBuf::from(&req.path);
-    with_pool(&state, |pool| service(&state).import_fixture(pool, &path))
+    with_pool(&state, |svc, pool| svc.import_fixture(pool, &path))
 }

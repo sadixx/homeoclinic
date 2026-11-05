@@ -81,15 +81,19 @@ pub fn run() {
             // anything else writes diagnostics. The guard must outlive the
             // app, so it is stashed in managed state.
             use tauri::Manager as _;
-            let data_dir = app.path().app_data_dir()?;
-            let guard = hc_app::logging::init(&data_dir, hc_app::logging::RotationPolicy::DEFAULT)?;
+            // The OS app data dir is the fixed home (ADR 0020): logs and the
+            // data-location pointer always stay here; the data may live in a
+            // folder the doctor chose in Settings.
+            let home = app.path().app_data_dir()?;
+            let guard = hc_app::logging::init(&home, hc_app::logging::RotationPolicy::DEFAULT)?;
             app.manage(guard);
 
             // Build the shell-managed application state (HC-MVP1-026/027):
-            // the data dir, a keystore backend, and the runtime clock. On
-            // headless Linux / E2E the keystore resolves to the always-present
-            // encrypted-file fallback (NFR-020); no network, no socket.
-            let state = hc_app::state::AppState::with_file_keystore(data_dir)?;
+            // the resolved data folder (pointer in home, ADR 0020), a keystore
+            // backend, and the runtime clock. On headless Linux / E2E the
+            // keystore resolves to the always-present encrypted-file fallback
+            // (NFR-020); no network, no socket.
+            let state = hc_app::state::AppState::with_file_keystore(home)?;
             app.manage(state);
 
             // Grant the native webview's camera permission request so real
