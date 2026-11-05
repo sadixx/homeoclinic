@@ -18,6 +18,9 @@
 // No patient data, path or stack ever leaves through these helpers
 // (R-PRIV-001, R-UI-008).
 
+import type { CameraChoice } from '@/bindings';
+import { listCameras, resolvePreferredCamera } from '@/shared/camera';
+
 /** A photo attached to the form, with a preview URL and an opaque stored ref. */
 export interface AttachedPhoto {
   /** Object URL / data URL used only for the on-screen <img> preview. */
@@ -96,15 +99,67 @@ export interface WebcamCaptureResult {
   readonly previewUrl?: string;
 }
 
+/** Errors that mean "the chosen camera is not usable here" (retry default). */
+const CHOSEN_CAMERA_UNAVAILABLE = new Set([
+  'OverconstrainedError',
+  'NotFoundError',
+]);
+
+function isChosenCameraUnavailable(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    CHOSEN_CAMERA_UNAVAILABLE.has(String((error as { name: unknown }).name))
+  );
+}
+
 /**
- * Capture a photo from the DEFAULT camera using the real WebRTC API
+ * Open a camera stream: the chosen device (SET-007) by exact id when it can be
+ * resolved (id, else the same label), retrying ONCE with the system default
+ * when that device refuses; with no preference, the system default exactly as
+ * before.
+ */
+async function openCameraStream(
+  mediaDevices: MediaDevices,
+  preferred: CameraChoice | null | undefined,
+): Promise<MediaStream> {
+  const systemDefault: MediaStreamConstraints = { video: true, audio: false };
+  if (!preferred) {
+    return mediaDevices.getUserMedia(systemDefault);
+  }
+  // Before the first grant of a session WebKitGTK hides every deviceId and
+  // label, so the saved camera cannot be matched. Unlock first (a bounded
+  // getUserMedia, only while labels are hidden), then enumerate (ms-review-2).
+  const list = await listCameras({ unlockLabels: true });
+  const deviceId =
+    list.status === 'ok'
+      ? resolvePreferredCamera(preferred, list.cameras)
+      : undefined;
+  if (deviceId === undefined) {
+    return mediaDevices.getUserMedia(systemDefault);
+  }
+  try {
+    return await mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId } },
+      audio: false,
+    });
+  } catch (error: unknown) {
+    if (!isChosenCameraUnavailable(error)) throw error;
+    return mediaDevices.getUserMedia(systemDefault);
+  }
+}
+
+/**
+ * Capture a photo using the real WebRTC API
  * (`navigator.mediaDevices.getUserMedia`), draw one frame to a canvas and
  * return it as a PNG data URL. This is the production path for patient photo
  * capture (HC-MVP1-038); on a laptop it uses the built-in webcam.
  *
- * Camera *switching* (choosing among multiple devices) is deferred to the
- * Settings milestone (MS / SET-007); here we always use the browser's default
- * video input.
+ * `preferred` is the camera chosen in Settings (SET-007): requested by exact
+ * device id (re-found by label when the id changed), with one retry on the
+ * system default when it is unplugged or refuses. No preference = the
+ * browser's default video input. "Choose file" stays the fallback on the form.
  *
  * Determinism / headless fallback: when `window.__HC_E2E_CAMERA__` is set, or
  * when `navigator.mediaDevices.getUserMedia` is unavailable (headless/CI, no
@@ -112,7 +167,9 @@ export interface WebcamCaptureResult {
  * E2E stays reproducible and the app never throws. No patient data, path or
  * stack leaves this helper (R-PRIV-001).
  */
-export async function captureWebcamPhoto(): Promise<WebcamCaptureResult> {
+export async function captureWebcamPhoto(
+  preferred?: CameraChoice | null,
+): Promise<WebcamCaptureResult> {
   const override =
     typeof window !== 'undefined' ? window.__HC_E2E_CAMERA__ : undefined;
   const mediaDevices =
@@ -135,7 +192,7 @@ export async function captureWebcamPhoto(): Promise<WebcamCaptureResult> {
   let stream: MediaStream | undefined;
 
   const capture = async (): Promise<WebcamCaptureResult> => {
-    stream = await mediaDevices.getUserMedia({ video: true, audio: false });
+    stream = await openCameraStream(mediaDevices, preferred);
     const video = document.createElement('video');
     video.srcObject = stream;
     video.muted = true;

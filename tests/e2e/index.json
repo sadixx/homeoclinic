@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-04T12:26:12.495Z",
+  "generatedAt": "2026-11-05T10:36:42.901Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -309,6 +309,60 @@
       ],
       "tier": "stable",
       "area": "search",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/settings/settings-camera.e2e.ts",
+      "reqs": [
+        "SET-007",
+        "PAT-038"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/settings/settings-data-folder.e2e.ts",
+      "reqs": [
+        "SET-006",
+        "SET-004"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/settings/settings-general.e2e.ts",
+      "reqs": [
+        "SET-002",
+        "SET-003",
+        "SET-004",
+        "SET-005",
+        "PAT-002",
+        "SUX-005",
+        "LIC-006"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/settings/settings-tabs-guard.e2e.ts",
+      "reqs": [
+        "SET-001",
+        "SET-002",
+        "LIC-006"
+      ],
+      "tier": "regression",
+      "area": "settings",
       "targets": [
         "linux"
       ]

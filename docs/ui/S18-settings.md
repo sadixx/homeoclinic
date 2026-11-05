@@ -149,6 +149,12 @@ Tabs that do not yet exist in the current release are hidden (not greyed).
 | Auto-lock minutes | number | idle lock time, default 15 (SET-004, ADM-001) | settings-autolock |
 | Font size | radio group | Normal / Large / Extra large, applied globally (SET-005) | settings-fontsize |
 | Data folder | path + button | shows and changes the data dir (SET-006) | settings-datafolder |
+| Data folder missing (boot screen) | screen | shown before unlock when the saved data folder is not reachable (SET-006, ADR 0020) | data-missing-screen |
+| Missing folder path | text | the saved folder the app could not reach, display only (SET-006) | data-missing-path |
+| Try again | button | rechecks the saved folder (SET-006) | data-missing-retry |
+| Use the default folder | button | opens the confirm step (SET-006) | data-missing-use-default |
+| Confirm default folder | button | forgets the saved folder and opens the default one; data on the missing drive is untouched (SET-006, R-UI-009) | data-missing-confirm |
+| Cancel default folder | button | backs out of the confirm step without changing anything (SET-006) | data-missing-cancel |
 | Save / Cancel | buttons | admin forms use explicit Save/Cancel (00-conventions section 4) | settings-save |
 | Template picker | dropdown | choose template to edit; ships Chronic/Acute/Child (CASE-004) | settings-template-select |
 | Template field list | list | drag to reorder, add/remove fields (CASE-004) | settings-template-field |
@@ -218,6 +224,11 @@ ship. Each tab's first release:
   at R8 when activation exists (LIC-006, S20); before R8 (dev trial) those fields
   are editable and are marked "will lock on activation".
 - Nothing in Settings is removed in a later release; tabs only appear.
+- R-DEL-002 exception (MS, design A8): the later tabs and the signature
+  button are shown disabled with "Available in a later update" instead of
+  being hidden. They are `aria-disabled`, do nothing when activated and lead
+  to no screen, so there is no dead end; showing them tells the doctor where
+  the feature will appear.
 
 ## States (empty, loading, error, read-only, trial)
 

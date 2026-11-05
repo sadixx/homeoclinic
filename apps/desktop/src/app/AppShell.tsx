@@ -5,13 +5,16 @@
 // R-DEL-002: only shipped features get a route. Patients ships at M2 Slice D
 // (R2), so when the compile-time flag features.patients is on (vite.config.ts)
 // the shell mounts a real /patients route AND the global S04 search overlay —
-// there is no dead-end nav. Settings is still gated OFF at M0/M1: its nav item
-// renders (disabled, see SideNav) but has no route and no "coming soon" screen.
+// there is no dead-end nav. Settings (S18) ships at MS behind features.settings
+// and sits inside the same completion route-guard as every shell route.
 //   /today    -> S03 Today (empty state at R0), the default route
 //   /patients -> S05/S06/S07 patient UI (list / register+edit / dashboard),
 //                deep-linked via ?id=<patientId> or ?view=new (search overlay)
 //   /backup   -> S17 backup/restore (BAK-001..004)
+//   /settings -> S18 settings (MS, SET-002..007)
 //   /lock     -> S02 lock stub (full-window overlay, no nav)
+//   /data-missing -> "data folder not available" (ADR 0020 §7, outside the
+//                    shell like /lock)
 // Unknown routes redirect to /today.
 //
 // Launch boot-gate (SET-001, SET-004; handoff 34): before the router mounts,
@@ -24,8 +27,10 @@
 // failing) always goes to /setup so a brand-new, PIN-less user is never
 // stranded on the lock screen; only a provisioned install whose lock read is
 // uncertain fails safe to /lock (handoff 46). The resolved autolockMinutes is
-// threaded into ShellFrame's idle timer (replacing the hardcoded fallback when
-// a value is present). UI -> typed commands only.
+// threaded into ShellFrame's idle timer until the saved prefs are read
+// (useAppPrefs, read after every unlock; F5). A data folder that the pointer
+// names but that is not present wins over everything (/data-missing).
+// UI -> typed commands only.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
@@ -40,17 +45,21 @@ import {
 } from 'react-router-dom';
 
 import { AppBar } from '@/app/AppBar';
+import { DataFolderMissing } from '@/app/DataFolderMissing';
+import { rootFontPx } from '@/app/fontScale';
 import { LockScreen } from '@/app/LockScreen';
 import { SearchOverlay } from '@/app/SearchOverlay';
 import { SideNav, type NavRoute } from '@/app/SideNav';
 import { StatusBar } from '@/app/StatusBar';
 import { TopBar } from '@/app/TopBar';
+import { AppPrefsProvider, useAppPrefs } from '@/app/useAppPrefs';
 import { useZoom } from '@/app/useZoom';
 import { BackupScreen } from '@/backup/BackupScreen';
 import { commands } from '@/bindings';
 import { CaseForm } from '@/case/CaseForm';
 import { TodayScreen } from '@/home/TodayScreen';
 import { PatientsPage } from '@/patients/PatientsPage';
+import { SettingsScreen } from '@/settings/SettingsScreen';
 import { SetupWizard } from '@/setup/SetupWizard';
 import { run } from '@/shared/command';
 import { features } from '@/shared/features';
@@ -65,15 +74,8 @@ import { FollowupVisit } from '@/visit/FollowupVisit';
  */
 const DEFAULT_AUTOLOCK_MINUTES = 15;
 
-/**
- * The `:root` (html) font-size baseline in px (SET-005 / 00-conventions §1,
- * src/index.css). The zoom scale multiplies this to drive the document-root
- * font-size so all rem-based text and layout scale together (C8 fix).
- */
-const ZOOM_ROOT_BASELINE_PX = 14;
-
 /** The launch route chosen by the boot-gate. */
-type BootRoute = '/setup' | '/lock' | '/today';
+type BootRoute = '/setup' | '/lock' | '/today' | '/data-missing';
 
 /**
  * Boot-gate state: `undefined` while the two reads are in flight (render the
@@ -130,6 +132,19 @@ function useBootDecision(): BootDecision | undefined {
       try {
         const setup = await run(commands.setupGetState());
         completed = setup.completed;
+        // ADR 0020 §7: the pointed data folder is not present (e.g. an
+        // unplugged drive). Nothing else may run until the doctor decides.
+        const missing = setup.dataFolderMissing;
+        if (typeof missing === 'string' && missing !== '') {
+          if (!cancelled) {
+            setDecision({
+              route: '/data-missing',
+              autolockMinutes: null,
+              completed,
+            });
+          }
+          return;
+        }
       } catch {
         if (!cancelled) {
           setDecision({
@@ -216,21 +231,26 @@ function ShellFrame({
   // font-size (14px baseline, src/index.css), scaling the root scales text AND
   // layout together. Applying it to a mid-tree div was the C8 no-op bug.
   const zoom = useZoom();
+  // Saved app prefs (SET-004/005/007), read after every unlock (F5).
+  const prefs = useAppPrefs();
 
-  // C8 fix: apply the zoom scale to the document-root font-size so all
-  // rem-based text and layout scale. The 14px baseline comes from `:root` in
-  // src/index.css; `14 * scale` px keeps rem anchored to the scaled root. On
-  // reset the scale returns to 1.0 (14px); on unmount the inline override is
-  // cleared so the CSS baseline resumes. No network call, no patient data.
+  // C8 fix + SET-005: apply the chosen font size (Normal 14 / Large 16 /
+  // Extra large 18 px, 00-conventions §1) times the zoom scale to the
+  // document-root font-size so all rem-based text and layout scale. Ctrl+0
+  // resets the zoom to 1.0, i.e. back to the CHOSEN size (design §6). On
+  // unmount (lock / setup) the inline override is cleared so the CSS baseline
+  // (14px) resumes. No network call, no patient data.
   useEffect(() => {
     const root = document.documentElement;
-    root.style.fontSize = `${ZOOM_ROOT_BASELINE_PX * zoom.scale}px`;
+    root.style.fontSize = `${rootFontPx(prefs.fontSize, zoom.scale)}px`;
+    root.setAttribute('data-hc-font-size', prefs.fontSize);
     return () => {
       // Clear the inline override on unmount so the CSS `:root` baseline (14px)
       // resumes rather than a stale scaled value lingering on the element.
       root.style.fontSize = '';
+      root.removeAttribute('data-hc-font-size');
     };
-  }, [zoom.scale]);
+  }, [prefs.fontSize, zoom.scale]);
 
   const goToLock = useCallback(() => navigate('/lock'), [navigate]);
   const onNavigate = useCallback(
@@ -478,12 +498,17 @@ function ShellFrame({
   // Idle auto-lock (SET-004): after the configured idle timeout with no user
   // activity, lock the app. Any clinical edit is already autosaved (CASE-005),
   // so locking never loses data. Ctrl+L (TopBar) is the explicit path. The
-  // configured value from authGetLockState is used when present; otherwise the
-  // default fallback keeps the timer running.
-  const effectiveMinutes =
+  // saved value (useAppPrefs: read after unlock, updated by a Settings Save)
+  // wins; until it is read the value from authGetLockState is used; otherwise
+  // the default fallback keeps the timer running.
+  const bootMinutes =
     autolockMinutes != null && autolockMinutes > 0
       ? autolockMinutes
       : DEFAULT_AUTOLOCK_MINUTES;
+  const effectiveMinutes =
+    prefs.loaded && prefs.autolockMinutes > 0
+      ? prefs.autolockMinutes
+      : bootMinutes;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const timeoutMs = effectiveMinutes * 60 * 1000;
@@ -519,7 +544,9 @@ function ShellFrame({
         ? '/patients'
         : location.pathname === '/backup'
           ? '/backup'
-          : undefined;
+          : location.pathname === '/settings'
+            ? '/settings'
+            : undefined;
 
   // The content root carries the zoom VARIABLE only (`--hc-font-scale`), so any
   // layout math that reads the scale still works. The actual text/layout
@@ -621,6 +648,9 @@ function ShellFrame({
             ) : null}
             {features.backup ? (
               <Route path="/backup" element={<BackupScreen />} />
+            ) : null}
+            {features.settings ? (
+              <Route path="/settings" element={<SettingsScreen />} />
             ) : null}
             <Route path="*" element={<Navigate to="/today" replace />} />
           </Routes>
@@ -877,7 +907,11 @@ function ShellRoute({
   if (!completed) {
     return <Navigate to="/setup" replace />;
   }
-  return <ShellFrame autolockMinutes={autolockMinutes} />;
+  return (
+    <AppPrefsProvider>
+      <ShellFrame autolockMinutes={autolockMinutes} />
+    </AppPrefsProvider>
+  );
 }
 
 /**
@@ -918,6 +952,10 @@ function BootRouter({
           element={<SetupRoute onCompleted={markCompleted} />}
         />
         <Route path="/lock" element={<LockRoute />} />
+        <Route
+          path="/data-missing"
+          element={<DataFolderMissing onResolved={setLiveCompleted} />}
+        />
         <Route
           path="*"
           element={

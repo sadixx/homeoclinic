@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Upload, Trash2, RefreshCw } from 'lucide-react';
 
+import { useAppPrefs } from '@/app/useAppPrefs';
 import { commands } from '@/bindings';
 import { run } from '@/shared/command';
 import { PatientAvatar, avatarKindForSex } from '@/shared/PatientAvatar';
@@ -146,6 +147,8 @@ export function PatientForm({
   onOpenExisting,
   onCancel,
 }: PatientFormProps): JSX.Element {
+  // SET-007: the camera chosen in Settings (null = system default).
+  const { defaultCamera } = useAppPrefs();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [code, setCode] = useState<string>('');
   const [photo, setPhoto] = useState<AttachedPhoto | null>(null);
@@ -270,9 +273,9 @@ export function PatientForm({
   );
 
   const onUseWebcam = useCallback(async (): Promise<void> => {
-    // Capture from the default camera (real getUserMedia; simulated fallback
-    // in headless/E2E). Camera switching arrives with Settings (SET-007).
-    const result = await captureWebcamPhoto();
+    // Capture from the camera chosen in Settings, else the system default
+    // (real getUserMedia; simulated fallback in headless/E2E, SET-007).
+    const result = await captureWebcamPhoto(defaultCamera);
     if (!result.ok || result.previewUrl === undefined) {
       setCameraDenied(true);
       return;
@@ -289,7 +292,7 @@ export function PatientForm({
         source: 'webcam',
       };
     });
-  }, []);
+  }, [defaultCamera]);
 
   const onRemovePhoto = useCallback((): void => {
     setPhoto((prev) => {
