@@ -1,0 +1,24 @@
+/* Receipt printing (R5 design §8.1, BILL-003). While the receipt preview is
+   mounted, <html> carries `hc-printing`; on print only the receipt shows (the
+   shell chrome and the preview toolbar are hidden). The paper size comes from
+   the @page rule the preview renders (A5 by default, A4 optional). */
+@media print {
+  html.hc-printing body * {
+    visibility: hidden;
+  }
+  html.hc-printing .receipt-document,
+  html.hc-printing .receipt-document * {
+    visibility: visible;
+  }
+  html.hc-printing .receipt-document {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+  [data-print-hide] {
+    display: none !important;
+  }
+}

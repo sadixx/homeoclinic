@@ -33,6 +33,7 @@ import { run } from '@/shared/command';
 import { formatDateTime, todayIsoDate } from '@/shared/datetime';
 import { features } from '@/shared/features';
 import { t } from '@/shared/strings';
+import { billChipText, rupees } from '@/billing/billChip';
 
 export interface TodayScreenProps {
   /** Invoked by the primary "New patient" action when the Patients flow ships. */
@@ -41,6 +42,13 @@ export interface TodayScreenProps {
   onOpenPatient?: (patientId: string) => void;
   /** Opens the backup flow (S17) from the backup-warning banner (BAK-004). */
   onOpenBackup?: () => void;
+  /**
+   * R5 (BILL-002, design §9): Clear dues opens the S05 list filtered to
+   * dues > 0 (`/patients?dues=1`).
+   */
+  onOpenDuesList?: () => void;
+  /** R5 (BILL-001): open a registered-today visit's S15 invoice. */
+  onOpenInvoice?: (patientId: string, visitId: string) => void;
 }
 
 /** The overview the three lists + banners render from (today_get_overview). */
@@ -81,6 +89,8 @@ export function TodayScreen({
   onNewPatient,
   onOpenPatient,
   onOpenBackup,
+  onOpenDuesList,
+  onOpenInvoice,
 }: TodayScreenProps): JSX.Element {
   const [overview, setOverview] = useState<Overview>(EMPTY_OVERVIEW);
 
@@ -167,7 +177,11 @@ export function TodayScreen({
               onOpenPatient={onOpenPatient}
             />
           </div>
-          <RegisteredList rows={registered} onOpenPatient={onOpenPatient} />
+          <RegisteredList
+            rows={registered}
+            onOpenPatient={onOpenPatient}
+            onOpenInvoice={onOpenInvoice}
+          />
         </div>
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
@@ -205,17 +219,15 @@ export function TodayScreen({
         </div>
       )}
 
-      {/* Clear-dues PLACEHOLDER (Slice C6): billing arrives in R5 (BILL-001..
-          002). Rendered as a clearly-disabled, no-op control so there is no
-          dead end (R-DEL-002) and no fake money / math / network. */}
+      {/* Clear dues (R5, BILL-002): opens the S05 patient list filtered to
+          dues > 0; from there a patient's dashboard records the payment. */}
       <div className="flex flex-none justify-end border-t border-slate-100 pt-2">
         <button
           type="button"
           data-testid="today-clear-dues"
-          disabled
-          aria-disabled="true"
-          title={t('today.clearDues.disabledHint')}
-          className="cursor-not-allowed rounded border border-slate-300 bg-slate-100 px-3 py-1.5 text-sm text-slate-400"
+          title={t('today.clearDues.hint')}
+          onClick={() => onOpenDuesList?.()}
+          className="rounded border border-slate-300 px-3 py-1.5 text-base hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
         >
           {t('today.clearDues.label')}
         </button>
@@ -277,6 +289,9 @@ function PatientList({
                   {context === 'due'
                     ? t('today.row.dueToday')
                     : `${t('today.row.overdueSuffix')}`}
+                  {row.duesPaise > 0
+                    ? ` · ${t('today.row.dues')} ${rupees(row.duesPaise)}`
+                    : ''}
                 </div>
               </div>
             </div>
@@ -291,9 +306,13 @@ function PatientList({
 function RegisteredList({
   rows,
   onOpenPatient,
+  onOpenInvoice,
 }: {
   readonly rows: readonly TodayVisitRow[];
   readonly onOpenPatient?: ((patientId: string) => void) | undefined;
+  readonly onOpenInvoice?:
+    | ((patientId: string, visitId: string) => void)
+    | undefined;
 }): JSX.Element | null {
   if (rows.length === 0) return null;
   const title = `${t('today.registered.title')} (${rows.length})`;
@@ -311,7 +330,10 @@ function RegisteredList({
           const when = formatDateTime(row.visitAt);
           const hhmm = when !== null ? when.slice(-5) : '';
           return (
-            <li key={`${row.patientId}-${row.visitAt}`}>
+            <li
+              key={`${row.patientId}-${row.visitAt}`}
+              className="flex items-center gap-2 border-b border-slate-100 pr-3"
+            >
               <div
                 data-testid="today-registered-row"
                 role="button"
@@ -323,7 +345,7 @@ function RegisteredList({
                     onOpenPatient?.(row.patientId);
                   }
                 }}
-                className="flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-2 text-sm hover:bg-slate-50 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600"
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-slate-50 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600"
               >
                 <div className="min-w-0 flex-1">
                   <span className="font-medium">{row.name}</span>{' '}
@@ -333,6 +355,34 @@ function RegisteredList({
                   {row.type} · {hhmm}
                 </span>
               </div>
+              {/* R5 bill chip + Bill / Open bill for this visit (BILL-001). */}
+              <span
+                data-testid={`today-visit-billchip-${row.visitId}`}
+                className="text-base text-slate-700"
+              >
+                {billChipText(row.bill, false)}
+              </span>
+              <button
+                type="button"
+                data-testid={`today-visit-bill-${row.visitId}`}
+                // Each row's button names its patient and time for screen
+                // readers (R-UI-005): not a list of identical "Bill"s.
+                aria-label={[
+                  (row.bill ?? null) === null
+                    ? t('billing.bill')
+                    : t('billing.openBill'),
+                  row.name,
+                  hhmm,
+                ]
+                  .filter((part) => part !== '')
+                  .join(', ')}
+                onClick={() => onOpenInvoice?.(row.patientId, row.visitId)}
+                className="rounded border border-slate-300 px-2 py-0.5 text-base hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                {(row.bill ?? null) === null
+                  ? t('billing.bill')
+                  : t('billing.openBill')}
+              </button>
             </li>
           );
         })}

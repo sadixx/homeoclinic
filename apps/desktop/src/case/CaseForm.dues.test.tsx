@@ -1,29 +1,31 @@
-// RED tests for M3-RW Slice C — DUES PLACEHOLDER on save (Slice C6). Design:
-// docs/adr/0018-case-big-box-dated-log.md (cross-cutting §UX shell: "Dues auto-
-// shown on save ... are PLACEHOLDERS (billing is R5 / M8, BILL-001..002)").
-// The slice plan C6: render a clearly-labelled, disabled placeholder with a
-// "Billing arrives in R5" tooltip (no dead end, R-DEL-002) — NO fake money /
-// math / network.
+// R5 — S08 case-form billing strip (R5 design §9; HC-MVP1-149, BILL-001/002).
+// Replaces the R3 Slice C6 "dues placeholder" (billing is now built): once the
+// visit is saved the strip shows the patient's REAL dues, this visit's bill
+// state with "Bill this visit" / "Open bill", and an ENABLED Clear dues when
+// dues > 0 (same ClearDuesDialog as the dashboard). The placeholder is gone.
 //
-// CUT: the REAL <CaseForm /> (apps/desktop/src/case/CaseForm.tsx). The ONLY
-// faked thing is the generated binding `@/bindings` (a dependency, R-TEST-002),
-// created with `vi.hoisted` (see CaseForm.journal.test.tsx). Autosave/force-
-// save go through caseVisitAutosave; the dues placeholder must NOT call any
-// billing binding.
-//
-// Red-first state: the case form has no dues area on save — there is no
-// `case-form-dues-placeholder`. So `findByTestId` rejects and these FAIL on the
-// query, not at import. After hc-ui-dev adds the labelled, disabled placeholder
-// shown on save these pass.
+// CUT: the REAL <CaseForm /> (with the REAL ClearDuesDialog). Fake: the
+// generated binding `@/bindings` only (R-TEST-002), via `vi.hoisted`.
+// RED: CaseForm still renders the R3 disabled placeholder.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { openOrCreate, autosave, listAttachments } = vi.hoisted(() => ({
+const {
+  openOrCreate,
+  autosave,
+  listAttachments,
+  billingVisitStatus,
+  patientDuesGet,
+  patientClearDues,
+} = vi.hoisted(() => ({
   openOrCreate: vi.fn(),
   autosave: vi.fn(),
   listAttachments: vi.fn(),
+  billingVisitStatus: vi.fn(),
+  patientDuesGet: vi.fn(),
+  patientClearDues: vi.fn(),
 }));
 
 vi.mock('@/bindings', () => ({
@@ -31,9 +33,13 @@ vi.mock('@/bindings', () => ({
     caseVisitOpenOrCreate: openOrCreate,
     caseVisitAutosave: autosave,
     visitListAttachments: listAttachments,
+    billingVisitStatus,
+    patientDuesGet,
+    patientClearDues,
   },
 }));
 
+import { clearAll, ok, patientDues } from '@/test/billingFixtures';
 import { CaseForm } from './CaseForm';
 
 function journalDoc() {
@@ -69,6 +75,28 @@ function renderCase(props: Record<string, unknown> = {}) {
   );
 }
 
+async function saveCase(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByTestId('case-form');
+  await user.click(screen.getByTestId('case-form-save'));
+  await waitFor(() => expect(autosave).toHaveBeenCalled());
+}
+
+const unbilled = {
+  visitId: 'v-1',
+  patientId: 'p-123',
+  patientDuesPaise: 67750,
+  bill: null,
+};
+const billed = {
+  ...unbilled,
+  bill: {
+    invoiceId: 'inv-1',
+    number: '2026-27/0001',
+    totalPaise: 42750,
+    balancePaise: 22750,
+  },
+};
+
 beforeEach(() => {
   openOrCreate.mockReset();
   openOrCreate.mockResolvedValue({
@@ -83,49 +111,76 @@ beforeEach(() => {
   autosave.mockResolvedValue({ savedAt: '2026-10-16T10:42:30Z' });
   listAttachments.mockReset();
   listAttachments.mockResolvedValue({ attachments: [] });
+  billingVisitStatus.mockReset();
+  billingVisitStatus.mockResolvedValue(ok(unbilled));
+  patientDuesGet.mockReset();
+  patientDuesGet.mockResolvedValue(ok(patientDues()));
+  patientClearDues.mockReset();
+  patientClearDues.mockResolvedValue(ok(clearAll));
 });
 
-describe('CaseForm (S08) — dues placeholder on save (Slice C6)', () => {
-  it('shows a dues area once the visit is saved', async () => {
+describe('CaseForm (S08) — billing strip on save (R5)', () => {
+  it('shows the real patient dues for this visit once saved, and no placeholder', async () => {
     const user = userEvent.setup();
     renderCase();
-    await screen.findByTestId('case-form');
+    await saveCase(user);
 
-    // Force-flush the save (the explicit Save button).
-    await user.click(screen.getByTestId('case-form-save'));
-    await waitFor(() => expect(autosave).toHaveBeenCalled());
-
-    expect(
-      await screen.findByTestId('case-form-dues-placeholder'),
-    ).toBeInTheDocument();
+    const strip = await screen.findByTestId('case-form-billing');
+    expect(billingVisitStatus).toHaveBeenCalledWith({ visitId: 'v-1' });
+    await waitFor(() =>
+      expect(screen.getByTestId('case-form-dues')).toHaveTextContent('677.50'),
+    );
+    expect(strip).toBeInTheDocument();
+    expect(screen.queryByTestId('case-form-dues-placeholder')).toBeNull();
   });
 
-  it('marks the dues area as a clearly-labelled PLACEHOLDER (billing is R5)', async () => {
+  it('"Bill this visit" opens the invoice of this visit when it is not billed', async () => {
     const user = userEvent.setup();
-    renderCase();
-    await screen.findByTestId('case-form');
-
-    await user.click(screen.getByTestId('case-form-save'));
-    await waitFor(() => expect(autosave).toHaveBeenCalled());
-
-    const dues = await screen.findByTestId('case-form-dues-placeholder');
-    // It must read as a placeholder, not a live billing figure (no money math).
-    expect(dues.textContent ?? '').toMatch(/R5|later|placeholder|billing/i);
+    const onOpenInvoice = vi.fn();
+    renderCase({ onOpenInvoice });
+    await saveCase(user);
+    const bill = await screen.findByTestId('case-form-bill-visit');
+    expect(bill).toBeEnabled();
+    await user.click(bill);
+    expect(onOpenInvoice).toHaveBeenCalledWith('p-123', 'v-1');
   });
 
-  it('the dues placeholder has no enabled action (no fake money / no-op)', async () => {
+  it('"Open bill" shows the receipt number when the visit is already billed', async () => {
+    const user = userEvent.setup();
+    const onOpenInvoice = vi.fn();
+    billingVisitStatus.mockResolvedValue(ok(billed));
+    renderCase({ onOpenInvoice });
+    await saveCase(user);
+    const open = await screen.findByTestId('case-form-open-bill');
+    expect(screen.getByTestId('case-form-billing')).toHaveTextContent(
+      '2026-27/0001',
+    );
+    expect(screen.queryByTestId('case-form-bill-visit')).toBeNull();
+    await user.click(open);
+    expect(onOpenInvoice).toHaveBeenCalledWith('p-123', 'v-1');
+  });
+
+  it('Clear dues is enabled when there are dues and opens the Clear-dues dialog', async () => {
     const user = userEvent.setup();
     renderCase();
-    await screen.findByTestId('case-form');
+    await saveCase(user);
+    const clear = await screen.findByTestId('case-form-dues-clear');
+    await waitFor(() => expect(clear).toBeEnabled());
+    await user.click(clear);
+    expect(await screen.findByTestId('clear-dues-dialog')).toBeInTheDocument();
+    expect(patientDuesGet).toHaveBeenCalledWith({ patientId: 'p-123' });
+  });
 
-    await user.click(screen.getByTestId('case-form-save'));
-    await waitFor(() => expect(autosave).toHaveBeenCalled());
-
-    const dues = await screen.findByTestId('case-form-dues-placeholder');
-    // Any button inside the dues placeholder must be disabled (no dead end,
-    // no live clearing before R5). If it renders no button that is also fine;
-    // what must NOT exist is an enabled, clickable dues action.
-    const buttons = dues.querySelectorAll('button');
-    buttons.forEach((b) => expect(b).toBeDisabled());
+  it('Clear dues is disabled when the patient owes nothing', async () => {
+    const user = userEvent.setup();
+    billingVisitStatus.mockResolvedValue(
+      ok({ ...unbilled, patientDuesPaise: 0 }),
+    );
+    renderCase();
+    await saveCase(user);
+    await waitFor(() =>
+      expect(screen.getByTestId('case-form-dues')).toHaveTextContent('0.00'),
+    );
+    expect(screen.getByTestId('case-form-dues-clear')).toBeDisabled();
   });
 });

@@ -75,6 +75,7 @@ function makeView(fontSize: FontSize, autolockMinutes: number): SettingsView {
       gstin: null,
       feeFirstPaise: 50000,
       feeFollowupPaise: 30000,
+      upiVpa: null,
     },
     app: { idPrefix: 'HC-', autolockMinutes, fontSize, defaultCamera: null },
     nextNumber: '000001',

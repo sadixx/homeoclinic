@@ -1,5 +1,5 @@
-// Left navigation of the app shell (00-conventions §2). R0 subset: Today,
-// Patients, Settings. Labels come from locales/en.json via the typed accessor
+// Left navigation of the app shell (00-conventions §2): Today, Patients,
+// Reports (R5), Backup, Settings. Labels come from locales/en.json via the typed accessor
 // (R-UI-007). Each item advertises its global shortcut (F3 Today, etc.).
 //
 // R-DEL-002: Patients and Settings do not ship at M0, so they are gated by the
@@ -14,6 +14,7 @@
 // chosen route through `onNavigate` (AppShell wires it to the router). This keeps
 // the component unit-testable without a Router provider.
 import {
+  BarChart3,
   CalendarDays,
   DatabaseBackup,
   Settings as SettingsIcon,
@@ -24,7 +25,12 @@ import {
 import { features } from '@/shared/features';
 import { t, type StringKey } from '@/shared/strings';
 
-export type NavRoute = '/today' | '/patients' | '/backup' | '/settings';
+export type NavRoute =
+  | '/today'
+  | '/patients'
+  | '/reports'
+  | '/backup'
+  | '/settings';
 
 export interface SideNavProps {
   /** The currently active route, highlighted in the nav. */
@@ -59,6 +65,16 @@ const ITEMS: readonly NavItem[] = [
     shortcut: 'F4',
     Icon: Users,
     enabled: features.patients,
+  },
+  {
+    // R5 (S16, BILL-004): always enabled. There is no "Billing" item: bills
+    // are reached per visit / per patient (design A11).
+    route: '/reports',
+    labelKey: 'nav.reports',
+    testid: 'nav-reports',
+    shortcut: '',
+    Icon: BarChart3,
+    enabled: true,
   },
   {
     route: '/backup',

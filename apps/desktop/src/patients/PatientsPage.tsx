@@ -26,6 +26,12 @@ export interface PatientsPageProps {
   readonly onTakeCase?: (patientId: string) => void;
   /** Start a Follow-up visit for a patient (backend resolves the prior visit). */
   readonly onNewFollowup?: (patientId: string, prevVisitId?: string) => void;
+  /** R5: open the list with the "Dues > 0" filter applied (Today Clear dues). */
+  readonly initialDuesPositive?: boolean;
+  /** R5: open the S15 invoice of a visit (dashboard Bill / timeline chip). */
+  readonly onOpenInvoice?: (patientId: string, visitId: string) => void;
+  /** R5: open a receipt (Clear-dues result link). */
+  readonly onPrintReceipt?: (patientId: string, invoiceId: string) => void;
 }
 
 /** The `/patients` container. */
@@ -34,6 +40,9 @@ export function PatientsPage({
   initialView = 'list',
   onTakeCase,
   onNewFollowup,
+  initialDuesPositive = false,
+  onOpenInvoice,
+  onPrintReceipt,
 }: PatientsPageProps): JSX.Element {
   const [view, setView] = useState<View>(() => {
     if (initialPatientId !== undefined) {
@@ -61,7 +70,11 @@ export function PatientsPage({
   switch (view.kind) {
     case 'list':
       return (
-        <PatientList onOpenPatient={openDashboard} onNewPatient={openNew} />
+        <PatientList
+          onOpenPatient={openDashboard}
+          onNewPatient={openNew}
+          initialDuesPositive={initialDuesPositive}
+        />
       );
 
     case 'new':
@@ -93,6 +106,8 @@ export function PatientsPage({
           onBack={openList}
           {...(onTakeCase !== undefined ? { onTakeCase } : {})}
           {...(onNewFollowup !== undefined ? { onNewFollowup } : {})}
+          {...(onOpenInvoice !== undefined ? { onOpenInvoice } : {})}
+          {...(onPrintReceipt !== undefined ? { onPrintReceipt } : {})}
         />
       );
   }

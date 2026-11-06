@@ -46,6 +46,8 @@ const TIMINGS_ID = 'settings-clinic-timings';
 /** Fee cap: Rs 10,00,000 in paise (backend cap, catches a typo). */
 const MAX_FEE_PAISE = 100_000_000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** UPI VPA shape (BILL-005), mirrors hc_domain::billing::validate_vpa. */
+const UPI_VPA_RE = /^[A-Za-z0-9._-]{2,256}@[A-Za-z][A-Za-z0-9]{1,63}$/;
 /** PAT-002 / A9: 1-6 of [A-Z0-9-], not ending in a digit (after uppercasing). */
 const PREFIX_RE = /^[A-Z0-9-]{0,5}[A-Z-]$/;
 
@@ -69,6 +71,7 @@ interface FormState {
   readonly clinicName: string;
   readonly address: string;
   readonly gstin: string;
+  readonly upiVpa: string;
   readonly timings: TimingsBoxes;
   readonly feeFirst: string;
   readonly feeFollowup: string;
@@ -89,6 +92,7 @@ function formFrom(view: SettingsView): FormState {
     clinicName: view.clinic.name,
     address: view.clinic.address,
     gstin: view.clinic.gstin ?? '',
+    upiVpa: view.clinic.upiVpa ?? '',
     timings: timingsBoxesFor(view.clinic.timings ?? ''),
     feeFirst: formatPaise(view.clinic.feeFirstPaise),
     feeFollowup: formatPaise(view.clinic.feeFollowupPaise),
@@ -148,6 +152,13 @@ function validate(form: FormState):
   const feeFirstPaise = fee('settings-fee-consult', form.feeFirst);
   const feeFollowupPaise = fee('settings-fee-followup', form.feeFollowup);
 
+  // BILL-005: the same VPA shape the backend enforces (validate_vpa); blank
+  // means "no clinic UPI ID" (the invoice then shows a Settings hint).
+  const upiVpa = optional(form.upiVpa);
+  if (upiVpa !== null && !UPI_VPA_RE.test(upiVpa)) {
+    errors['settings-clinic-upi'] = t('settings.error.upi');
+  }
+
   const idPrefix = form.idPrefix.trim().toUpperCase();
   if (!PREFIX_RE.test(idPrefix)) {
     errors['settings-id-prefix'] = t('settings.error.prefix');
@@ -177,6 +188,7 @@ function validate(form: FormState):
         gstin: optional(form.gstin),
         feeFirstPaise,
         feeFollowupPaise,
+        upiVpa,
       },
       app: {
         idPrefix,
@@ -316,6 +328,7 @@ export function GeneralSettings({
       | 'email'
       | 'clinicName'
       | 'gstin'
+      | 'upiVpa'
       | 'feeFirst'
       | 'feeFollowup'
       | 'idPrefix'
@@ -479,6 +492,9 @@ export function GeneralSettings({
             { required: true },
           )}
           {textField('settings-clinic-gstin', 'setup.clinic.gstin', 'gstin')}
+          {textField('settings-clinic-upi', 'settings.clinic.upi', 'upiVpa', {
+            hint: t('settings.clinic.upi.hint'),
+          })}
           <div className="flex min-w-0 flex-col md:col-span-2">
             <label
               htmlFor="settings-clinic-address-input"

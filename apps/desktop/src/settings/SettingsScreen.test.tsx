@@ -86,6 +86,7 @@ function makeView(over: Partial<SettingsView> = {}): SettingsView {
       gstin: null,
       feeFirstPaise: 50000,
       feeFollowupPaise: 30000,
+      upiVpa: null,
     },
     app: {
       idPrefix: 'HC-',

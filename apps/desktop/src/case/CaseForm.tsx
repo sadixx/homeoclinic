@@ -74,6 +74,7 @@ import { formatDate, formatDateTime, todayIsoDate } from '@/shared/datetime';
 import { t } from '@/shared/strings';
 import type { StringKey } from '@/shared/strings';
 import { NextFollowupControl } from '@/case/NextFollowupControl';
+import { VisitBillingStrip } from '@/billing/VisitBillingStrip';
 
 // The legacy v2->* upcast now lives in caseRich (parseCaseDoc). It is re-exported
 // here for continuity with callers/tests that imported it alongside the
@@ -96,6 +97,16 @@ export interface CaseFormProps {
    * `first`.
    */
   readonly visitType?: 'first' | 'follow_up';
+  /**
+   * R5 (BILL-001, design §9): open this visit's S15 invoice from the billing
+   * strip (Bill this visit / Open bill).
+   */
+  readonly onOpenInvoice?: (patientId: string, visitId: string) => void;
+  /**
+   * R5 (design §9): open a receipt from the billing strip's Clear dues result
+   * (same as the dashboard).
+   */
+  readonly onPrintReceipt?: (patientId: string, invoiceId: string) => void;
   /**
    * Return to the patient dashboard. When provided, a Back control is rendered
    * top-left (00-conventions §3); Back never discards data (the form
@@ -160,6 +171,8 @@ export function CaseForm({
   visitId,
   visitType = 'first',
   onBack,
+  onOpenInvoice,
+  onPrintReceipt,
 }: CaseFormProps): JSX.Element {
   const isFollowup = visitType === 'follow_up';
 
@@ -951,29 +964,15 @@ export function CaseForm({
         </div>
       </div>
 
+      {/* R5 billing strip (design §9): real dues + Bill this visit / Open
+          bill + Clear dues, once the visit has been saved. */}
       {savedOnce ? (
-        <section
-          data-testid="case-form-dues-placeholder"
-          aria-label={t('case.form.dues.title')}
-          className="flex flex-none items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600"
-        >
-          <span>
-            <strong className="mr-1 text-slate-700">
-              {t('case.form.dues.title')}
-            </strong>
-            {t('case.form.dues.placeholder')}
-          </span>
-          <button
-            type="button"
-            data-testid="case-form-dues-clear"
-            disabled
-            aria-disabled="true"
-            title={t('case.form.dues.disabledHint')}
-            className="cursor-not-allowed rounded border border-slate-300 bg-slate-100 px-3 py-1 text-slate-400"
-          >
-            {t('case.form.dues.clear')}
-          </button>
-        </section>
+        <VisitBillingStrip
+          patientId={patientId}
+          visitId={visitId}
+          onOpenInvoice={onOpenInvoice}
+          onPrintReceipt={onPrintReceipt}
+        />
       ) : null}
 
       {popup === 'vitals' ? (

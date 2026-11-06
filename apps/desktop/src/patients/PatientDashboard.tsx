@@ -8,10 +8,11 @@
 // The visit timeline lists the saved visits newest first with a readable
 // type, the last visit date is shown above it, and the last-prescription card
 // shows the latest recorded prescription labelled as an R4 PREVIEW (M3-RWv6
-// item 9; honest-empty text when none). The dues badge shows Rs 0 (billing is
-// R5, R-DEL-002), and the four consultation quick buttons (New visit /
-// Repertorise / Prescribe / Bill) are HIDDEN — not disabled — so there is no
-// dead end (ADR-0002 point 5). Demographics, alerts, family, recycle-bin
+// item 9; honest-empty text when none). R5: the dues badge shows the REAL
+// running balance with Clear dues (BILL-002), a Bill quick button opens the
+// latest visit's invoice and every timeline row carries its bill chip
+// (BILL-001). Repertorise / Prescribe stay hidden until their screens ship (no
+// dead end, ADR-0002 point 5). Demographics, alerts, family, recycle-bin
 // (soft-delete + restore) and export (PDF/JSON) are REAL.
 
 import { useCallback, useEffect, useState } from 'react';
@@ -27,6 +28,8 @@ import { features } from '@/shared/features';
 import { formatMobile } from '@/shared/mobile';
 import { formatPaise } from '@/shared/money';
 import { PatientAvatar, avatarKindForSex } from '@/shared/PatientAvatar';
+import { billChipText } from '@/billing/billChip';
+import { ClearDuesDialog } from '@/billing/ClearDuesDialog';
 import { t } from '@/shared/strings';
 import type { StringKey } from '@/shared/strings';
 
@@ -71,6 +74,13 @@ export interface PatientDashboardProps {
   readonly onNewFollowup?: (patientId: string, prevVisitId?: string) => void;
   /** Render already in the recycle bin (deep-link into a soft-deleted row). */
   readonly initiallyDeleted?: boolean;
+  /**
+   * R5 (BILL-001, design §9): open the S15 invoice of a visit (Bill button =
+   * latest visit; timeline bill chip = that visit).
+   */
+  readonly onOpenInvoice?: (patientId: string, visitId: string) => void;
+  /** R5 (BILL-003): open a receipt (Clear-dues result link). */
+  readonly onPrintReceipt?: (patientId: string, invoiceId: string) => void;
 }
 
 /** The single-patient dashboard. */
@@ -82,6 +92,8 @@ export function PatientDashboard({
   onTakeCase,
   onNewFollowup,
   initiallyDeleted = false,
+  onOpenInvoice,
+  onPrintReceipt,
 }: PatientDashboardProps): JSX.Element {
   const [data, setData] = useState<PatientDashboardData | null>(null);
   const [errored, setErrored] = useState(false);
@@ -93,6 +105,18 @@ export function PatientDashboard({
   // offered instead. The signal comes from the typed Slice A command, never a
   // client-side guess.
   const [hasSavedFirstCase, setHasSavedFirstCase] = useState(false);
+  // R5: the Clear-dues dialog (BILL-002).
+  const [clearingDues, setClearingDues] = useState(false);
+
+  // Re-read the dashboard after a Clear dues so the badge and the timeline
+  // chips show the new balance (the backend is the only source of money).
+  const refresh = useCallback(async (): Promise<void> => {
+    try {
+      setData(await run(commands.patientGetDashboard({ patientId })));
+    } catch {
+      /* keep the current view; the next open reloads it */
+    }
+  }, [patientId]);
 
   // Load the full patient in one call and record the open in the recent list
   // (PSR-007). A fresh load whenever the patient id changes (family switch).
@@ -213,6 +237,8 @@ export function PatientDashboard({
   // Pre-composed so the confirm dialog renders an identifier, not a JSX literal
   // (R-UI-007 / jsx-no-literals); the names come from the loaded record.
   const deleteTarget = `${demo.name} (${demo.code})`;
+  // The Bill quick button bills the newest visit (timeline is newest first).
+  const latestVisitId = data.visits[0]?.visitId ?? null;
 
   return (
     <section
@@ -301,12 +327,29 @@ export function PatientDashboard({
                 {t('patient.dash.referred')} {demo.referredBy}
               </span>
             ) : null}
-            <span
-              data-testid="patient-dash-dues"
-              className="mt-1 inline-flex w-fit rounded bg-slate-100 px-2 py-0.5 text-slate-700"
-            >
-              {t('patient.dash.dues')} {t('common.duesPrefix')}
-              {formatPaise(data.duesPaise)}
+            <span className="mt-1 flex flex-wrap items-center gap-2">
+              <span
+                data-testid="patient-dash-dues"
+                className={[
+                  'inline-flex w-fit rounded px-2 py-0.5 text-base',
+                  data.duesPaise > 0
+                    ? 'border border-amber-400 bg-amber-50 font-semibold text-amber-900'
+                    : 'bg-slate-100 text-slate-700',
+                ].join(' ')}
+              >
+                {t('patient.dash.dues')} {t('common.duesPrefix')}
+                {formatPaise(data.duesPaise)}
+              </span>
+              {data.duesPaise > 0 && !deleted ? (
+                <button
+                  type="button"
+                  data-testid="patient-dash-clear-dues"
+                  onClick={() => setClearingDues(true)}
+                  className="rounded border text-base border-slate-300 px-2 py-0.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  {t('case.form.dues.clear')}
+                </button>
+              ) : null}
             </span>
           </div>
         </div>
@@ -434,6 +477,32 @@ export function PatientDashboard({
           >
             {t('patient.dash.takeCase')}
           </button>
+          {/* R5 Bill (F8): bills the LATEST visit; disabled with a hint when
+              the patient has no visit yet (no dead end). */}
+          <button
+            type="button"
+            data-testid="patient-dash-bill"
+            disabled={latestVisitId === null}
+            aria-describedby={
+              latestVisitId === null ? 'patient-dash-bill-hint' : undefined
+            }
+            title={
+              latestVisitId === null ? t('billing.startVisitFirst') : undefined
+            }
+            onClick={() => {
+              if (latestVisitId !== null) {
+                onOpenInvoice?.(patientId, latestVisitId);
+              }
+            }}
+            className="rounded border border-slate-300 px-3 py-1.5 text-base hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:cursor-not-allowed disabled:text-slate-400"
+          >
+            {t('billing.bill')}
+          </button>
+          {latestVisitId === null ? (
+            <span id="patient-dash-bill-hint" className="sr-only">
+              {t('billing.startVisitFirst')}
+            </span>
+          ) : null}
         </div>
       ) : null}
 
@@ -466,12 +535,43 @@ export function PatientDashboard({
                   <li
                     key={v.visitId}
                     data-testid="patient-dash-visit-row"
-                    className="flex items-center justify-between border-b border-slate-100 px-3 py-2 last:border-0"
+                    className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 last:border-0"
                   >
                     <span>{formatDate(v.visitAt) ?? t('common.none')}</span>
-                    <span className="text-slate-600">
+                    <span className="flex-1 text-slate-600">
                       {visitTypeLabel(v.kind)}
                     </span>
+                    {(v.bill ?? null) !== null ? (
+                      <button
+                        type="button"
+                        data-testid={`patient-dash-visit-billchip-${v.visitId}`}
+                        onClick={() => onOpenInvoice?.(patientId, v.visitId)}
+                        className="rounded border border-slate-300 px-2 py-0.5 text-base hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      >
+                        {billChipText(v.bill)}
+                      </button>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <span
+                          data-testid={`patient-dash-visit-billchip-${v.visitId}`}
+                          className="text-base text-slate-600"
+                        >
+                          {billChipText(null)}
+                        </span>
+                        <button
+                          type="button"
+                          data-testid={`patient-dash-visit-bill-${v.visitId}`}
+                          // Names the visit for screen readers (R-UI-005).
+                          aria-label={`${t('billing.bill')}, ${
+                            formatDate(v.visitAt) ?? t('common.none')
+                          }`}
+                          onClick={() => onOpenInvoice?.(patientId, v.visitId)}
+                          className="rounded border border-slate-300 px-2 py-0.5 text-base hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        >
+                          {t('billing.bill')}
+                        </button>
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -556,6 +656,20 @@ export function PatientDashboard({
           visits via the shared two-way store (patient_list_attachments) with
           open/preview and a delete-everywhere behind a confirm. */}
       <LabReportsPanel patientId={patientId} />
+
+      {/* R5 Clear dues (BILL-002): one payment, oldest bill first. */}
+      <ClearDuesDialog
+        patientId={patientId}
+        open={clearingDues}
+        onClose={() => setClearingDues(false)}
+        onCleared={() => void refresh()}
+        {...(onPrintReceipt !== undefined
+          ? {
+              onPrintReceipt: (invoiceId: string) =>
+                onPrintReceipt(patientId, invoiceId),
+            }
+          : {})}
+      />
 
       {/* Move-to-bin confirm dialog, names the patient (PAT-008, §4) */}
       {confirmingDelete ? (

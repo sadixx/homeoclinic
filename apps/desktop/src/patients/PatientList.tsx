@@ -40,6 +40,8 @@ export interface PatientListProps {
   readonly onOpenPatient: (patientId: string) => void;
   /** Start a new registration from the empty state (S06). */
   readonly onNewPatient?: () => void;
+  /** R5: start with the "Dues greater than zero" filter applied. */
+  readonly initialDuesPositive?: boolean;
 }
 
 /** Editable filter form state (strings; parsed into PatientFilter on apply). */
@@ -116,11 +118,15 @@ function isFiltered(form: FilterForm): boolean {
 export function PatientList({
   onOpenPatient,
   onNewPatient,
+  initialDuesPositive = false,
 }: PatientListProps): JSX.Element {
-  const [form, setForm] = useState<FilterForm>(EMPTY_FILTERS);
+  const [form, setForm] = useState<FilterForm>(() => ({
+    ...EMPTY_FILTERS,
+    duesPositive: initialDuesPositive,
+  }));
   // The filter/sort actually in force (only Apply / a sort header commits).
   const [appliedFilters, setAppliedFilters] = useState<PatientFilter>(() =>
-    toPatientFilter(EMPTY_FILTERS),
+    toPatientFilter({ ...EMPTY_FILTERS, duesPositive: initialDuesPositive }),
   );
   const [sort, setSort] = useState<PatientSort>({ field: 'name', dir: 'asc' });
   const [rows, setRows] = useState<SearchRow[]>([]);

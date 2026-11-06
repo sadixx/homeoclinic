@@ -1,98 +1,114 @@
-// RED tests for M3-RW Slice C — DUES PLACEHOLDER on home (Slice C6). Design:
-// docs/adr/0018-case-big-box-dated-log.md (cross-cutting §UX shell: "Dues auto-
-// shown on save + Clear-dues on home are PLACEHOLDERS (billing is R5 / M8,
-// BILL-001..002)"). The slice plan C6 says render a clearly-disabled
-// placeholder with a "Billing arrives in R5" tooltip (no dead-end, R-DEL-002),
-// with NO fake money / math / network.
+// R5 — S03 Today: Clear dues + registered-visit bill chips (R5 design §9;
+// HC-MVP1-149, BILL-001/002). Replaces the R3 Slice C6 disabled placeholder:
+// "Clear dues" is now ENABLED and opens the S05 patient list filtered to
+// dues > 0 (`/patients?dues=1`); due/overdue rows show the real dues; each
+// registered-today row shows its bill chip and a Bill button for that visit.
 //
-// CUT: the REAL <TodayScreen /> (apps/desktop/src/home/TodayScreen.tsx). The
-// ONLY faked thing is the generated binding `@/bindings` (a dependency,
-// R-TEST-002), created with `vi.hoisted` (see TodayScreen.test.tsx).
-//
-// Red-first state: Today has no "Clear dues" control at all, so
-// `findByTestId('today-clear-dues')` rejects and these FAIL on the query, not
-// at import. After hc-ui-dev adds the labelled, disabled placeholder these pass.
-//
-// The assertions are deliberately NARROW: the control is present, is clearly a
-// PLACEHOLDER (its label/tooltip says so), is DISABLED, and clicking it is a
-// NO-OP that calls NO binding (no fake clearing, no money math, no network).
+// CUT: the REAL <TodayScreen />. Fake: `@/bindings` only (R-TEST-002).
+// RED: Today still renders the disabled R3 placeholder and no bill chips.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { todayGetOverview } = vi.hoisted(() => ({
-  todayGetOverview: vi.fn(),
-}));
+const { todayGetOverview } = vi.hoisted(() => ({ todayGetOverview: vi.fn() }));
 
-// Record every binding call so a no-op placeholder can be proven to touch none.
-const invokedCommands: string[] = [];
+vi.mock('@/bindings', () => ({ commands: { todayGetOverview } }));
 
-vi.mock('@/bindings', () => ({
-  commands: new Proxy(
-    { todayGetOverview },
-    {
-      get(_target: Record<string, unknown>, prop: string) {
-        if (prop === 'todayGetOverview') return todayGetOverview;
-        // Any OTHER command access returns a spy that records the call, so a
-        // placeholder that wrongly invokes a binding is caught.
-        return () => {
-          invokedCommands.push(prop);
-          return Promise.resolve(undefined);
-        };
-      },
-    },
-  ),
-}));
-
+import { todayIsoDate } from '@/shared/datetime';
 import { TodayScreen } from './TodayScreen';
 
+const dueRow = {
+  patientId: 'p-1',
+  code: 'HC-000001',
+  name: 'Test Patient R5',
+  ageLabel: '34 y',
+  sex: 'male',
+  photoPath: null,
+  nextFollowupOn: todayIsoDate(),
+  duesPaise: 12750,
+};
+
+const registered = [
+  {
+    visitId: 'v-billed',
+    patientId: 'p-1',
+    code: 'HC-000001',
+    name: 'Test Patient R5',
+    photoPath: null,
+    visitAt: `${todayIsoDate()}T05:00:00Z`,
+    type: 'follow_up',
+    bill: {
+      invoiceId: 'inv-1',
+      number: '2026-27/0001',
+      totalPaise: 42750,
+      balancePaise: 12750,
+    },
+  },
+  {
+    visitId: 'v-new',
+    patientId: 'p-2',
+    code: 'HC-000002',
+    name: 'Test Patient R5 B',
+    photoPath: null,
+    visitAt: `${todayIsoDate()}T06:00:00Z`,
+    type: 'first',
+    bill: null,
+  },
+];
+
 beforeEach(() => {
-  invokedCommands.length = 0;
   todayGetOverview.mockReset();
   todayGetOverview.mockResolvedValue({
-    dueToday: [],
+    dueToday: [dueRow],
     overdue: [],
-    registeredToday: [],
+    registeredToday: registered,
     backupWarning: null,
     licenceReminder: null,
   });
 });
 
-describe('TodayScreen (S03) — Clear-dues placeholder (Slice C6)', () => {
-  it('renders a Clear-dues control on home', async () => {
-    render(<TodayScreen />);
-    await screen.findByTestId('today-screen');
-    expect(await screen.findByTestId('today-clear-dues')).toBeInTheDocument();
-  });
-
-  it('marks the Clear-dues control as a disabled PLACEHOLDER (billing is R5)', async () => {
-    render(<TodayScreen />);
-    await screen.findByTestId('today-screen');
-    const clear = await screen.findByTestId('today-clear-dues');
-
-    // Clearly a placeholder, not a live control: disabled + aria-disabled.
-    expect(clear).toBeDisabled();
-    expect(clear).toHaveAttribute('aria-disabled', 'true');
-    // A tooltip / accessible hint that says billing is not here yet (R5). The
-    // exact wording is hc-ui-dev's en.json string; assert a non-empty tooltip
-    // referencing a later release rather than a hardcoded sentence.
-    const title = clear.getAttribute('title') ?? '';
-    expect(title).not.toBe('');
-    expect(title).toMatch(/R5|later|billing/i);
-  });
-
-  it('clicking Clear-dues is a NO-OP: it calls NO binding (no money math, no network)', async () => {
+describe('TodayScreen (S03) — Clear dues (R5)', () => {
+  it('Clear dues is enabled and opens the dues > 0 patient list', async () => {
     const user = userEvent.setup();
-    render(<TodayScreen />);
-    await screen.findByTestId('today-screen');
+    const onOpenDuesList = vi.fn();
+    render(<TodayScreen onOpenDuesList={onOpenDuesList} />);
     const clear = await screen.findByTestId('today-clear-dues');
-
-    // Only the mount-time overview read is allowed; nothing else.
-    const before = invokedCommands.slice();
+    expect(clear).toBeEnabled();
+    expect(clear).not.toHaveAttribute('aria-disabled', 'true');
     await user.click(clear);
-    expect(invokedCommands).toEqual(before);
-    // And specifically no clear-dues / billing binding fired.
-    expect(invokedCommands.some((c) => /dues|bill|clear/i.test(c))).toBe(false);
+    expect(onOpenDuesList).toHaveBeenCalledTimes(1);
+  });
+
+  it('due-today rows show the real dues', async () => {
+    render(<TodayScreen />);
+    expect(await screen.findByText(/127\.50/)).toBeInTheDocument();
+  });
+});
+
+describe('TodayScreen (S03) — registered-today bill chips (R5)', () => {
+  it('shows the receipt number for a billed visit and a Bill button for an unbilled one', async () => {
+    const user = userEvent.setup();
+    const onOpenInvoice = vi.fn();
+    render(<TodayScreen onOpenInvoice={onOpenInvoice} />);
+    const chip = await screen.findByTestId('today-visit-billchip-v-billed');
+    expect(chip).toHaveTextContent('2026-27/0001');
+    expect(screen.getByTestId('today-visit-billchip-v-new')).toHaveTextContent(
+      /not billed/i,
+    );
+
+    await user.click(screen.getByTestId('today-visit-bill-v-new'));
+    expect(onOpenInvoice).toHaveBeenCalledWith('p-2', 'v-new');
+  });
+});
+
+describe('TodayScreen (S03) — per-row Bill buttons are distinguishable (r5-review-12)', () => {
+  it('names each Bill / Open bill button with its patient for screen readers', async () => {
+    render(<TodayScreen onOpenInvoice={vi.fn()} />);
+    const billed = await screen.findByTestId('today-visit-bill-v-billed');
+    const unbilled = screen.getByTestId('today-visit-bill-v-new');
+    expect(unbilled).toHaveAccessibleName(/^bill\b.*Test Patient R5 B/i);
+    expect(billed).toHaveAccessibleName(/^open bill\b.*Test Patient R5\b/i);
+    expect(billed).not.toHaveAccessibleName(/Test Patient R5 B/);
   });
 });

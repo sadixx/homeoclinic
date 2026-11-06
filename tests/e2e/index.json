@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-05T10:36:42.901Z",
+  "generatedAt": "2026-11-06T09:40:24.238Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -278,6 +278,21 @@
         "VIS-001",
         "VIS-004",
         "VIS-005"
+      ],
+      "tier": "regression",
+      "area": "release",
+      "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/release/r5-demo.e2e.ts",
+      "reqs": [
+        "BILL-001",
+        "BILL-002",
+        "BILL-003",
+        "BILL-004"
       ],
       "tier": "regression",
       "area": "release",

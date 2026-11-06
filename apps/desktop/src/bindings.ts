@@ -271,9 +271,47 @@ export const commands = {
 	 *  (`settings_forget_data_folder`).
 	 */
 	settingsForgetDataFolder: () => typedError<null, UserFacingError>(__TAURI_INVOKE("settings_forget_data_folder")),
+	/**  S15 load: the visit's invoice, or an unsaved proposal. */
+	invoiceGetForVisit: (req: InvoiceGetForVisitRequest) => typedError<InvoiceScreen, UserFacingError>(__TAURI_INVOKE("invoice_get_for_visit", { req })),
+	/**  S15 live totals (pure; the UI never does money maths). */
+	invoiceComputeTotals: (req: ComputeTotalsRequest) => typedError<TotalsView, UserFacingError>(__TAURI_INVOKE("invoice_compute_totals", { req })),
+	/**  S15 Save: issue (first save, assigns the receipt number) or update. */
+	invoiceSave: (req: InvoiceSaveRequest) => typedError<InvoiceScreen, UserFacingError>(__TAURI_INVOKE("invoice_save", { req })),
+	/**  Record one payment against a saved invoice. */
+	paymentAdd: (req: PaymentAddRequest) => typedError<InvoiceScreen, UserFacingError>(__TAURI_INVOKE("payment_add", { req })),
+	/**  Cancel a mistaken payment (with a reason). */
+	paymentVoid: (req: PaymentVoidRequest) => typedError<InvoiceScreen, UserFacingError>(__TAURI_INVOKE("payment_void", { req })),
+	/**  Cancel a bill (keeps its number; voids its payments). */
+	invoiceVoid: (req: InvoiceVoidRequest) => typedError<InvoiceScreen, UserFacingError>(__TAURI_INVOKE("invoice_void", { req })),
+	/**  Clinic UPI QR for the invoice balance. */
+	invoiceUpiQr: (req: InvoiceIdRequest) => typedError<UpiQrView, UserFacingError>(__TAURI_INVOKE("invoice_upi_qr", { req })),
+	/**  The receipt document (S14-lite print route). */
+	receiptGet: (req: InvoiceIdRequest) => typedError<ReceiptDoc, UserFacingError>(__TAURI_INVOKE("receipt_get", { req })),
+	/**  Billing state of one visit + patient dues (case strip, chips). */
+	billingVisitStatus: (req: VisitIdRequest) => typedError<VisitBillingStatus, UserFacingError>(__TAURI_INVOKE("billing_visit_status", { req })),
+	/**  Patient dues + open invoices (Clear-dues dialog). */
+	patientDuesGet: (req: PatientIdRequest) => typedError<PatientDues, UserFacingError>(__TAURI_INVOKE("patient_dues_get", { req })),
+	/**  Clear dues: one payment allocated oldest-first, one audit row. */
+	patientClearDues: (req: ClearDuesRequest) => typedError<ClearDuesResult, UserFacingError>(__TAURI_INVOKE("patient_clear_dues", { req })),
+	/**  Daily collection by mode (S16). */
+	reportDailyCollection: (req: DailyCollectionRequest) => typedError<DailyCollection, UserFacingError>(__TAURI_INVOKE("report_daily_collection", { req })),
+	/**  Monthly summary (S16). */
+	reportMonthlySummary: (req: MonthlySummaryRequest) => typedError<MonthlySummary, UserFacingError>(__TAURI_INVOKE("report_monthly_summary", { req })),
+	/**  Pick a folder and export the report as CSV / xlsx (S16). */
+	reportExport: (req: ReportExportRequest) => typedError<ReportExportResult, UserFacingError>(__TAURI_INVOKE("report_export", { req })),
 };
 
 /* Types */
+/**  One Clear-dues allocation. */
+export type Allocation = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  Receipt number. */
+	number: string,
+	/**  Amount allocated. */
+	amountPaise: number,
+};
+
 /**
  *  Read-only description of the running application build.
  * 
@@ -407,6 +445,26 @@ export type BackupStatus = {
 	stale: boolean,
 };
 
+/**  Patient header of the invoice screen. */
+export type BillPatient = {
+	/**  Patient id. */
+	patientId: string,
+	/**  Patient code. */
+	code: string,
+	/**  Display name. */
+	name: string,
+};
+
+/**  Visit header of the invoice screen. */
+export type BillVisit = {
+	/**  Visit id. */
+	visitId: string,
+	/**  RFC3339 visit instant. */
+	visitAt: string,
+	/**  Visit type code. */
+	visitType: string,
+};
+
 /**
  *  Which Cargo/Vite profile produced this build.
  * 
@@ -459,6 +517,26 @@ export type CheckDuplicateResponse = {
 	matches: DuplicateMatch[],
 };
 
+/**  `patient_clear_dues`. */
+export type ClearDuesRequest = {
+	/**  Patient id. */
+	patientId: string,
+	/**  The payment. */
+	payment: PaymentInput,
+	/**  Dues the dialog opened with (stale = conflict). */
+	expectedDuesPaise: number,
+};
+
+/**  `patient_clear_dues` response. */
+export type ClearDuesResult = {
+	/**  Shared batch id. */
+	batchId: string,
+	/**  Allocations, oldest first. */
+	allocations: Allocation[],
+	/**  Dues after. */
+	duesPaise: number,
+};
+
 /**  Clinic section of the General form. Fees are integer paise. */
 export type ClinicSettings = {
 	/**  Clinic name. */
@@ -473,12 +551,26 @@ export type ClinicSettings = {
 	feeFirstPaise: number,
 	/**  Default follow-up fee, integer paise. */
 	feeFollowupPaise: number,
+	/**
+	 *  R5 (BILL-005): clinic UPI ID (VPA) for the payment QR; `None` = unset.
+	 *  Stored as `app_setting` key `clinic_upi_vpa` in the same single-audit
+	 *  Save.
+	 */
+	upiVpa: string | null,
 };
 
 /**  Result of completing setup. */
 export type CompleteSetupResponse = {
 	/**  Route to open after setup (`"/today"`). */
 	homeRoute: string,
+};
+
+/**  `invoice_compute_totals`. */
+export type ComputeTotalsRequest = {
+	/**  Invoice lines. */
+	lines: LineDto[],
+	/**  Discount. */
+	discount: DiscountDto,
 };
 
 /**  `visit_create_followup` request (VIS-002). */
@@ -555,12 +647,50 @@ export type CreatePatientResponse = {
 	code: string,
 };
 
+/**  `report_daily_collection` response. */
+export type DailyCollection = {
+	/**  Local date `YYYY-MM-DD`. */
+	date: string,
+	/**  Always 4 rows: cash, upi, card, other. */
+	byMode: ModeRow[],
+	/**  Payments that day. */
+	totalCount: number,
+	/**  Collected that day, paise. */
+	totalPaise: number,
+	/**  Balance on non-void bills issued that day. */
+	outstandingPaise: number,
+};
+
+/**  `report_daily_collection` request. */
+export type DailyCollectionRequest = {
+	/**  Local date `YYYY-MM-DD`. */
+	date: string,
+};
+
 /**  `settings_recheck_data_folder` response. */
 export type DataFolderCheck = {
 	/**  Whether the pointed folder is present now. */
 	available: boolean,
 	/**  The pointed folder (display only). */
 	dataFolder: string,
+};
+
+/**  One day of the monthly summary. */
+export type DayRow = {
+	/**  Local date `YYYY-MM-DD`. */
+	date: string,
+	/**  Cash, paise. */
+	cashPaise: number,
+	/**  UPI, paise. */
+	upiPaise: number,
+	/**  Card, paise. */
+	cardPaise: number,
+	/**  Other, paise. */
+	otherPaise: number,
+	/**  Number of live payments. */
+	count: number,
+	/**  Collected that day, paise. */
+	totalPaise: number,
 };
 
 /**  `case_template_get_default` response — the default template (CASE-004). */
@@ -609,6 +739,19 @@ export type Demographics = {
 	 */
 	maritalStatus: string | null,
 };
+
+/**  Discount on the wire. */
+export type DiscountDto = 
+/**  No discount. */
+{ kind: "none" } | 
+/**  Fixed amount. */
+{ kind: "amount"; 
+/**  Paise. */
+paise: number } | 
+/**  Percent in basis points. */
+{ kind: "percent"; 
+/**  1% = 100. */
+basisPoints: number };
 
 /**  Doctor section of the General form. */
 export type DoctorSettings = {
@@ -719,6 +862,14 @@ export type ErrorCode =
  *  was locked; the PIN unlock opens the new folder.
  */
 "data_folder_reopen_failed" | 
+/**  R5 (BILL-002): the payment is more than the amount due. */
+"payment_exceeds_balance" | 
+/**  R5 (BILL-001): an edit would make the total less than what was paid. */
+"total_below_paid" | 
+/**  R5 (BILL-001): the bill was cancelled (void) and cannot be changed. */
+"invoice_voided" | 
+/**  R5 (BILL-004): the report file could not be written. */
+"export_failed" | 
 /**
  *  A boot-time command read (`setup_get_state` / `auth_get_lock_state`)
  *  failed at the IPC transport/serialisation layer rather than returning a
@@ -732,6 +883,13 @@ export type ErrorCode =
 "boot_read_failed" | 
 /**  Anything not otherwise classified. The message stays generic. */
 "unexpected";
+
+/**  Export format. */
+export type ExportFormat = 
+/**  UTF-8 CSV with a BOM (opens in Excel). */
+"csv" | 
+/**  Excel workbook (one sheet). */
+"xlsx";
 
 /**  Export input (`patient_export_pdf` / `patient_export_json`, PAT-011). */
 export type ExportRequest = {
@@ -814,6 +972,103 @@ export type HealthStatus = {
 	loggingReady: boolean,
 };
 
+/**  `invoice_get_for_visit`. */
+export type InvoiceGetForVisitRequest = {
+	/**  Visit id. */
+	visitId: string,
+	/**  The clinic-local date `YYYY-MM-DD` (±1 day of the clock). */
+	localToday: string,
+};
+
+/**  `invoice_upi_qr` / `receipt_get`. */
+export type InvoiceIdRequest = {
+	/**  Invoice id. */
+	invoiceId: string,
+};
+
+/**  `invoice_save` (create when `invoice_id` is `None`). */
+export type InvoiceSaveRequest = {
+	/**  Visit id. */
+	visitId: string,
+	/**  Invoice id. */
+	invoiceId: string | null,
+	/**  Row version the editor loaded (stale = conflict). */
+	expectedRowVersion: number | null,
+	/**  Invoice lines. */
+	lines: LineDto[],
+	/**  Discount. */
+	discount: DiscountDto,
+	/**  The payment. */
+	payment: PaymentInput | null,
+	/**  The clinic-local date `YYYY-MM-DD` (±1 day of the clock). */
+	localToday: string,
+};
+
+/**  The whole S15 screen payload. */
+export type InvoiceScreen = {
+	/**  Patient. */
+	patient: BillPatient,
+	/**  Visit. */
+	visit: BillVisit,
+	/**  The live (or just-voided) invoice; `None` = unbilled. */
+	invoice: InvoiceView | null,
+	/**  Prefilled lines when unbilled. */
+	proposal: LineDto[] | null,
+	/**  Patient running dues after this operation. */
+	patientDuesPaise: number,
+	/**  Clinic VPA is set. */
+	upiConfigured: boolean,
+	/**  GSTIN (snapshot if issued, else current). */
+	gstin: string | null,
+};
+
+/**  Invoice status. */
+export type InvoiceStatus = 
+/**  Issued (live). */
+"issued" | 
+/**  Cancelled; number kept. */
+"void";
+
+/**  One saved invoice. */
+export type InvoiceView = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  Optimistic-concurrency version. */
+	rowVersion: number,
+	/**  Receipt number `2026-27/0001`. */
+	number: string,
+	/**  FY label. */
+	fy: string,
+	/**  Local issue date. */
+	issuedOn: string,
+	/**  Status. */
+	status: InvoiceStatus,
+	/**  Live lines (ids set). */
+	lines: LineDto[],
+	/**  Discount. */
+	discount: DiscountDto,
+	/**  Totals. */
+	totals: TotalsView,
+	/**  Paid (live payments). */
+	paidPaise: number,
+	/**  Balance. */
+	balancePaise: number,
+	/**  All payments incl. cancelled. */
+	payments: PaymentView[],
+	/**  Void reason when void. */
+	voidReason: string | null,
+};
+
+/**  `invoice_void`. */
+export type InvoiceVoidRequest = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  Why (required, <= 200 chars). */
+	reason: string,
+	/**  Row version the editor loaded (stale = conflict). */
+	expectedRowVersion: number,
+};
+
 /**
  *  The licence kind the UI renders. `Trial` is the only R1 value; the others
  *  leave room for the full `Active`/`ReadOnly`/`Unlicensed` states (design §6)
@@ -843,6 +1098,29 @@ export type LicenceStatus = {
 	/**  Whether the trial/licence has expired at the effective now. */
 	expired: boolean,
 };
+
+/**  One invoice line on the wire. */
+export type LineDto = {
+	/**  Stored line id (`Some` once saved). */
+	id: string | null,
+	/**  Line kind. */
+	kind: LineKind,
+	/**  Description. */
+	description: string,
+	/**  Quantity. */
+	qty: number,
+	/**  Rate per unit, paise. */
+	ratePaise: number,
+};
+
+/**  Invoice line kind. */
+export type LineKind = 
+/**  Consultation fee. */
+"consultation" | 
+/**  Medicine (free text + manual rate until R4). */
+"medicine" | 
+/**  Any other charge. */
+"other";
 
 /**  Family-link input (`patient_link_family`, PAT-006). */
 export type LinkFamilyRequest = {
@@ -915,6 +1193,32 @@ export type LockState = {
 	autolockMinutes: number,
 };
 
+/**  One mode row (always 4 rows: cash, upi, card, other). */
+export type ModeRow = {
+	/**  Payment mode. */
+	mode: PaymentMode,
+	/**  Number of live payments. */
+	count: number,
+	/**  Sum, paise. */
+	amountPaise: number,
+};
+
+/**  `report_monthly_summary` response. */
+export type MonthlySummary = {
+	/**  `YYYY-MM`. */
+	month: string,
+	/**  Every calendar day of the month. */
+	days: DayRow[],
+	/**  Month total (`date` = the month). */
+	total: DayRow,
+};
+
+/**  `report_monthly_summary` request. */
+export type MonthlySummaryRequest = {
+	/**  Month `YYYY-MM`. */
+	month: string,
+};
+
 /**  `settings_move_data_folder` request. */
 export type MoveDataFolderRequest = {
 	/**  The parent folder returned by the picker. */
@@ -965,6 +1269,18 @@ export type OpenAttachmentResponse = {
 	dataBase64: string,
 };
 
+/**  One open invoice (dues dialog). */
+export type OpenInvoice = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  Receipt number. */
+	number: string,
+	/**  Local issue date. */
+	issuedOn: string,
+	/**  Balance. */
+	balancePaise: number,
+};
+
 /**  `case_visit_open_or_create` request (VIS-001). */
 export type OpenOrCreateRequest = {
 	/**  Patient the visit belongs to. */
@@ -995,7 +1311,7 @@ export type OpenOrCreateResponse = {
 /**
  *  The single patient dashboard payload (PAT-005): demographics, alerts,
  *  family, the visit timeline and the last prescription (an R4 preview) are
- *  REAL; `dues_paise` is 0 (billing is R5, R-DEL-002).
+ *  REAL; `dues_paise` is the R5 running patient balance.
  */
 export type PatientDashboard = {
 	/**  Real demographics. */
@@ -1004,7 +1320,7 @@ export type PatientDashboard = {
 	allergies: string | null,
 	/**  Other alerts, or `None`. */
 	alerts: string | null,
-	/**  Outstanding dues, integer paise. ALWAYS 0 for R2 (billing is R5). */
+	/**  Outstanding dues (running patient balance), integer paise (R5). */
 	duesPaise: number,
 	/**  Visit timeline (newest first), non-deleted visits, bounded. */
 	visits: VisitSummary[],
@@ -1012,6 +1328,16 @@ export type PatientDashboard = {
 	lastPrescription: RxSummary | null,
 	/**  Linked family (REAL, PAT-006). */
 	family: FamilyMember[],
+};
+
+/**  `patient_dues_get` response. */
+export type PatientDues = {
+	/**  Patient id. */
+	patientId: string,
+	/**  Running dues. */
+	duesPaise: number,
+	/**  Open invoices, oldest first. */
+	openInvoices: OpenInvoice[],
 };
 
 /**
@@ -1058,6 +1384,12 @@ export type PatientFilter = {
 	casenoteText: string | null,
 };
 
+/**  `patient_dues_get`. */
+export type PatientIdRequest = {
+	/**  Patient id. */
+	patientId: string,
+};
+
 /**
  *  `patient_list_attachments` request (M3-RWv4 §5.4 / §9). Lists ALL of a
  *  patient's attachments across visits — the shared two-way store behind the
@@ -1074,6 +1406,61 @@ export type PatientSort = {
 	field: SortField,
 	/**  The direction. */
 	dir: SortDir,
+};
+
+/**  `payment_add`. */
+export type PaymentAddRequest = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  The payment. */
+	payment: PaymentInput,
+};
+
+/**  A payment as entered. */
+export type PaymentInput = {
+	/**  Amount, paise (1..=balance). */
+	amountPaise: number,
+	/**  Mode. */
+	mode: PaymentMode,
+	/**  Optional UTR / slip reference. */
+	reference: string | null,
+	/**  Local date `YYYY-MM-DD` the money was received. */
+	paidOn: string,
+};
+
+/**  Payment mode. */
+export type PaymentMode = 
+/**  Cash. */
+"cash" | 
+/**  UPI. */
+"upi" | 
+/**  Card. */
+"card" | 
+/**  Other. */
+"other";
+
+/**  One payment as shown. */
+export type PaymentView = {
+	/**  Payment id. */
+	paymentId: string,
+	/**  Local date. */
+	paidOn: string,
+	/**  Amount. */
+	amountPaise: number,
+	/**  Mode. */
+	mode: PaymentMode,
+	/**  Reference. */
+	reference: string | null,
+	/**  Cancelled (payment void). */
+	voided: boolean,
+};
+
+/**  `payment_void`. */
+export type PaymentVoidRequest = {
+	/**  Payment id. */
+	paymentId: string,
+	/**  Why (required, <= 200 chars). */
+	reason: string,
 };
 
 /**
@@ -1126,6 +1513,52 @@ export type PrevComplaint = {
 	location: string,
 };
 
+/**  `receipt_get` response: everything the receipt prints. */
+export type ReceiptDoc = {
+	/**  Clinic name. */
+	clinicName: string,
+	/**  Clinic address. */
+	clinicAddress: string,
+	/**  Clinic phone, if set. */
+	clinicPhone: string | null,
+	/**  Clinic GSTIN snapshot at issue (printed only when set, BILL-006). */
+	gstin: string | null,
+	/**  Doctor name. */
+	doctorName: string,
+	/**  Doctor qualification. */
+	doctorQualification: string,
+	/**  Doctor registration number. */
+	doctorRegNo: string,
+	/**  Receipt number `2026-27/0001`. */
+	number: string,
+	/**  Local issue date `YYYY-MM-DD`. */
+	issuedOn: string,
+	/**  Patient display name. */
+	patientName: string,
+	/**  Patient code. */
+	patientCode: string,
+	/**  RFC3339 visit instant. */
+	visitOn: string,
+	/**  Invoice lines. */
+	lines: LineDto[],
+	/**  Totals. */
+	totals: TotalsView,
+	/**  Discount. */
+	discount: DiscountDto,
+	/**  Live payments only. */
+	payments: PaymentView[],
+	/**  Paid (live payments), paise. */
+	paidPaise: number,
+	/**  Balance, paise. */
+	balancePaise: number,
+	/**  `amount_in_words(paid_paise)`. */
+	paidInWords: string,
+	/**  CANCELLED watermark. */
+	void: boolean,
+	/**  UPI QR when balance > 0 and a VPA is set. */
+	upiQrDataUrl: string | null,
+};
+
 /**  Recent-list input (`patient_recent`, PSR-007). */
 export type RecentRequest = {
 	/**  How many recent patients to return (capped at 20). */
@@ -1172,6 +1605,35 @@ export type RemovableDrives = {
 	/**  The mounted removable drives found, newest-first order not guaranteed. */
 	drives: RemovableDrive[],
 };
+
+/**  `report_export` request. */
+export type ReportExportRequest = {
+	/**  Which report. */
+	report: ReportSpec,
+	/**  CSV or xlsx. */
+	format: ExportFormat,
+};
+
+/**  `report_export` response (no path ever crosses to the UI). */
+export type ReportExportResult = {
+	/**  `false` when the picker was cancelled. */
+	saved: boolean,
+	/**  Saved file name (never a path). */
+	fileName: string | null,
+	/**  Body rows written. */
+	rowCount: number,
+};
+
+/**  Which report to export. */
+export type ReportSpec = 
+/**  The daily collection of one local date. */
+{ type: "daily"; 
+/**  Local date `YYYY-MM-DD`. */
+date: string } | 
+/**  The monthly summary of one month. */
+{ type: "monthly"; 
+/**  Month `YYYY-MM`. */
+month: string };
 
 /**  Result of `restore_apply` (BAK-003). */
 export type RestoreApplyResponse = {
@@ -1343,8 +1805,8 @@ export type SearchResponse = {
 
 /**
  *  One row for the S04 search list and S05 patient list (PSR-005/008). Full
- *  demographics the row renders; `dues_paise` is always 0 at R2 (billing is R5,
- *  R-DEL-002); `match_type` is the ranking tag ("" for list rows).
+ *  demographics the row renders; `dues_paise` is the running patient balance
+ *  (R5); `match_type` is the ranking tag ("" for list rows).
  */
 export type SearchRow = {
 	/**  UUIDv7 id. */
@@ -1363,7 +1825,10 @@ export type SearchRow = {
 	city: string | null,
 	/**  RFC3339 most-recent-visit instant, or `None` (NULL at R2). */
 	lastVisitAt: string | null,
-	/**  Outstanding dues, integer paise. ALWAYS 0 for R2 (R-DEL-002, R-DATA-004). */
+	/**
+	 *  Outstanding dues (running patient balance), integer paise (R5,
+	 *  R-DATA-004).
+	 */
 	duesPaise: number,
 	/**
 	 *  Match-type tag for the ranking display (PSR-004): one of `exact_id`,
@@ -1571,12 +2036,14 @@ export type TodayPatientRow = {
 	photoPath: string | null,
 	/**  Next-follow-up date (RFC3339 date), or `None`. */
 	nextFollowupOn: string | null,
-	/**  Outstanding dues in paise (0 at R3 — billing not built, R-DEL-002). */
+	/**  Outstanding dues in paise (the running patient balance, R5). */
 	duesPaise: number,
 };
 
 /**  A Today-list registered-visit row (today's registered visits). */
 export type TodayVisitRow = {
+	/**  R5: the visit id (Bill button target). */
+	visitId: string,
 	/**  Patient id. */
 	patientId: string,
 	/**  Patient code. */
@@ -1589,6 +2056,20 @@ export type TodayVisitRow = {
 	visitAt: string,
 	/**  Visit type. */
 	type: string,
+	/**  R5: the visit's live bill, or `None`. */
+	bill: VisitBill | null,
+};
+
+/**  Computed totals. */
+export type TotalsView = {
+	/**  Per-line amounts, input order. */
+	lineAmountsPaise: number[],
+	/**  Subtotal. */
+	subtotalPaise: number,
+	/**  Discount. */
+	discountPaise: number,
+	/**  Total. */
+	totalPaise: number,
 };
 
 /**
@@ -1663,6 +2144,18 @@ export type UpdatePatientRequest = {
 	consentAt: string | null,
 };
 
+/**  `invoice_upi_qr` response. */
+export type UpiQrView = {
+	/**  A QR can be shown. */
+	available: boolean,
+	/**  `upi://pay?...`. */
+	upiUrl: string | null,
+	/**  `data:image/svg+xml;base64,...`. */
+	qrDataUrl: string | null,
+	/**  Amount encoded (the balance). */
+	amountPaise: number,
+};
+
 /**
  *  The ONLY error shape the UI ever receives.
  * 
@@ -1690,6 +2183,36 @@ export type VerifyBackupResponse = {
 	decryptOk: boolean,
 };
 
+/**  Bill summary of one visit. */
+export type VisitBill = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  Receipt number. */
+	number: string,
+	/**  Total. */
+	totalPaise: number,
+	/**  Balance. */
+	balancePaise: number,
+};
+
+/**  `billing_visit_status` response. */
+export type VisitBillingStatus = {
+	/**  Visit id. */
+	visitId: string,
+	/**  Patient id. */
+	patientId: string,
+	/**  Patient running dues. */
+	patientDuesPaise: number,
+	/**  This visit's live bill, if any. */
+	bill: VisitBill | null,
+};
+
+/**  `billing_visit_status`. */
+export type VisitIdRequest = {
+	/**  Visit id. */
+	visitId: string,
+};
+
 /**  A visit timeline entry (PAT-005): one saved visit of the patient. */
 export type VisitSummary = {
 	/**  Visit id. */
@@ -1703,6 +2226,11 @@ export type VisitSummary = {
 	kind: string,
 	/**  Headline remedy label, or `None` (the Rx engine is R4). */
 	headlineRemedyLabel: string | null,
+	/**
+	 *  R5: this visit's live bill (number, total, balance), or `None` when
+	 *  not billed.
+	 */
+	bill: VisitBill | null,
 };
 
 /* Tauri Specta runtime */
