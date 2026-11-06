@@ -95,6 +95,13 @@ pub fn migrations() -> &'static [Migration] {
             target: 11,
             sql: include_str!("migrations/0011_case_template_journal.sql"),
         },
+        // R5 (HC-MVP1-148..153, BILL-001..006, ADR 0021): billing tables
+        // receipt_sequence / invoice / invoice_line / payment. Purely additive
+        // (no ALTER of existing tables); money in INTEGER paise. Forward-only.
+        Migration {
+            target: 12,
+            sql: include_str!("migrations/0012_billing.sql"),
+        },
     ]
 }
 

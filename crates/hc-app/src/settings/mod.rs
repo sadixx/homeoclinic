@@ -67,6 +67,10 @@ pub struct ClinicSettings {
     /// Default follow-up fee, integer paise.
     #[specta(type = specta_typescript::Number)]
     pub fee_followup_paise: i64,
+    /// R5 (BILL-005): clinic UPI ID (VPA) for the payment QR; `None` = unset.
+    /// Stored as `app_setting` key `clinic_upi_vpa` in the same single-audit
+    /// Save.
+    pub upi_vpa: Option<String>,
 }
 
 /// App preferences of the General form.
@@ -245,6 +249,15 @@ struct ValidForm {
     autolock_minutes: u16,
     font_size: FontSize,
     camera_json: Option<String>,
+    upi_vpa: Option<String>,
+}
+
+/// R5 (BILL-005): blank = unset; otherwise a valid VPA (trimmed).
+fn check_vpa(raw: Option<String>) -> Result<Option<String>, AppError> {
+    match raw {
+        Some(v) if !v.trim().is_empty() => Ok(Some(hc_domain::billing::validate_vpa(&v)?)),
+        _ => Ok(None),
+    }
 }
 
 fn validate(req: SaveGeneralSettingsRequest) -> Result<ValidForm, AppError> {
@@ -269,6 +282,7 @@ fn validate(req: SaveGeneralSettingsRequest) -> Result<ValidForm, AppError> {
         autolock_minutes: req.app.autolock_minutes,
         font_size: req.app.font_size,
         camera_json: check_camera(req.app.default_camera)?,
+        upi_vpa: check_vpa(req.clinic.upi_vpa)?,
     })
 }
 
@@ -309,6 +323,7 @@ impl ValidForm {
             autolock_minutes: self.autolock_minutes,
             font_size: font_size_str(self.font_size).to_string(),
             default_camera_json: self.camera_json.clone(),
+            upi_vpa: self.upi_vpa.clone(),
         }
     }
 }
@@ -362,6 +377,7 @@ impl<'a> SettingsService<'a> {
                 gstin: rec.clinic.gstin,
                 fee_first_paise: rec.clinic.fee_first_paise,
                 fee_followup_paise: rec.clinic.fee_followup_paise,
+                upi_vpa: rec.upi_vpa,
             },
             app: AppPrefs {
                 id_prefix: rec.id_prefix,

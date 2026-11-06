@@ -68,6 +68,14 @@ pub enum ErrorCode {
     /// MS (SET-006): the data was moved but the app could not reopen it, so it
     /// was locked; the PIN unlock opens the new folder.
     DataFolderReopenFailed,
+    /// R5 (BILL-002): the payment is more than the amount due.
+    PaymentExceedsBalance,
+    /// R5 (BILL-001): an edit would make the total less than what was paid.
+    TotalBelowPaid,
+    /// R5 (BILL-001): the bill was cancelled (void) and cannot be changed.
+    InvoiceVoided,
+    /// R5 (BILL-004): the report file could not be written.
+    ExportFailed,
     /// A boot-time command read (`setup_get_state` / `auth_get_lock_state`)
     /// failed at the IPC transport/serialisation layer rather than returning a
     /// mapped `UserFacingError` (SET-001, SET-004; handoff 46). Produced by the
@@ -165,6 +173,18 @@ pub enum AppError {
     /// MS (SET-006): moved, but the reopen failed; the app was locked.
     #[error("data folder reopen failed")]
     DataFolderReopenFailed,
+    /// R5 (BILL-002): payment larger than the balance.
+    #[error("payment exceeds balance")]
+    PaymentExceedsBalance,
+    /// R5 (BILL-001): edited total below the amount already paid.
+    #[error("total below paid")]
+    TotalBelowPaid,
+    /// R5 (BILL-001): the invoice is void.
+    #[error("invoice voided")]
+    InvoiceVoided,
+    /// R5 (BILL-004): the export file could not be written.
+    #[error("export failed")]
+    ExportFailed,
 }
 
 /// Map any internal error to the UI-facing value.
@@ -266,6 +286,40 @@ pub fn map_error(err: &AppError) -> UserFacingError {
             message: "Your data was moved. Unlock HomeoClinic to continue.".to_string(),
             suggested_action: "Unlock with your PIN, then check your patients.".to_string(),
         },
+        AppError::PaymentExceedsBalance => UserFacingError {
+            code: ErrorCode::PaymentExceedsBalance,
+            message: "The payment is more than the amount due.".to_string(),
+            suggested_action: "Enter an amount up to the balance and try again.".to_string(),
+        },
+        AppError::TotalBelowPaid => UserFacingError {
+            code: ErrorCode::TotalBelowPaid,
+            message: "The bill total cannot be less than what was already paid.".to_string(),
+            suggested_action: "Cancel a payment first, then change the bill.".to_string(),
+        },
+        AppError::InvoiceVoided => UserFacingError {
+            code: ErrorCode::InvoiceVoided,
+            message: "This bill was cancelled.".to_string(),
+            suggested_action: "Create a new bill for the visit.".to_string(),
+        },
+        AppError::ExportFailed => UserFacingError {
+            code: ErrorCode::ExportFailed,
+            message: "The report could not be saved.".to_string(),
+            suggested_action: "Choose another folder and try again.".to_string(),
+        },
+    }
+}
+
+/// R5 (design §6.4): map a pure billing rule error to the app error.
+impl From<hc_domain::billing::BillingError> for AppError {
+    fn from(err: hc_domain::billing::BillingError) -> Self {
+        use hc_domain::billing::BillingError;
+        match err {
+            BillingError::Invalid | BillingError::DiscountTooLarge => {
+                AppError::Validation(hc_domain::error::DomainError::Invalid)
+            }
+            BillingError::ExceedsBalance => AppError::PaymentExceedsBalance,
+            BillingError::TotalBelowPaid => AppError::TotalBelowPaid,
+        }
     }
 }
 

@@ -11,6 +11,7 @@
 pub mod attachment;
 pub mod auth;
 pub mod backup;
+pub mod billing;
 pub mod clock;
 pub mod commands;
 pub mod data_folder;
@@ -18,6 +19,7 @@ pub mod error;
 pub mod licence;
 pub mod logging;
 pub mod patient;
+pub mod reports;
 pub mod settings;
 pub mod setup;
 pub mod state;
@@ -124,7 +126,22 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::settings::settings_pick_data_folder,
                 commands::settings::settings_move_data_folder,
                 commands::settings::settings_recheck_data_folder,
-                commands::settings::settings_forget_data_folder
+                commands::settings::settings_forget_data_folder,
+                // R5 billing + reports (BILL-001..005, HC-MVP1-148..153).
+                commands::billing::invoice_get_for_visit,
+                commands::billing::invoice_compute_totals,
+                commands::billing::invoice_save,
+                commands::billing::payment_add,
+                commands::billing::payment_void,
+                commands::billing::invoice_void,
+                commands::billing::invoice_upi_qr,
+                commands::billing::receipt_get,
+                commands::billing::billing_visit_status,
+                commands::billing::patient_dues_get,
+                commands::billing::patient_clear_dues,
+                commands::reports::report_daily_collection,
+                commands::reports::report_monthly_summary,
+                commands::reports::report_export
             ]
         };
         (with_e2e) => {
@@ -200,6 +217,21 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
                 commands::settings::settings_move_data_folder,
                 commands::settings::settings_recheck_data_folder,
                 commands::settings::settings_forget_data_folder,
+                // R5 billing + reports (BILL-001..005, HC-MVP1-148..153).
+                commands::billing::invoice_get_for_visit,
+                commands::billing::invoice_compute_totals,
+                commands::billing::invoice_save,
+                commands::billing::payment_add,
+                commands::billing::payment_void,
+                commands::billing::invoice_void,
+                commands::billing::invoice_upi_qr,
+                commands::billing::receipt_get,
+                commands::billing::billing_visit_status,
+                commands::billing::patient_dues_get,
+                commands::billing::patient_clear_dues,
+                commands::reports::report_daily_collection,
+                commands::reports::report_monthly_summary,
+                commands::reports::report_export,
                 // DEV/E2E ONLY (feature e2e-test-keys): synthetic fixture
                 // import through the real create path (OPTION A seeding).
                 commands::patient::patient_import_fixture

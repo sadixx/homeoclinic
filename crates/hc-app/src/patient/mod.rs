@@ -245,6 +245,9 @@ pub struct VisitSummary {
     pub kind: String,
     /// Headline remedy label, or `None` (the Rx engine is R4).
     pub headline_remedy_label: Option<String>,
+    /// R5: this visit's live bill (number, total, balance), or `None` when
+    /// not billed.
+    pub bill: Option<crate::billing::VisitBill>,
 }
 
 /// Last-prescription card (PAT-005). Until the R4 Rx engine, a PREVIEW built
@@ -274,7 +277,7 @@ pub struct FamilyMember {
 
 /// The single patient dashboard payload (PAT-005): demographics, alerts,
 /// family, the visit timeline and the last prescription (an R4 preview) are
-/// REAL; `dues_paise` is 0 (billing is R5, R-DEL-002).
+/// REAL; `dues_paise` is the R5 running patient balance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PatientDashboard {
@@ -284,7 +287,7 @@ pub struct PatientDashboard {
     pub allergies: Option<String>,
     /// Other alerts, or `None`.
     pub alerts: Option<String>,
-    /// Outstanding dues, integer paise. ALWAYS 0 for R2 (billing is R5).
+    /// Outstanding dues (running patient balance), integer paise (R5).
     #[specta(type = specta_typescript::Number)]
     pub dues_paise: i64,
     /// Visit timeline (newest first), non-deleted visits, bounded.
@@ -376,8 +379,8 @@ pub struct ExportResponse {
 // ---------------------------------------------------------------------------
 
 /// One row for the S04 search list and S05 patient list (PSR-005/008). Full
-/// demographics the row renders; `dues_paise` is always 0 at R2 (billing is R5,
-/// R-DEL-002); `match_type` is the ranking tag ("" for list rows).
+/// demographics the row renders; `dues_paise` is the running patient balance
+/// (R5); `match_type` is the ranking tag ("" for list rows).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchRow {
@@ -397,7 +400,8 @@ pub struct SearchRow {
     pub city: Option<String>,
     /// RFC3339 most-recent-visit instant, or `None` (NULL at R2).
     pub last_visit_at: Option<String>,
-    /// Outstanding dues, integer paise. ALWAYS 0 for R2 (R-DEL-002, R-DATA-004).
+    /// Outstanding dues (running patient balance), integer paise (R5,
+    /// R-DATA-004).
     #[specta(type = specta_typescript::Number)]
     pub dues_paise: i64,
     /// Match-type tag for the ranking display (PSR-004): one of `exact_id`,
@@ -770,14 +774,15 @@ impl<'a> PatientService<'a> {
     /// family, the visit timeline newest first and the last prescription
     /// (M3-RWv6 item 9). The prescription is an R4 PREVIEW read from the newest
     /// visit whose `case-rich` document holds a prescription table (the last
-    /// such table in that document). `dues_paise = 0` (billing is R5,
-    /// R-DEL-002). `data_json` is read only, never rewritten.
+    /// such table in that document). `dues_paise` is the running patient
+    /// balance and each timeline row carries its live bill (R5). `data_json`
+    /// is read only, never rewritten.
     pub fn get_dashboard(
         &self,
         pool: &Pool,
         req: GetDashboardRequest,
     ) -> Result<PatientDashboard, AppError> {
-        let (row, family, timeline) = pool.with_reader(|c| {
+        let (row, family, timeline, dues, bills) = pool.with_reader(|c| {
             let row = repo::get_patient(c, &req.patient_id)?;
             let family = repo::list_family(c, &req.patient_id)?;
             let timeline = hc_storage::visit::list_visits_for_patient(
@@ -785,7 +790,10 @@ impl<'a> PatientService<'a> {
                 &req.patient_id,
                 hc_storage::visit::PATIENT_TIMELINE_LIMIT,
             )?;
-            Ok((row, family, timeline))
+            let dues = hc_storage::billing::patient_balance(c, &req.patient_id)?.unwrap_or(0);
+            let ids: Vec<String> = timeline.iter().map(|v| v.id.clone()).collect();
+            let bills = hc_storage::billing::live_invoices_for_visits(c, &ids)?;
+            Ok((row, family, timeline, dues, bills))
         })?;
         let row = row.ok_or(AppError::NotFound)?;
 
@@ -801,10 +809,11 @@ impl<'a> PatientService<'a> {
         let visits = timeline
             .into_iter()
             .map(|v| VisitSummary {
-                visit_id: v.id,
                 visit_at: v.visit_at,
                 kind: v.visit_type,
                 headline_remedy_label: None,
+                bill: crate::billing::visit_bill_for(&bills, &v.id),
+                visit_id: v.id,
             })
             .collect();
 
@@ -847,8 +856,7 @@ impl<'a> PatientService<'a> {
             demographics,
             allergies: row.allergies,
             alerts: row.alerts,
-            // Billing is R5 (R-DEL-002): no fabricated dues.
-            dues_paise: 0,
+            dues_paise: dues,
             visits,
             last_prescription,
             family,
@@ -1393,7 +1401,7 @@ fn match_type_for_rank(rank: i64) -> String {
 }
 
 /// Build a [`SearchRow`] from a storage [`repo::PatientListRow`] + a match tag.
-/// `dues_paise` is always 0 at R2 (billing is R5, R-DEL-002). Mobile is the
+/// `dues_paise` is the running patient balance (R5). Mobile is the
 /// FULL number in MVP1 (no masking, PSR-005 open-Q). `today` anchors the age
 /// label to the app clock (A3).
 fn search_row_from(row: &repo::PatientListRow, match_type: String, today: &str) -> SearchRow {
@@ -1406,7 +1414,7 @@ fn search_row_from(row: &repo::PatientListRow, match_type: String, today: &str) 
         mobile: row.mobile.clone(),
         city: row.city.clone(),
         last_visit_at: row.last_visit_at.clone(),
-        dues_paise: 0,
+        dues_paise: row.balance_paise,
         match_type,
         photo_path: row.photo_path.clone(),
     }
@@ -1565,7 +1573,7 @@ fn decode_list_cursor(token: Option<&str>) -> Result<Option<repo::ListCursor>, A
 
 /// Render the filtered list as CSV (PSR-011). A header row plus one data row per
 /// patient. Fields are RFC-4180 quoted when they contain a comma, quote or
-/// newline. `dues` is 0 at R2 (billing is R5, R-DEL-002).
+/// newline. `dues` is the running patient balance in plain rupees (R5).
 fn render_patient_csv(rows: &[repo::PatientListRow], today: &str) -> String {
     let mut out = String::new();
     out.push_str("code,name,sex,age,mobile,city,last_visit,next_followup,dues\n");
@@ -1580,7 +1588,7 @@ fn render_patient_csv(rows: &[repo::PatientListRow], today: &str) -> String {
             r.city.clone().unwrap_or_default(),
             r.last_visit_at.clone().unwrap_or_default(),
             r.next_followup_on.clone().unwrap_or_default(),
-            "0".to_string(),
+            hc_docs::inr::rupees_plain(r.balance_paise),
         ];
         let line = fields
             .iter()

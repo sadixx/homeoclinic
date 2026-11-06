@@ -58,6 +58,7 @@ fn base_request() -> SaveGeneralSettingsRequest {
             gstin: None,
             fee_first_paise: 50_000,
             fee_followup_paise: 30_000,
+            upi_vpa: None,
         },
         app: AppPrefs {
             id_prefix: "HC-".to_string(),
@@ -495,4 +496,77 @@ fn set006_relocate_storage_errors_map_to_data_folder_errors() {
         matches!(failed, AppError::DataFolderMoveFailed),
         "got {failed:?}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// R5 (BILL-005, HC-MVP1-151): clinic UPI ID in the same single-audit Save
+// (R5 design §6.3 "Settings delta").
+// ---------------------------------------------------------------------------
+
+/// Bug caught: the clinic UPI ID is not saved (no QR ever shows), is saved
+/// with stray spaces, or the save writes more than one audit row.
+#[test]
+fn r5_save_general_persists_the_clinic_upi_id_trimmed_with_one_audit_row() {
+    let (dir, pool, _) = seeded_data_dir();
+    let clock = FixedClock;
+    let svc = SettingsService::new(&clock, &UNLOCKED);
+    let before = settings_audit_count(&pool);
+
+    let mut req = base_request();
+    req.clinic.upi_vpa = Some("  testclinic@upi ".to_string());
+    let resp = svc.save_general(&pool, dir.path(), req).expect("save ok");
+    assert!(resp.changed);
+    assert_eq!(
+        resp.settings.clinic.upi_vpa.as_deref(),
+        Some("testclinic@upi")
+    );
+    assert_eq!(
+        settings_audit_count(&pool),
+        before + 1,
+        "exactly one audit row"
+    );
+
+    let view = svc.get(&pool, dir.path()).expect("get");
+    assert_eq!(
+        view.clinic.upi_vpa.as_deref(),
+        Some("testclinic@upi"),
+        "read back after reload"
+    );
+}
+
+/// Bug caught: clearing the UPI ID leaves the old one stored (QR keeps
+/// showing a VPA the doctor removed).
+#[test]
+fn r5_save_general_clears_the_clinic_upi_id_on_none() {
+    let (dir, pool, _) = seeded_data_dir();
+    let clock = FixedClock;
+    let svc = SettingsService::new(&clock, &UNLOCKED);
+    let mut req = base_request();
+    req.clinic.upi_vpa = Some("testclinic@upi".to_string());
+    svc.save_general(&pool, dir.path(), req.clone())
+        .expect("set");
+    assert_eq!(
+        svc.get(&pool, dir.path())
+            .unwrap()
+            .clinic
+            .upi_vpa
+            .as_deref(),
+        Some("testclinic@upi"),
+        "precondition: stored"
+    );
+
+    req.clinic.upi_vpa = None;
+    svc.save_general(&pool, dir.path(), req).expect("clear");
+    assert_eq!(svc.get(&pool, dir.path()).unwrap().clinic.upi_vpa, None);
+}
+
+/// Bug caught: a malformed UPI ID is saved and every QR is unpayable.
+#[test]
+fn r5_save_general_rejects_a_malformed_clinic_upi_id() {
+    let (dir, pool, _) = seeded_data_dir();
+    for bad in ["testclinic", "test clinic@upi", "a@upi"] {
+        let mut req = base_request();
+        req.clinic.upi_vpa = Some(bad.to_string());
+        assert_rejected(&pool, dir.path(), req, bad);
+    }
 }

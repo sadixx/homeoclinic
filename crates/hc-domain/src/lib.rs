@@ -8,6 +8,8 @@
 pub mod age;
 pub mod app_info;
 pub mod attachment;
+pub mod billing;
 pub mod error;
+pub mod money;
 pub mod patient_code;
 pub mod vitals;

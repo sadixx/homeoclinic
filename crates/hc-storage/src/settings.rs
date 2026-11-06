@@ -22,6 +22,9 @@ const KEY_AUTOLOCK: &str = "autolock_minutes";
 const KEY_FONT_SIZE: &str = "font_size";
 /// `app_setting` key of the remembered camera (JSON object), absent = default.
 const KEY_CAMERA: &str = "default_camera";
+/// `app_setting` key of the clinic UPI ID (JSON string), absent = unset (R5,
+/// BILL-005).
+pub const KEY_CLINIC_UPI_VPA: &str = "clinic_upi_vpa";
 /// Auto-lock minutes when the key was never written.
 const DEFAULT_AUTOLOCK: u16 = 15;
 /// Font size when the key was never written.
@@ -43,6 +46,15 @@ pub struct GeneralSettingsRecord {
     /// Raw JSON of the remembered camera (`{"deviceId":..,"label":..}`), or
     /// `None` = system default (SET-007).
     pub default_camera_json: Option<String>,
+    /// Clinic UPI ID (VPA) for the payment QR, or `None` (R5, BILL-005).
+    pub upi_vpa: Option<String>,
+}
+
+/// The stored clinic UPI ID, or `None` when unset or unreadable (R5).
+pub fn read_upi_vpa(conn: &Connection) -> Result<Option<String>, StorageError> {
+    Ok(get_setting(conn, KEY_CLINIC_UPI_VPA)?
+        .and_then(|raw| serde_json::from_str::<String>(&raw).ok())
+        .filter(|v| !v.trim().is_empty()))
 }
 
 /// Read the record; `Ok(None)` when the doctor or clinic profile is missing.
@@ -61,6 +73,7 @@ pub fn read_general(conn: &Connection) -> Result<Option<GeneralSettingsRecord>, 
         .and_then(|raw| serde_json::from_str::<String>(&raw).ok())
         .unwrap_or_else(|| DEFAULT_FONT_SIZE.to_string());
     let default_camera_json = get_setting(conn, KEY_CAMERA)?;
+    let upi_vpa = read_upi_vpa(conn)?;
     Ok(Some(GeneralSettingsRecord {
         doctor,
         clinic,
@@ -68,6 +81,7 @@ pub fn read_general(conn: &Connection) -> Result<Option<GeneralSettingsRecord>, 
         autolock_minutes,
         font_size,
         default_camera_json,
+        upi_vpa,
     }))
 }
 
@@ -118,6 +132,7 @@ fn flat(rec: &GeneralSettingsRecord) -> Value {
         "clinic.gstin": rec.clinic.gstin,
         "clinic.fee_first_paise": rec.clinic.fee_first_paise,
         "clinic.fee_followup_paise": rec.clinic.fee_followup_paise,
+        "clinic.upi_vpa": rec.upi_vpa,
         "app.id_prefix": rec.id_prefix,
         "app.autolock_minutes": rec.autolock_minutes,
         "app.font_size": rec.font_size,
@@ -143,8 +158,9 @@ fn set_key(tx: &Transaction<'_>, key: &str, value_json: &str) -> Result<(), Stor
 /// Only the changed tables/keys are touched: `doctor_profile` and
 /// `clinic_profile` are `UPDATE`d by id (`updated_at = now`, `row_version + 1`,
 /// `created_at` kept); `patient_sequence.prefix` (id 1) is updated without
-/// touching `next_seq`; `autolock_minutes` / `font_size` / `default_camera`
-/// are upserted (the camera key is deleted on `None`).
+/// touching `next_seq`; `autolock_minutes` / `font_size` / `default_camera` /
+/// `clinic_upi_vpa` are upserted (the camera and UPI keys are deleted on
+/// `None`).
 pub fn write_general(
     tx: &Transaction<'_>,
     old: &GeneralSettingsRecord,
@@ -213,6 +229,18 @@ pub fn write_general(
                 tx.execute(
                     "DELETE FROM app_setting WHERE key = ?1",
                     params![KEY_CAMERA],
+                )?;
+            }
+        }
+    }
+
+    if old.upi_vpa != new.upi_vpa {
+        match &new.upi_vpa {
+            Some(v) => set_key(tx, KEY_CLINIC_UPI_VPA, &serde_json::to_string(v)?)?,
+            None => {
+                tx.execute(
+                    "DELETE FROM app_setting WHERE key = ?1",
+                    params![KEY_CLINIC_UPI_VPA],
                 )?;
             }
         }
