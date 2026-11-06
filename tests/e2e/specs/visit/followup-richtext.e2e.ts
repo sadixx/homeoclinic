@@ -1,7 +1,7 @@
 // @req VIS-001 VIS-002 VIS-003 CASE-005
 // @tier stable
 // @area visit
-// @targets linux
+// @targets linux, windows
 //
 // M3-RWv2 S09 follow-up — RICH-TEXT (TipTap) model (ADR 0019 #10; docs/ui/
 // S08-case-form.md; schema M3-RWv2-serialization-v3.md §9). The follow-up REUSES

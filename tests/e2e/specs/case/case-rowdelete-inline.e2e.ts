@@ -2,6 +2,7 @@
 // @tier stable
 // @area case
 // @targets linux
+// Linux only: a GDK_BACKEND=x11 1366x768 window phase.
 //
 // M3ux inline row delete in case tables, end to end on the built desktop app
 // (WebKitGTK), fresh isolated data dir, synthetic patient only, no network.

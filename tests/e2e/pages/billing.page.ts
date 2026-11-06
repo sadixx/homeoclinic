@@ -310,6 +310,14 @@ export class BillingPage {
     await this.waitForScreen(timeout);
   }
 
+  /** Dashboard visit-row Bill button (unbilled visit) -> S15 for THAT visit. */
+  async openFromDashboardBill(visitId: string, timeout = 20000): Promise<void> {
+    const btn = byTestId(`patient-dash-visit-bill-${visitId}`);
+    await btn.waitForClickable({ timeout });
+    await btn.click();
+    await this.waitForScreen(timeout);
+  }
+
   /** The dashboard dues badge text. */
   async dashboardDues(): Promise<string> {
     const d = byTestId('patient-dash-dues');

@@ -1,7 +1,7 @@
 // @req PSR-001 PSR-004 PSR-005 PSR-006
 // @tier stable
 // @area search
-// @targets linux
+// @targets linux, windows
 //
 // R2 patient-register demo (HC-MVP1-216), part 2: GLOBAL SEARCH (S04) over a
 // seeded >=200-patient multi-disease fixture. The fixture is imported into the

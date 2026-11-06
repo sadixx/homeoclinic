@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-06T09:40:24.238Z",
+  "generatedAt": "2026-11-06T11:23:18.913Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -10,7 +10,8 @@
       "tier": "regression",
       "area": "settings",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -50,7 +51,8 @@
       "tier": "regression",
       "area": "backup",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -62,7 +64,8 @@
       "tier": "regression",
       "area": "backup",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -85,7 +88,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -98,7 +102,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -128,7 +133,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -154,7 +160,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -168,7 +175,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -183,7 +191,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -207,7 +216,8 @@
       "tier": "stable",
       "area": "home",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -221,7 +231,8 @@
       "tier": "stable",
       "area": "patients",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -235,7 +246,8 @@
       "tier": "stable",
       "area": "patients",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -249,7 +261,8 @@
       "tier": "stable",
       "area": "patients",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -305,7 +318,11 @@
       "path": "tests/e2e/specs/release/upgrade-path.e2e.ts",
       "reqs": [
         "NFR-011",
-        "NFR-042"
+        "NFR-042",
+        "BILL-001",
+        "SET-003",
+        "VIS-004",
+        "VIS-005"
       ],
       "tier": "regression",
       "area": "release",
@@ -325,7 +342,8 @@
       "tier": "stable",
       "area": "search",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -366,7 +384,8 @@
       "tier": "regression",
       "area": "settings",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -379,7 +398,8 @@
       "tier": "regression",
       "area": "settings",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -406,7 +426,8 @@
       "tier": "regression",
       "area": "settings",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -418,7 +439,8 @@
       "tier": "stable",
       "area": "settings",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -432,7 +454,8 @@
       "tier": "stable",
       "area": "visit",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     }
   ]

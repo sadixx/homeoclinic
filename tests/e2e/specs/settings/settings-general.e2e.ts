@@ -1,7 +1,7 @@
 // @req SET-002 SET-003 SET-004 SET-005 PAT-002 SUX-005 LIC-006
 // @tier regression
 // @area settings
-// @targets linux
+// @targets linux, windows
 //
 // MS (S18 Settings, General tab): one admin form, one Save.
 //

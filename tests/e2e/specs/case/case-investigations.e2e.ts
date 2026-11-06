@@ -1,7 +1,7 @@
 // @req PAT-009
 // @tier stable
 // @area case
-// @targets linux
+// @targets linux, windows
 //
 // R3 UX3 S08 Investigations — lab-report attachments (HC-MVP1-M3ux3; PAT-009;
 // docs/ui/S08-case-form.md; ADR 0017). Boot-gate aware, network disabled,

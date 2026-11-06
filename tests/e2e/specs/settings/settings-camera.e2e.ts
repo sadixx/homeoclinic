@@ -2,6 +2,7 @@
 // @tier regression
 // @area settings
 // @targets linux
+// Linux only: step 1 relies on headless xvfb with no camera (WebKitGTK / PipeWire enumeration).
 //
 // MS (S18 Settings) camera choice (SET-007, design §7).
 //

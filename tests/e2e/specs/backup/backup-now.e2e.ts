@@ -1,7 +1,7 @@
 // @req BAK-001 BAK-002 BAK-004
 // @tier regression
 // @area backup
-// @targets linux
+// @targets linux, windows
 //
 // R1 demo STEP 3, PHASE A (source install). Network disabled, fresh data dir
 // (the executor sets XDG_DATA_HOME to a per-run temp dir so app_data_dir is

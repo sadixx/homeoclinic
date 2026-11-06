@@ -1,7 +1,7 @@
 // @req CASE-001 CASE-003
 // @tier stable
 // @area case
-// @targets linux
+// @targets linux, windows
 //
 // M3-RWv4 §4 + §5 — modalities single-append table and section/entry removal
 // with confirm + renumber. Boot-gate aware, network disabled, isolated per-spec

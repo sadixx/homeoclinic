@@ -2,6 +2,7 @@
 // @tier smoke
 // @area case
 // @targets linux
+// Linux only: drives the real GTK file chooser through X11 (xwininfo, xprop, gdb).
 //
 // M3-RWv5 REAL-PICKER SMOKE (permanent; build-15). Proves the Investigations
 // upload opens the REAL native GTK file chooser without freezing the app — the

@@ -2,6 +2,7 @@
 // @tier regression
 // @area settings
 // @targets linux
+// Linux only: asserts the Linux data-folder layout $XDG_DATA_HOME/dev.homeoclinic.desktop (Windows uses %APPDATA%).
 //
 // MS (S18 Settings) data-folder move (SET-006, ADR 0020) and the boot-time
 // "data folder not available" screen.

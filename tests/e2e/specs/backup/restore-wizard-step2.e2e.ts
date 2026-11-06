@@ -2,6 +2,7 @@
 // @tier regression
 // @area backup
 // @targets linux
+// Linux only: GTK chooser seam + a GDK_BACKEND=x11 window phase.
 //
 // b23-n1 / b23-n1-d1 / b23-n1-d2: click through the VISIBLE S17 restore wizard
 // (docs/ui/S17-backup-restore.md) end to end with a REAL .hcbak: Step 1 picks

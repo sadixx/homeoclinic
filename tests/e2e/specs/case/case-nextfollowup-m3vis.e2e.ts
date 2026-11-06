@@ -2,6 +2,7 @@
 // @tier stable
 // @area case
 // @targets linux
+// Linux only: a GDK_BACKEND=x11 1366x768 window phase.
 //
 // HC-MVP1-M3vis end to end (docs/ui/S08-case-form.md): the S08 header Next
 // follow-up scheduler, F5 visit resolution and Ctrl/Cmd+S force-save, on a

@@ -2,6 +2,7 @@
 // @tier stable
 // @area settings
 // @targets linux
+// Linux only: resizes the window under GDK_BACKEND=x11 on Xvfb.
 //
 // M3-RWv5 C fluid layout: at window sizes small (the app minimum, requested
 // 900x600), large (1600x1000) and maximised, each at zoom 1.0 and 1.3, the

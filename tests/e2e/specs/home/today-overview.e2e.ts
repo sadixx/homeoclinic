@@ -1,7 +1,7 @@
 // @req VIS-004 VIS-005
 // @tier stable
 // @area home
-// @targets linux
+// @targets linux, windows
 //
 // R3 S03 Today due/overdue (HC-MVP1-217 step 3; docs/ui/S03-today.md).
 // Boot-gate aware, network disabled, isolated per-spec data dir. Single launch

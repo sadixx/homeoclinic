@@ -1,7 +1,7 @@
 // @req SET-001 SET-002 LIC-006
 // @tier regression
 // @area settings
-// @targets linux
+// @targets linux, windows
 //
 // MS (S18 Settings) route guard + tab bar.
 //

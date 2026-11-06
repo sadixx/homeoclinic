@@ -1,7 +1,7 @@
 // @req PAT-005 PAT-006 PAT-008 PAT-001
 // @tier stable
 // @area patients
-// @targets linux
+// @targets linux, windows
 //
 // R2 patient-register demo (HC-MVP1-216), part 3: the S07 dashboard and the
 // record lifecycle on a KNOWN patient (registered by the spec, so assertions
