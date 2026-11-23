@@ -236,9 +236,22 @@ describe('S15 Invoice — a line that is being filled in', () => {
     await user.click(screen.getByTestId('invoice-add-medicine'));
 
     await user.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
-    await user.clear(byPrefix('invoice-line-rate-')[1]!);
 
     await expectTotalStays('300.00');
+  });
+
+  it('drops the new line from the total again when its typed rate is cleared', async () => {
+    const user = userEvent.setup();
+    await renderInvoice();
+    await user.click(screen.getByTestId('invoice-add-medicine'));
+    await user.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
+    await user.type(byPrefix('invoice-line-rate-')[1]!, '150');
+    await expectTotalSettles('450.00');
+
+    await user.clear(byPrefix('invoice-line-rate-')[1]!);
+
+    await expectTotalSettles('300.00');
+    expect(byPrefix('invoice-line-amount-')[1]).toHaveTextContent(DASH);
   });
 
   it('keeps the total while the new line has a rate but no description yet', async () => {
