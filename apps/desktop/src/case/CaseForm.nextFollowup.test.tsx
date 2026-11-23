@@ -14,10 +14,14 @@
 //  - a click sends commands.visitSetNextFollowup({ visitId, nextFollowupOn })
 //    with a LOCAL YYYY-MM-DD date (shared/datetime), and the header
 //    `case-form-next-followup` then shows that date as DD-MM-YYYY;
-//  - a custom date is committed on blur / Enter / a short pause, never on
-//    every intermediate change; before local today it is rejected with an
-//    inline role=alert and NO command call; today itself is allowed;
-//  - one command in flight at a time; the last choice wins;
+//  - a custom date is committed ONLY on blur / Enter of a complete valid
+//    date (never by a timer, never on an intermediate segment edit); before
+//    local today it is rejected with an inline role=alert and NO command
+//    call; today itself is allowed;
+//  - a pointer click on a quick button / Clear does not first write the
+//    uncommitted custom date (data-2);
+//  - one command in flight at a time; the last choice wins, shown AND sent,
+//    and a choice is always sent to the visit it was made on (data-3);
 //  - Clear sends null and the header shows the "none" text.
 // If the implementation puts the group behind a disclosure button (to save
 // header width), the `nextFollowupGroup()` helper opens it via the button
@@ -25,7 +29,7 @@
 //
 // Clock: `Date` is faked (`vi.useFakeTimers({ toFake: ['Date'] })`), so
 // userEvent and React scheduling run on real timers (no fake-timer deadlock).
-// The custom-date pause tests additionally fake setTimeout/clearTimeout in a
+// The "no timer commit" tests additionally fake setTimeout/clearTimeout in a
 // short synchronous window (see `fakePauseTimer`). The only other fake is the
 // typed bindings dependency. Synthetic data only.
 
@@ -77,7 +81,6 @@ vi.mock('@/bindings', () => ({
 }));
 
 import { CaseForm } from './CaseForm';
-import { CUSTOM_COMMIT_MS } from './NextFollowupControl';
 import en from '@/locales/en.json';
 
 // Local wall clock 00:30 on 4 Nov 2026. In a UTC+ zone (the clinic's IST, or
@@ -321,8 +324,9 @@ describe('M3vis Next follow-up control: date maths, custom, past, clear', () => 
 
 // --- Review fixes (review-nextfollowup.json a11y-1, a11y-2, data-1, ux-1) ---
 
-// The custom-date pause (CUSTOM_COMMIT_MS) is elapsed on a FAKE clock, never
-// slept on (R-TEST-006). The form is first rendered and loaded on real timers
+// A long idle period (IDLE_MS, far beyond any plausible commit pause) is
+// elapsed on a FAKE clock, never slept on (R-TEST-006), to prove that NO
+// timer ever commits a custom date. The form is first rendered and loaded on real timers
 // (findBy/waitFor and the editor need them); then `fakePauseTimer()` also
 // fakes setTimeout/clearTimeout at the same fake instant, the control is
 // driven with fireEvent (synchronous, wrapped in act) and the pause is
@@ -341,10 +345,13 @@ function fakePauseTimer(): void {
   vi.setSystemTime(now);
 }
 
-/** Elapse exactly the custom-date pause; an armed commit timer fires. */
+/** Idle time elapsed on the fake clock; any armed commit timer would fire. */
+const IDLE_MS = 60_000;
+
+/** Elapse IDLE_MS on the fake clock (any armed commit timer would fire). */
 function elapseCommitPause(): void {
   act(() => {
-    vi.advanceTimersByTime(CUSTOM_COMMIT_MS);
+    vi.advanceTimersByTime(IDLE_MS);
   });
 }
 
@@ -447,34 +454,35 @@ describe('M3vis Next follow-up control: custom date commit (data-1)', () => {
     await waitFor(() => expect(headerText()).toContain('20-11-2026'));
   });
 
-  it('a calendar pick with focus left in the field is committed after a short pause, once', async () => {
+  it('a calendar pick / segment edits with focus left in the field are never written by a timer; Enter writes the final date once (data-2)', async () => {
+    const user = userEvent.setup();
     await renderForm();
     const input = customInput(nextFollowupGroup());
+    input.focus();
     fakePauseTimer();
+    // Valid intermediate values of a segment-by-segment edit (day "2", "5").
     fireEvent.change(input, { target: { value: '2026-11-20' } });
-    expect(setNextFollowup).not.toHaveBeenCalled();
-    act(() => {
-      vi.advanceTimersByTime(CUSTOM_COMMIT_MS - 1);
-    });
+    fireEvent.change(input, { target: { value: '2026-11-22' } });
+    fireEvent.change(input, { target: { value: '2026-11-25' } });
+    elapseCommitPause();
     expect(
       setNextFollowup,
-      'not committed before the pause has elapsed',
+      'no write while the date is still being edited, however long it idles',
     ).not.toHaveBeenCalled();
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
+    realPauseTimer();
+    expect(document.activeElement).toBe(input);
+
+    await user.keyboard('{Enter}');
+
     expect(setNextFollowup).toHaveBeenCalledTimes(1);
     expect(setNextFollowup).toHaveBeenCalledWith({
       visitId: 'v-1',
-      nextFollowupOn: '2026-11-20',
+      nextFollowupOn: '2026-11-25',
     });
-    fireEvent.blur(input);
-    expect(
-      setNextFollowup,
-      'blur after the pause does not re-send',
-    ).toHaveBeenCalledTimes(1);
-    realPauseTimer();
-    await waitFor(() => expect(headerText()).toContain('20-11-2026'));
+    await waitFor(() => expect(headerText()).toContain('25-11-2026'));
+    // Leaving the field afterwards does not write it again.
+    await user.tab();
+    expect(setNextFollowup).toHaveBeenCalledTimes(1);
   });
 
   it('a partial / invalid value and a past date are never written, even after blur and the pause', async () => {
@@ -591,5 +599,185 @@ describe('M3vis Next follow-up control: in-flight guard, last write wins (ux-1)'
     });
     await waitFor(() => expect(headerText()).toContain('19-11-2026'));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+});
+
+// --- R5 follow-ups (review-nextfollowup.json round 3, data-2 / data-3) ---
+
+describe('M3vis Next follow-up control: pointer click supersedes a pending custom date (data-2)', () => {
+  it.each([
+    ['7 days', '2026-11-11', '11-11-2026'],
+    ['2 months', '2027-01-04', '04-01-2027'],
+  ])(
+    'a real pointer click on %s while a custom date is uncommitted writes only %s, once',
+    async (name, iso, shown) => {
+      const user = userEvent.setup();
+      await renderForm();
+      const group = nextFollowupGroup();
+      const input = customInput(group);
+      await user.click(input);
+      fireEvent.change(input, { target: { value: '2026-11-20' } });
+
+      // userEvent dispatches the full pointer sequence (pointerdown,
+      // mousedown + focus move / blur, mouseup, click), as a real mouse does.
+      await user.click(
+        within(group).getByRole('button', { name: new RegExp(`^${name}$`) }),
+      );
+
+      expect(setNextFollowup).toHaveBeenNthCalledWith(1, {
+        visitId: 'v-1',
+        nextFollowupOn: iso,
+      });
+      expect(setNextFollowup).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(headerText()).toContain(shown));
+      expect(
+        customInput(group).value,
+        'the custom field shows the choice',
+      ).toBe(iso);
+      // Moving on afterwards never sends the superseded custom date.
+      await user.tab();
+      await user.tab();
+      expect(setNextFollowup).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('a real pointer click on Clear while a custom date is uncommitted writes only null, once', async () => {
+    const user = userEvent.setup();
+    openOrCreate.mockResolvedValue(openResp({ nextFollowupOn: '2026-11-25' }));
+    await renderForm();
+    await waitFor(() => expect(headerText()).toContain('25-11-2026'));
+    const group = nextFollowupGroup();
+    const input = customInput(group);
+    await user.click(input);
+    fireEvent.change(input, { target: { value: '2026-11-28' } });
+
+    await user.click(within(group).getByRole('button', { name: /^clear$/i }));
+
+    expect(setNextFollowup).toHaveBeenNthCalledWith(1, {
+      visitId: 'v-1',
+      nextFollowupOn: null,
+    });
+    expect(setNextFollowup).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(headerText()).toBe(en['case.form.nextFollowup.none']),
+    );
+    expect(customInput(group).value).toBe('');
+  });
+
+  it('keyboard: Tab away from a complete custom date still commits it, once', async () => {
+    const user = userEvent.setup();
+    await renderForm();
+    const input = customInput(nextFollowupGroup());
+    await user.click(input);
+    fireEvent.change(input, { target: { value: '2026-11-20' } });
+
+    await user.tab(); // focus moves to Clear / the next control
+
+    expect(setNextFollowup).toHaveBeenCalledTimes(1);
+    expect(setNextFollowup).toHaveBeenCalledWith({
+      visitId: 'v-1',
+      nextFollowupOn: '2026-11-20',
+    });
+    await waitFor(() => expect(headerText()).toContain('20-11-2026'));
+  });
+});
+
+describe('M3vis Next follow-up control: rapid clicks and visit switches (data-3)', () => {
+  it('rapid 7 days, 15 days, 1 month, 2 months with ordered replies: the LAST click is shown in the header and the field, and is the last write', async () => {
+    const replies = [deferred(), deferred()];
+    setNextFollowup.mockReset();
+    for (const r of replies)
+      setNextFollowup.mockImplementationOnce(() => r.promise);
+    setNextFollowup.mockResolvedValue({ ok: true });
+    await renderForm();
+    const group = nextFollowupGroup();
+
+    for (const name of [/^7 days$/, /^15 days$/, /^1 month$/, /^2 months$/]) {
+      fireEvent.click(within(group).getByRole('button', { name }));
+    }
+    expect(setNextFollowup).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      replies[0]!.resolve({ ok: true });
+      await replies[0]!.promise;
+    });
+    await waitFor(() => expect(setNextFollowup).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      replies[1]!.resolve({ ok: true });
+      await replies[1]!.promise;
+    });
+    await waitFor(() => expect(headerText()).toContain('04-01-2027'));
+
+    expect(setNextFollowup).toHaveBeenCalledTimes(2);
+    expect(setNextFollowup).toHaveBeenLastCalledWith({
+      visitId: 'v-1',
+      nextFollowupOn: '2027-01-04',
+    });
+    expect(customInput(group).value).toBe('2027-01-04');
+  });
+
+  it('a choice made after switching to another visit is sent to THAT visit at once, and the old visit’s late reply does not overwrite its header', async () => {
+    const v1Write = deferred();
+    setNextFollowup.mockReset();
+    setNextFollowup
+      .mockImplementationOnce(() => v1Write.promise)
+      .mockResolvedValue({ ok: true });
+    const view = render(
+      <CaseForm
+        patientId="p-123"
+        visitId="v-1"
+        sex="male"
+        ageYears={34}
+        visitType="first"
+      />,
+    );
+    await screen.findByTestId('case-form', undefined, { timeout: 1500 });
+
+    // v-1: 7 days, still in flight.
+    fireEvent.click(
+      within(nextFollowupGroup()).getByRole('button', { name: /^7 days$/ }),
+    );
+    expect(setNextFollowup).toHaveBeenCalledTimes(1);
+    expect(setNextFollowup).toHaveBeenLastCalledWith({
+      visitId: 'v-1',
+      nextFollowupOn: '2026-11-11',
+    });
+
+    // The route moves to v-2 (its saved next follow-up is 30 Nov).
+    openOrCreate.mockResolvedValue(
+      openResp({ visitId: 'v-2', nextFollowupOn: '2026-11-30' }),
+    );
+    view.rerender(
+      <CaseForm
+        patientId="p-123"
+        visitId="v-2"
+        sex="male"
+        ageYears={34}
+        visitType="first"
+      />,
+    );
+    await waitFor(() => expect(headerText()).toContain('30-11-2026'));
+
+    // v-2: 2 months is sent at once, to v-2 (not queued behind v-1's write).
+    fireEvent.click(
+      within(nextFollowupGroup()).getByRole('button', { name: /^2 months$/ }),
+    );
+    expect(setNextFollowup).toHaveBeenCalledTimes(2);
+    expect(setNextFollowup).toHaveBeenLastCalledWith({
+      visitId: 'v-2',
+      nextFollowupOn: '2027-01-04',
+    });
+    await waitFor(() => expect(headerText()).toContain('04-01-2027'));
+
+    // v-1's write now completes; it must not change what v-2 shows.
+    await act(async () => {
+      v1Write.resolve({ ok: true });
+      await v1Write.promise;
+      // Drain the save loop's continuation microtasks (no timers involved).
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    });
+    expect(headerText()).toContain('04-01-2027');
+    expect(customInput(nextFollowupGroup()).value).toBe('2027-01-04');
+    expect(setNextFollowup).toHaveBeenCalledTimes(2);
   });
 });

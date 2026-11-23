@@ -13,17 +13,29 @@
 // full names as visible text (WCAG 2.5.3 label-in-name) and the custom date
 // has a visible label (00-conventions §5).
 //
-// Writes:
-//  - The custom date is committed on blur / Enter, or after a short pause
-//    (CUSTOM_COMMIT_MS) so a pick from the native calendar saves without
-//    leaving the field. Intermediate values while typing a date segment by
-//    segment are never written (each write is an audit row).
+// Writes (each write is an audit row, so only committed choices are sent):
+//  - The custom date is committed ONLY on blur / Enter of a complete, valid,
+//    non-past date (or on unmount, so a picked date is never dropped). No
+//    timer commits it: a native date input reports a valid value after every
+//    segment edit once all segments are filled, so a pause-based commit wrote
+//    intermediate dates (review data-2).
+//  - A pointer press on a quick button / Clear keeps focus in the custom
+//    field (mousedown preventDefault), so the field's blur does not first
+//    write the uncommitted custom date; the button's click supersedes it.
+//    Keyboard Tab out of the field still blurs and commits it.
 //  - At most one command is in flight. A choice made while one is in flight
 //    replaces any earlier queued choice and is sent when it completes, so
-//    rapid clicks are applied in order and the LAST choice is what stays.
+//    rapid clicks are applied in order and the LAST choice is what stays
+//    (shown and saved).
+//  - The parent keys this control by visitId, so a visit switch gets a fresh
+//    instance and queue: a choice is always sent to the visit it was made on
+//    (review data-3). A reply that lands after unmount is not shown.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+} from 'react';
 import { commands } from '@/bindings';
 import { run } from '@/shared/command';
 import {
@@ -35,9 +47,6 @@ import {
 } from '@/shared/datetime';
 import { t } from '@/shared/strings';
 import type { StringKey } from '@/shared/strings';
-
-/** Pause after the last valid custom-date change before it is committed. */
-export const CUSTOM_COMMIT_MS = 800;
 
 /** One quick-schedule button: visible text (= accessible name), date. */
 interface QuickOption {
@@ -76,7 +85,10 @@ const BUTTON_CLASS =
   'whitespace-nowrap rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-60';
 
 export interface NextFollowupControlProps {
-  /** The open visit whose next follow-up is set. */
+  /**
+   * The open visit whose next follow-up is set. Render the control with
+   * `key={visitId}` so a visit switch never reuses an in-flight queue.
+   */
   readonly visitId: string;
   /** The saved next follow-up (`YYYY-MM-DD`) or `null` when none. */
   readonly value: string | null;
@@ -102,15 +114,24 @@ export function NextFollowupControl({
     onSavedRef.current = onSaved;
   });
 
+  // False once unmounted: a late reply still completes its write (to this
+  // instance's visit) but no longer touches the UI or the parent.
+  const liveRef = useRef(true);
+  useEffect(() => {
+    liveRef.current = true;
+    return () => {
+      liveRef.current = false;
+    };
+  }, []);
+
   // In-flight guard: true while a command runs; `queuedRef` holds the newest
   // choice made meanwhile (`undefined` = nothing queued; `null` = Clear).
   const inFlightRef = useRef(false);
   const queuedRef = useRef<string | null | undefined>(undefined);
 
-  // A valid, non-past custom date waiting to be committed (blur / Enter /
-  // pause), and its pause timer.
+  // A complete, valid, non-past custom date waiting for blur / Enter.
   const pendingCustomRef = useRef<string | null>(null);
-  const customTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const customInputRef = useRef<HTMLInputElement | null>(null);
 
   // Keep the custom input in step with the saved value (load / quick / clear).
   useEffect(() => {
@@ -125,19 +146,26 @@ export function NextFollowupControl({
         return;
       }
       inFlightRef.current = true;
+      // The last value the backend confirmed (what the header shows).
+      let confirmed = valueRef.current;
       let target = next;
       for (;;) {
         try {
           await run(
             commands.visitSetNextFollowup({ visitId, nextFollowupOn: target }),
           );
-          setError(null);
-          onSavedRef.current(target);
+          confirmed = target;
+          if (liveRef.current) {
+            setError(null);
+            onSavedRef.current(target);
+          }
         } catch {
           // Observable failure (R-UI-008); fixed log line, no patient data.
-          setError('saveFailed');
-          setDraft(valueRef.current ?? '');
           console.error('[CaseForm] next follow-up save failed');
+          if (liveRef.current) {
+            setError('saveFailed');
+            setDraft(confirmed ?? '');
+          }
         }
         const queued = queuedRef.current;
         if (queued === undefined) break;
@@ -150,10 +178,6 @@ export function NextFollowupControl({
   );
 
   const cancelPendingCustom = useCallback((): void => {
-    if (customTimerRef.current !== null) {
-      clearTimeout(customTimerRef.current);
-      customTimerRef.current = null;
-    }
     pendingCustomRef.current = null;
   }, []);
 
@@ -179,10 +203,10 @@ export function NextFollowupControl({
         return;
       }
       setError((e) => (e === 'past' ? null : e));
+      // Committed on blur / Enter only, never by a timer.
       pendingCustomRef.current = iso;
-      customTimerRef.current = setTimeout(commitCustom, CUSTOM_COMMIT_MS);
     },
-    [cancelPendingCustom, commitCustom],
+    [cancelPendingCustom],
   );
 
   const onCustomKeyDown = useCallback(
@@ -194,10 +218,29 @@ export function NextFollowupControl({
     [commitCustom],
   );
 
+  /**
+   * Pointer press on a quick button / Clear while the custom field has focus:
+   * keep focus there so its blur does not write the uncommitted custom date
+   * first (the click supersedes it). Keyboard focus moves are unaffected.
+   */
+  const keepCustomFocus = useCallback(
+    (e: ReactMouseEvent<HTMLButtonElement>): void => {
+      if (
+        customInputRef.current !== null &&
+        document.activeElement === customInputRef.current
+      ) {
+        e.preventDefault();
+      }
+    },
+    [],
+  );
+
   /** A quick button / Clear: supersedes any uncommitted custom date. */
   const choose = useCallback(
     (next: string | null): void => {
       cancelPendingCustom();
+      setDraft(next ?? '');
+      setError((e) => (e === 'past' ? null : e));
       void save(next);
     },
     [cancelPendingCustom, save],
@@ -216,6 +259,7 @@ export function NextFollowupControl({
             key={q.id}
             type="button"
             data-testid={`case-form-next-${q.id}`}
+            onMouseDown={keepCustomFocus}
             onClick={() => choose(q.date())}
             className={BUTTON_CLASS}
           >
@@ -227,6 +271,7 @@ export function NextFollowupControl({
             {t('case.form.nextFollowup.custom')}
           </span>
           <input
+            ref={customInputRef}
             type="date"
             data-testid="case-form-next-custom"
             min={todayIsoDate()}
@@ -245,6 +290,7 @@ export function NextFollowupControl({
           type="button"
           data-testid="case-form-next-clear"
           disabled={value === null}
+          onMouseDown={keepCustomFocus}
           onClick={() => choose(null)}
           className={BUTTON_CLASS}
         >

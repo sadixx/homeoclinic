@@ -83,7 +83,10 @@
    button is always visible and focusable (E2E waitForClickable and keyboard
    users need it), in a calm slate tone; it turns red when its row is hovered
    or focused. Sizes in rem scale with the app zoom (root 14px):
-   1.75rem = 24.5px target, 1.15rem ≈ 16px glyph. Contrast on white:
+   1.625rem = 22.75px, floored at the 24px minimum target (WCAG 2.5.8),
+   1.15rem ≈ 16px glyph. The control is centred vertically in its cell, so in
+   a single-line (26px) row it sits ~1px inside both grid lines instead of
+   crossing the bottom one (b19-a1: 24.5px from 2.8px down overflowed 1.3px). Contrast on white:
    slate-600 #475569 text 7.6:1, slate-500 #64748b ring 4.8:1, red-700 #b91c1c
    6.5:1 (on red-50 6.0:1), blue-600 #2563eb focus ring 5.2:1 — all >= 3:1.
    --------------------------------------------------------------------------- */
@@ -93,8 +96,12 @@
 
 .hc-case-editor .hc-row-delete {
   position: absolute;
-  top: 0.125rem;
+  top: 50%;
   right: 0.25rem;
+  transform: translateY(-50%);
+  /* flex: the wrapper is exactly the button's height (no line-box strut),
+     so centring the wrapper centres the circle. */
+  display: flex;
   user-select: none;
 }
 
@@ -102,8 +109,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.625rem;
+  height: 1.625rem;
   min-width: 24px;
   min-height: 24px;
   padding: 0;

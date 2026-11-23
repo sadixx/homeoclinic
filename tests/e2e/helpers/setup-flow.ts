@@ -36,7 +36,7 @@ import { expect } from '@wdio/globals';
 
 import { bootPage } from '../pages/boot.page.js';
 import { lockPage } from '../pages/lock.page.js';
-import { setupPage } from '../pages/setup.page.js';
+import { setupPage, DEFAULT_CLINIC_FEES, type ClinicFees } from '../pages/setup.page.js';
 import { shellPage } from '../pages/shell.page.js';
 import { relaunchInto } from './launch.js';
 
@@ -55,10 +55,13 @@ export const DEFAULT_PIN = '4321';
  * the app lands on Today, unlocked. Callers that need the shell/Backup can use
  * it immediately; no relaunch is required.
  */
-export async function completeFirstRunWizard(pin = DEFAULT_PIN): Promise<string> {
+export async function completeFirstRunWizard(
+  pin = DEFAULT_PIN,
+  fees: ClinicFees = DEFAULT_CLINIC_FEES,
+): Promise<string> {
   await expect(setupPage.wizard).toBeDisplayed();
   await setupPage.fillDoctorAndNext();
-  await setupPage.fillClinicAndNext();
+  await setupPage.fillClinicAndNext(fees);
   const recoveryCode = await setupPage.setPinAndRevealRecovery(pin);
   await setupPage.ackRecoveryAndNext();
   await expect(setupPage.licenceDevTrial).toBeDisplayed();

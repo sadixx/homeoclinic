@@ -1,7 +1,7 @@
 // @req CASE-001 CASE-003 CASE-005 VIS-001 NFR-030 SET-005 PAT-009
 // @tier stable
 // @area case
-// @targets linux
+// @targets linux, windows
 //
 // M3-RWv3 S08 case record — unified COMPLAINT-SECTION rich model (ADR 0019;
 // docs/ui/S08-case-form.md). The case body is ONE chronological ProseMirror

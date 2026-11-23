@@ -1,9 +1,25 @@
 // WebdriverIO + tauri-driver configuration for the HomeoClinic desktop app
-// on Linux (hc-e2e-testing: WebKitWebDriver under xvfb). macOS/Windows are
-// handled elsewhere; this file targets linux only.
+// (hc-e2e-testing). Linux: WebKitWebDriver under xvfb. Windows: Edge
+// WebDriver (msedgedriver, HC_NATIVE_DRIVER) against WebView2. macOS is not a
+// target.
 //
 // tauri-driver is a thin WebDriver proxy that spawns the platform webdriver
-// (Linux: WebKitWebDriver) and the Tauri application binary.
+// (Linux: WebKitWebDriver, Windows: msedgedriver) and the Tauri application
+// binary.
+//
+// ── SPEC SELECTION BY TARGET ─────────────────────────────────────────────────
+// HC_E2E_TARGET=<linux|windows> runs only the specs whose `// @targets` header
+// lists that target (scripts/spec-header.ts, the same parser index.json is
+// built with). The Windows CI job sets HC_E2E_TARGET=windows so the X11-only
+// specs (real GTK picker, xvfb resize, GDK_BACKEND=x11 windows) never run
+// there. Unset = every spec (the Linux job and local runs). `--spec` on the
+// command line still narrows further, as usual.
+//
+// WINDOWS DATA-DIR CAVEAT: the per-spec isolation below works through
+// XDG_DATA_HOME, which Tauri's app_data_dir() honours on Linux only. On
+// Windows app_data_dir() is the Known Folder %APPDATA%\dev.homeoclinic.desktop
+// and ignores the environment, so Windows specs share one data dir until the
+// app or the harness gains a Windows isolation lever.
 //
 // ── DATA-DIR ISOLATION (CI parity with hc-e2e-orchestrator) ─────────────────
 // The app resolves its data dir from Tauri's app.path().app_data_dir(), which
@@ -33,13 +49,15 @@ import {
   sharedBackupDir,
 } from './helpers/launch.js';
 import { startDriver, stopDriver, resolveNativeDriver } from './helpers/driver.js';
+import { E2E_TARGETS, specsForTarget } from './scripts/spec-header.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..', '..');
 
 // Cargo workspace: the Tauri app crate lives under apps/desktop/src-tauri but
 // the compiled binary lands in the shared WORKSPACE-ROOT target dir.
-const defaultBinary = path.join(repoRoot, 'target/debug/homeoclinic-desktop');
+const exe = process.platform === 'win32' ? '.exe' : '';
+const defaultBinary = path.join(repoRoot, `target/debug/homeoclinic-desktop${exe}`);
 const appBinary = process.env.HC_APP_BINARY
   ? path.resolve(process.env.HC_APP_BINARY)
   : defaultBinary;
@@ -63,13 +81,33 @@ resolveNativeDriver();
 
 const tauriDriverPort = 4444;
 
+/**
+ * The spec list: every spec, or (HC_E2E_TARGET set) only those whose @targets
+ * header lists the target. An unknown target or an empty selection fails
+ * loudly: a filter that selects nothing must never pass green.
+ */
+function selectSpecs(): string[] {
+  const target = process.env.HC_E2E_TARGET?.trim();
+  if (target === undefined || target === '') return ['./specs/**/*.e2e.ts'];
+  if (!(E2E_TARGETS as readonly string[]).includes(target)) {
+    throw new Error(`HC_E2E_TARGET=${target} is not one of ${E2E_TARGETS.join(', ')}`);
+  }
+  const picked = specsForTarget(here, target);
+  if (picked.length === 0) {
+    throw new Error(`HC_E2E_TARGET=${target}: no spec lists ${target} in its @targets header`);
+  }
+  // eslint-disable-next-line no-console
+  console.log(`[wdio] HC_E2E_TARGET=${target}: ${picked.length} spec(s): ${picked.join(', ')}`);
+  return picked.map((rel) => path.join(here, rel));
+}
+
 export const config: WebdriverIO.Config = {
   runner: 'local',
   hostname: '127.0.0.1',
   port: tauriDriverPort,
   path: '/',
 
-  specs: ['./specs/**/*.e2e.ts'],
+  specs: selectSpecs(),
   // Strictly serial: one spec (and thus one driver + one app) at a time. The
   // per-spec driver lifecycle below depends on this.
   maxInstances: 1,

@@ -143,6 +143,99 @@ pub struct RestoreOutcome {
     pub schema_version: u32,
 }
 
+/// A restore that passed every pre-swap check and is staged on disk
+/// (b23-n1-d2). Produced by [`BackupEngine::restore_prepare`]; nothing live has
+/// changed yet. [`PreparedRestore::commit`] performs the swap.
+///
+/// Holds no pool and no key, so the caller can close its live pool between
+/// prepare and commit. Dropping it without committing leaves only the staging
+/// dir, which the next prepare clears.
+#[derive(Debug)]
+pub struct PreparedRestore {
+    /// The install's data-dir root.
+    data_dir: PathBuf,
+    /// `.hc-restore-staging/` holding the staged artifacts.
+    staging: PathBuf,
+    /// The staged, re-keyed `clinic.db`.
+    staged_db: PathBuf,
+    /// The staged attachment blobs dir.
+    staged_files: PathBuf,
+    /// Where the current live DB + files are moved (`pre-restore-<stamp>/`).
+    safety: PathBuf,
+}
+
+impl PreparedRestore {
+    /// Phase 2 of a restore: move the live DB (with its `-wal`/`-shm`
+    /// sidecars) and files aside to the pre-restore safety copy (BAK-003),
+    /// rename the staged artifacts into place, then open the restored DB under
+    /// `target_key` and run forward-only migrations (NFR-011). Returns the
+    /// outcome and the OPEN, migrated pool on the live `clinic.db`, so a running
+    /// app continues on the restored data (b23-n1-d2).
+    ///
+    /// The caller MUST have dropped every [`Pool`] on the live `clinic.db`
+    /// first. An open connection would keep reading and writing the moved
+    /// file (data loss on the next launch), Windows refuses to rename an open
+    /// SQLite file, and closing an old WAL connection after the swap could
+    /// checkpoint into or unlink the new file's sidecars by path.
+    ///
+    /// If the swap fails part-way, the previous live data is moved back (best
+    /// effort) so the install is never left without a `clinic.db`.
+    pub fn commit(
+        self,
+        target_key: &dyn KeyProvider,
+    ) -> Result<(RestoreOutcome, Pool), StorageError> {
+        let live_db = self.data_dir.join("clinic.db");
+        let live_files = self.data_dir.join("files");
+        let safety_db = self.safety.join("clinic.db");
+        let safety_files = self.safety.join("files");
+
+        // 3. Pre-restore safety copy of the CURRENT data (BAK-003). The DB's
+        //    WAL/SHM sidecars move WITH it; a stale `-wal`/`-shm` left behind
+        //    would make SQLCipher replay the old WAL against the restored file
+        //    and fail page decryption.
+        std::fs::create_dir_all(&self.safety)?;
+        move_db_with_sidecars(&live_db, &safety_db)?;
+        if live_files.exists() {
+            if let Err(e) = std::fs::rename(&live_files, &safety_files) {
+                let _ = move_db_with_sidecars(&safety_db, &live_db);
+                return Err(e.into());
+            }
+        }
+
+        // 4. Swap: move the staged artifacts into place. The DB file is a
+        //    single rename within the same dir (atomic on both OSes); the
+        //    restored file is fresh and carries no WAL sidecar.
+        let swapped = std::fs::rename(&self.staged_db, &live_db)
+            .and_then(|()| std::fs::rename(&self.staged_files, &live_files));
+        if let Err(e) = swapped {
+            // Put the previous live data back so unlock finds it again.
+            let _ = std::fs::remove_dir_all(&live_files);
+            let _ = std::fs::remove_file(&live_db);
+            let _ = move_db_with_sidecars(&safety_db, &live_db);
+            if safety_files.exists() {
+                let _ = std::fs::rename(&safety_files, &live_files);
+            }
+            return Err(e.into());
+        }
+        let _ = std::fs::remove_dir_all(&self.staging);
+
+        // 5. Migrate-if-older: open under the target key and run forward-only
+        //    migrations so an older snapshot reaches this build's schema
+        //    (NFR-011). The restored DB is a fresh file, so this also stamps
+        //    user_version. The pool is handed back to the caller.
+        let restored_pool = Pool::open(&live_db, target_key)?;
+        let schema_version = crate::migrate::run(&restored_pool)?;
+
+        Ok((
+            RestoreOutcome {
+                pre_restore_backup_path: self.safety,
+                schema_version,
+            },
+            restored_pool,
+        ))
+    }
+}
+
 /// Result of verify — HC-MVP1-034.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VerifyOutcome {
@@ -402,26 +495,46 @@ impl<'a> BackupEngine<'a> {
         read_header(file)
     }
 
-    /// (HC-MVP1-033) Apply a restore from `file` using `password`. Verifies the
-    /// header and opens the body (a wrong password →
-    /// [`StorageError::WrongBackupPassword`]), takes a safety copy of the
-    /// current data dir, re-keys the plaintext snapshot under `target_key`
-    /// (design §5), migrates if the archive is older (NFR-011), then atomically
-    /// swaps. Nothing live is touched on a pre-swap failure.
+    /// (HC-MVP1-033) Apply a restore from `file` using `password`: the
+    /// one-shot form of [`Self::restore_prepare`] + [`PreparedRestore::commit`].
+    /// The restored pool is dropped before returning.
+    ///
+    /// This form runs the swap while the bound live pool is still open, so it
+    /// is only correct when the caller does not keep using that pool and the
+    /// platform allows renaming an open file. A running app MUST use
+    /// `restore_prepare`, drop its live pool, then `commit` and continue on
+    /// the returned pool (b23-n1-d2).
     pub fn restore_apply(
         &self,
         file: &Path,
         password: &str,
         target_key: &dyn KeyProvider,
     ) -> Result<RestoreOutcome, StorageError> {
+        let (outcome, _restored_pool) = self
+            .restore_prepare(file, password, target_key)?
+            .commit(target_key)?;
+        Ok(outcome)
+    }
+
+    /// (HC-MVP1-033, b23-n1-d2) Phase 1 of a restore, which mutates NOTHING
+    /// live. Reads the header (rejects a bad or too-new archive), decrypts the
+    /// body (a wrong password gives [`StorageError::WrongBackupPassword`]),
+    /// and stages the re-keyed DB (under `target_key`, design §5) and the
+    /// attachment blobs in `.hc-restore-staging/`. On any error the live data
+    /// dir and the caller's open pool are untouched and still usable.
+    pub fn restore_prepare(
+        &self,
+        file: &Path,
+        password: &str,
+        target_key: &dyn KeyProvider,
+    ) -> Result<PreparedRestore, StorageError> {
         // 1. Read header (rejects bad/too-new archives) and decrypt the body
         //    (rejects a wrong password) BEFORE touching any live data.
         let header = read_header(file)?;
         let payload = self.open_body(file, password, &header)?;
 
         // 2. Build the restored artifacts in a staging dir so nothing live is
-        //    mutated until the atomic swap. If any step fails, the live data
-        //    dir is untouched.
+        //    mutated until the swap.
         let staging = self.data_dir.join(".hc-restore-staging");
         if staging.exists() {
             std::fs::remove_dir_all(&staging)?;
@@ -440,41 +553,16 @@ impl<'a> BackupEngine<'a> {
             std::fs::write(staged_files.join(&att.name), &att.blob)?;
         }
 
-        // 3. Pre-restore safety copy of the CURRENT data (BAK-003): the live DB
-        //    + files are moved aside before the swap, so a failure is
-        //    recoverable and the swap itself is a rename. The DB's WAL/SHM
-        //    sidecars move WITH it; leaving a stale `-wal`/`-shm` behind would
-        //    make SQLCipher replay the old WAL against the restored file and
-        //    fail page decryption, so they are relocated too.
         let safety = self.data_dir.join(format!(
             "pre-restore-{}",
             stamp_to_file_token(&self.clock.now_rfc3339())
         ));
-        std::fs::create_dir_all(&safety)?;
-        let live_db = self.data_dir.join("clinic.db");
-        move_db_with_sidecars(&live_db, &safety.join("clinic.db"))?;
-        let live_files = self.data_dir.join("files");
-        if live_files.exists() {
-            std::fs::rename(&live_files, safety.join("files"))?;
-        }
-
-        // 4. Atomic swap: move the staged artifacts into place. The DB file is a
-        //    single rename within the same dir (atomic on both OSes); the
-        //    restored file is fresh and carries no WAL sidecar.
-        std::fs::rename(&staged_db, &live_db)?;
-        std::fs::rename(&staged_files, &live_files)?;
-        let _ = std::fs::remove_dir_all(&staging);
-
-        // 5. Migrate-if-older: open under the target key and run forward-only
-        //    migrations so an older snapshot reaches this build's schema
-        //    (NFR-011). The restored DB is a fresh file, so this also stamps
-        //    user_version.
-        let restored_pool = Pool::open(&live_db, target_key)?;
-        let schema_version = crate::migrate::run(&restored_pool)?;
-
-        Ok(RestoreOutcome {
-            pre_restore_backup_path: safety,
-            schema_version,
+        Ok(PreparedRestore {
+            data_dir: self.data_dir.to_path_buf(),
+            staging,
+            staged_db,
+            staged_files,
+            safety,
         })
     }
 

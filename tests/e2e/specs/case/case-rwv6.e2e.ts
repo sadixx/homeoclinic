@@ -1,7 +1,7 @@
 // @req CASE-001, CASE-003, VIS-001, PAT-005, PAT-009
 // @tier stable
 // @area case
-// @targets linux
+// @targets linux, windows
 //
 // M3-RWv6 S08 case editor + S07 dashboard refinements, end to end on a fresh,
 // isolated data dir (synthetic patients only, no network). Case-form items:

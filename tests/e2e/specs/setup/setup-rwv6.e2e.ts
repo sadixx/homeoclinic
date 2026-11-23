@@ -1,7 +1,7 @@
 // @req SET-002, SET-003
 // @tier stable
 // @area settings
-// @targets linux
+// @targets linux, windows
 //
 // M3-RWv6 S01 first-run setup refinements, driven through the real wizard on
 // a fresh, isolated data dir (no network, synthetic data only):

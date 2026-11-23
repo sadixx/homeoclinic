@@ -77,6 +77,33 @@ export const commands = {
 	 */
 	listRemovableDrives: () => typedError<RemovableDrives, UserFacingError>(__TAURI_INVOKE("list_removable_drives")),
 	/**
+	 *  (`backup_pick_restore_file`) Open the OS file-open dialog filtered to
+	 *  `.hcbak` and return the chosen archive path for S17 restore Step 1
+	 *  (BAK-003, b23-n1-d1). Lets the UI obtain a `file_path` for
+	 *  `restore_preview` / `restore_apply` without constructing a filesystem path
+	 *  (architecture rule). Gated by the `dialog:allow-open` capability only (no
+	 *  fs/shell/opener scope); the dialog grants no filesystem read. When a
+	 *  removable drive is mounted the dialog starts there (backups usually live on
+	 *  a USB stick); otherwise it uses the OS default. No DB access, so it works
+	 *  whether or not the app is unlocked. The chosen path is never logged
+	 *  (R-PRIV-001). Interactive, so E2E-tested (real-picker smoke), not
+	 *  cargo-tested.
+	 * 
+	 *  Determinism seam (DEV/E2E ONLY, feature `e2e-test-keys`, ADR 0017): the
+	 *  native GTK chooser cannot be driven by webdriver, so under the E2E-only
+	 *  build feature this command FIRST consults `HC_E2E_RESTORE_FILE`; if it
+	 *  names a path that exists, that path is returned and the dialog is skipped.
+	 *  Same pattern as `HC_E2E_REPORT_FILE` in `visit_pick_report_file`. Compiled
+	 *  OUT of the release/public build, which always opens the native picker.
+	 * 
+	 *  Threading (M3-RWv5): this MUST be an async command. A sync command runs
+	 *  inline on the GTK main thread, where a blocking dialog wait deadlocks the
+	 *  main loop. The non-blocking `pick_file(callback)` is bridged through a
+	 *  tokio oneshot and awaited on the async runtime instead; the drive lookup
+	 *  (directory reads) runs on the blocking pool.
+	 */
+	backupPickRestoreFile: () => typedError<PickRestoreFileResponse, UserFacingError>(__TAURI_INVOKE("backup_pick_restore_file")),
+	/**
 	 *  (`backup_now`) Manual backup to a chosen folder or USB with a password
 	 *  (BAK-002/004, SUX-011). The password is required and ≥ 8 chars (OQ-S17-2).
 	 *  `remember_password` is accepted for the S17 contract; persisting it to the
@@ -94,6 +121,12 @@ export const commands = {
 	 *  re-key under THIS install's DEK → migrate-if-older. Requires the app to be
 	 *  unlocked so the retained target DEK is available (design §5 / ADR 0014); a
 	 *  wrong backup password is refused before anything live changes (AC4).
+	 * 
+	 *  The session continues on the restored data (b23-n1-d2): the old pool is
+	 *  closed before the swap and a migrated pool on the restored `clinic.db` is
+	 *  stored back in [`AppState`]. If the restored DB cannot be reopened, the app
+	 *  is locked and `restore_reopen_failed` is returned so the UI routes to the
+	 *  unlock screen. See [`restore_apply_in_state`].
 	 */
 	restoreApply: (filePath: string, password: string) => typedError<RestoreApplyResponse, UserFacingError>(__TAURI_INVOKE("restore_apply", { filePath, password })),
 	/**  (`verify_backup`) Checksum + decrypt-test an existing archive (BAK-004). */
@@ -214,9 +247,71 @@ export const commands = {
 	 *  through a tokio oneshot and awaited on the async runtime instead.
 	 */
 	visitPickReportFile: () => typedError<PickReportFileResponse, UserFacingError>(__TAURI_INVOKE("visit_pick_report_file")),
+	/**  Read the S18 General values (`settings_get`). */
+	settingsGet: () => typedError<SettingsView, UserFacingError>(__TAURI_INVOKE("settings_get")),
+	/**
+	 *  Save the whole S18 General form: one transaction, one audit row
+	 *  (`settings_save_general`).
+	 */
+	settingsSaveGeneral: (req: SaveGeneralSettingsRequest) => typedError<SaveGeneralSettingsResponse, UserFacingError>(__TAURI_INVOKE("settings_save_general", { req })),
+	/**
+	 *  Open the OS folder picker for a new data-folder parent
+	 *  (`settings_pick_data_folder`). `None` = cancelled.
+	 */
+	settingsPickDataFolder: () => typedError<PickDataFolderResponse, UserFacingError>(__TAURI_INVOKE("settings_pick_data_folder")),
+	/**  Move the data folder to `<parent>/HomeoClinic` (`settings_move_data_folder`). */
+	settingsMoveDataFolder: (req: MoveDataFolderRequest) => typedError<MoveDataFolderResponse, UserFacingError>(__TAURI_INVOKE("settings_move_data_folder", { req })),
+	/**
+	 *  Check again whether the pointed data folder is present
+	 *  (`settings_recheck_data_folder`).
+	 */
+	settingsRecheckDataFolder: () => typedError<DataFolderCheck, UserFacingError>(__TAURI_INVOKE("settings_recheck_data_folder")),
+	/**
+	 *  Forget the missing pointed folder and use the default location
+	 *  (`settings_forget_data_folder`).
+	 */
+	settingsForgetDataFolder: () => typedError<null, UserFacingError>(__TAURI_INVOKE("settings_forget_data_folder")),
+	/**  S15 load: the visit's invoice, or an unsaved proposal. */
+	invoiceGetForVisit: (req: InvoiceGetForVisitRequest) => typedError<InvoiceScreen, UserFacingError>(__TAURI_INVOKE("invoice_get_for_visit", { req })),
+	/**  S15 live totals (pure; the UI never does money maths). */
+	invoiceComputeTotals: (req: ComputeTotalsRequest) => typedError<TotalsView, UserFacingError>(__TAURI_INVOKE("invoice_compute_totals", { req })),
+	/**  S15 Save: issue (first save, assigns the receipt number) or update. */
+	invoiceSave: (req: InvoiceSaveRequest) => typedError<InvoiceScreen, UserFacingError>(__TAURI_INVOKE("invoice_save", { req })),
+	/**  Record one payment against a saved invoice. */
+	paymentAdd: (req: PaymentAddRequest) => typedError<InvoiceScreen, UserFacingError>(__TAURI_INVOKE("payment_add", { req })),
+	/**  Cancel a mistaken payment (with a reason). */
+	paymentVoid: (req: PaymentVoidRequest) => typedError<InvoiceScreen, UserFacingError>(__TAURI_INVOKE("payment_void", { req })),
+	/**  Cancel a bill (keeps its number; voids its payments). */
+	invoiceVoid: (req: InvoiceVoidRequest) => typedError<InvoiceScreen, UserFacingError>(__TAURI_INVOKE("invoice_void", { req })),
+	/**  Clinic UPI QR for the invoice balance. */
+	invoiceUpiQr: (req: InvoiceIdRequest) => typedError<UpiQrView, UserFacingError>(__TAURI_INVOKE("invoice_upi_qr", { req })),
+	/**  The receipt document (S14-lite print route). */
+	receiptGet: (req: InvoiceIdRequest) => typedError<ReceiptDoc, UserFacingError>(__TAURI_INVOKE("receipt_get", { req })),
+	/**  Billing state of one visit + patient dues (case strip, chips). */
+	billingVisitStatus: (req: VisitIdRequest) => typedError<VisitBillingStatus, UserFacingError>(__TAURI_INVOKE("billing_visit_status", { req })),
+	/**  Patient dues + open invoices (Clear-dues dialog). */
+	patientDuesGet: (req: PatientIdRequest) => typedError<PatientDues, UserFacingError>(__TAURI_INVOKE("patient_dues_get", { req })),
+	/**  Clear dues: one payment allocated oldest-first, one audit row. */
+	patientClearDues: (req: ClearDuesRequest) => typedError<ClearDuesResult, UserFacingError>(__TAURI_INVOKE("patient_clear_dues", { req })),
+	/**  Daily collection by mode (S16). */
+	reportDailyCollection: (req: DailyCollectionRequest) => typedError<DailyCollection, UserFacingError>(__TAURI_INVOKE("report_daily_collection", { req })),
+	/**  Monthly summary (S16). */
+	reportMonthlySummary: (req: MonthlySummaryRequest) => typedError<MonthlySummary, UserFacingError>(__TAURI_INVOKE("report_monthly_summary", { req })),
+	/**  Pick a folder and export the report as CSV / xlsx (S16). */
+	reportExport: (req: ReportExportRequest) => typedError<ReportExportResult, UserFacingError>(__TAURI_INVOKE("report_export", { req })),
 };
 
 /* Types */
+/**  One Clear-dues allocation. */
+export type Allocation = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  Receipt number. */
+	number: string,
+	/**  Amount allocated. */
+	amountPaise: number,
+};
+
 /**
  *  Read-only description of the running application build.
  * 
@@ -231,6 +326,18 @@ export type AppInfo = {
 	version: string,
 	/**  Build profile the binary was compiled in. */
 	build_profile: BuildProfile,
+};
+
+/**  App preferences of the General form. */
+export type AppPrefs = {
+	/**  Patient-ID prefix (PAT-002). */
+	idPrefix: string,
+	/**  Idle auto-lock minutes (SET-004). */
+	autolockMinutes: number,
+	/**  Font size (SET-005). */
+	fontSize: FontSize,
+	/**  Remembered camera, or `None` = system default (SET-007). */
+	defaultCamera: CameraChoice | null,
 };
 
 /**
@@ -338,6 +445,26 @@ export type BackupStatus = {
 	stale: boolean,
 };
 
+/**  Patient header of the invoice screen. */
+export type BillPatient = {
+	/**  Patient id. */
+	patientId: string,
+	/**  Patient code. */
+	code: string,
+	/**  Display name. */
+	name: string,
+};
+
+/**  Visit header of the invoice screen. */
+export type BillVisit = {
+	/**  Visit id. */
+	visitId: string,
+	/**  RFC3339 visit instant. */
+	visitAt: string,
+	/**  Visit type code. */
+	visitType: string,
+};
+
 /**
  *  Which Cargo/Vite profile produced this build.
  * 
@@ -349,6 +476,17 @@ export type BuildProfile =
 "debug" | 
 /**  Compiled in release mode (an optimised, shipped build). */
 "release";
+
+/**
+ *  A remembered camera choice (SET-007). `device_id` is the webview
+ *  `MediaDeviceInfo.deviceId`; `label` is kept to re-match when the id changes.
+ */
+export type CameraChoice = {
+	/**  Webview device id. */
+	deviceId: string,
+	/**  Device label at the time it was chosen. */
+	label: string,
+};
 
 /**  `case_visit_autosave` request (CASE-005). */
 export type CaseAutosaveRequest = {
@@ -379,10 +517,60 @@ export type CheckDuplicateResponse = {
 	matches: DuplicateMatch[],
 };
 
+/**  `patient_clear_dues`. */
+export type ClearDuesRequest = {
+	/**  Patient id. */
+	patientId: string,
+	/**  The payment. */
+	payment: PaymentInput,
+	/**  Dues the dialog opened with (stale = conflict). */
+	expectedDuesPaise: number,
+};
+
+/**  `patient_clear_dues` response. */
+export type ClearDuesResult = {
+	/**  Shared batch id. */
+	batchId: string,
+	/**  Allocations, oldest first. */
+	allocations: Allocation[],
+	/**  Dues after. */
+	duesPaise: number,
+};
+
+/**  Clinic section of the General form. Fees are integer paise. */
+export type ClinicSettings = {
+	/**  Clinic name. */
+	name: string,
+	/**  Clinic address. */
+	address: string,
+	/**  `ClinicTimingsInput` output string (or legacy text). */
+	timings: string | null,
+	/**  GSTIN. */
+	gstin: string | null,
+	/**  Default consultation fee, integer paise. */
+	feeFirstPaise: number,
+	/**  Default follow-up fee, integer paise. */
+	feeFollowupPaise: number,
+	/**
+	 *  R5 (BILL-005): clinic UPI ID (VPA) for the payment QR; `None` = unset.
+	 *  Stored as `app_setting` key `clinic_upi_vpa` in the same single-audit
+	 *  Save.
+	 */
+	upiVpa: string | null,
+};
+
 /**  Result of completing setup. */
 export type CompleteSetupResponse = {
 	/**  Route to open after setup (`"/today"`). */
 	homeRoute: string,
+};
+
+/**  `invoice_compute_totals`. */
+export type ComputeTotalsRequest = {
+	/**  Invoice lines. */
+	lines: LineDto[],
+	/**  Discount. */
+	discount: DiscountDto,
 };
 
 /**  `visit_create_followup` request (VIS-002). */
@@ -459,6 +647,52 @@ export type CreatePatientResponse = {
 	code: string,
 };
 
+/**  `report_daily_collection` response. */
+export type DailyCollection = {
+	/**  Local date `YYYY-MM-DD`. */
+	date: string,
+	/**  Always 4 rows: cash, upi, card, other. */
+	byMode: ModeRow[],
+	/**  Payments that day. */
+	totalCount: number,
+	/**  Collected that day, paise. */
+	totalPaise: number,
+	/**  Balance on non-void bills issued that day. */
+	outstandingPaise: number,
+};
+
+/**  `report_daily_collection` request. */
+export type DailyCollectionRequest = {
+	/**  Local date `YYYY-MM-DD`. */
+	date: string,
+};
+
+/**  `settings_recheck_data_folder` response. */
+export type DataFolderCheck = {
+	/**  Whether the pointed folder is present now. */
+	available: boolean,
+	/**  The pointed folder (display only). */
+	dataFolder: string,
+};
+
+/**  One day of the monthly summary. */
+export type DayRow = {
+	/**  Local date `YYYY-MM-DD`. */
+	date: string,
+	/**  Cash, paise. */
+	cashPaise: number,
+	/**  UPI, paise. */
+	upiPaise: number,
+	/**  Card, paise. */
+	cardPaise: number,
+	/**  Other, paise. */
+	otherPaise: number,
+	/**  Number of live payments. */
+	count: number,
+	/**  Collected that day, paise. */
+	totalPaise: number,
+};
+
 /**  `case_template_get_default` response — the default template (CASE-004). */
 export type DefaultTemplateResponse = {
 	/**  Template id (the fixed default id). */
@@ -504,6 +738,35 @@ export type Demographics = {
 	 *  kept so the edit form can show them and never wipe them), or `None`.
 	 */
 	maritalStatus: string | null,
+};
+
+/**  Discount on the wire. */
+export type DiscountDto = 
+/**  No discount. */
+{ kind: "none" } | 
+/**  Fixed amount. */
+{ kind: "amount"; 
+/**  Paise. */
+paise: number } | 
+/**  Percent in basis points. */
+{ kind: "percent"; 
+/**  1% = 100. */
+basisPoints: number };
+
+/**  Doctor section of the General form. */
+export type DoctorSettings = {
+	/**  Full name (identity-locked under a licence). */
+	name: string,
+	/**  Qualification. */
+	qualification: string,
+	/**  Registration number (identity-locked under a licence). */
+	regNo: string,
+	/**  Registration council (identity-locked under a licence). */
+	regCouncil: string,
+	/**  Phone, asked once; also saved as the clinic phone. */
+	phone: string | null,
+	/**  Email. */
+	email: string | null,
 };
 
 /**  One candidate duplicate (PAT-004). */
@@ -573,6 +836,41 @@ export type ErrorCode =
  */
 "backup_out_of_space" | 
 /**
+ *  A restore swapped the database but the app could not reopen it under
+ *  this install's key, so the app was LOCKED to stay safe (b23-n1-d2).
+ *  The UI routes to the unlock screen; the PIN unlock reopens and
+ *  migrates the live `clinic.db`. Never leaves a pool on the moved file.
+ */
+"restore_reopen_failed" | 
+/**
+ *  MS (LIC-006): a change to the licence-bound identity (name, reg no,
+ *  council) was refused because a real licence binds them.
+ */
+"identity_locked" | 
+/**
+ *  MS (SET-006): the chosen data folder is not usable (inline in the move
+ *  dialog).
+ */
+"data_folder_invalid" | 
+/**
+ *  MS (SET-006): copying the data failed; nothing changed, the old folder
+ *  is still in use.
+ */
+"data_folder_move_failed" | 
+/**
+ *  MS (SET-006): the data was moved but the app could not reopen it, so it
+ *  was locked; the PIN unlock opens the new folder.
+ */
+"data_folder_reopen_failed" | 
+/**  R5 (BILL-002): the payment is more than the amount due. */
+"payment_exceeds_balance" | 
+/**  R5 (BILL-001): an edit would make the total less than what was paid. */
+"total_below_paid" | 
+/**  R5 (BILL-001): the bill was cancelled (void) and cannot be changed. */
+"invoice_voided" | 
+/**  R5 (BILL-004): the report file could not be written. */
+"export_failed" | 
+/**
  *  A boot-time command read (`setup_get_state` / `auth_get_lock_state`)
  *  failed at the IPC transport/serialisation layer rather than returning a
  *  mapped `UserFacingError` (SET-001, SET-004; handoff 46). Produced by the
@@ -585,6 +883,13 @@ export type ErrorCode =
 "boot_read_failed" | 
 /**  Anything not otherwise classified. The message stays generic. */
 "unexpected";
+
+/**  Export format. */
+export type ExportFormat = 
+/**  UTF-8 CSV with a BOM (opens in Excel). */
+"csv" | 
+/**  Excel workbook (one sheet). */
+"xlsx";
 
 /**  Export input (`patient_export_pdf` / `patient_export_json`, PAT-011). */
 export type ExportRequest = {
@@ -667,6 +972,103 @@ export type HealthStatus = {
 	loggingReady: boolean,
 };
 
+/**  `invoice_get_for_visit`. */
+export type InvoiceGetForVisitRequest = {
+	/**  Visit id. */
+	visitId: string,
+	/**  The clinic-local date `YYYY-MM-DD` (±1 day of the clock). */
+	localToday: string,
+};
+
+/**  `invoice_upi_qr` / `receipt_get`. */
+export type InvoiceIdRequest = {
+	/**  Invoice id. */
+	invoiceId: string,
+};
+
+/**  `invoice_save` (create when `invoice_id` is `None`). */
+export type InvoiceSaveRequest = {
+	/**  Visit id. */
+	visitId: string,
+	/**  Invoice id. */
+	invoiceId: string | null,
+	/**  Row version the editor loaded (stale = conflict). */
+	expectedRowVersion: number | null,
+	/**  Invoice lines. */
+	lines: LineDto[],
+	/**  Discount. */
+	discount: DiscountDto,
+	/**  The payment. */
+	payment: PaymentInput | null,
+	/**  The clinic-local date `YYYY-MM-DD` (±1 day of the clock). */
+	localToday: string,
+};
+
+/**  The whole S15 screen payload. */
+export type InvoiceScreen = {
+	/**  Patient. */
+	patient: BillPatient,
+	/**  Visit. */
+	visit: BillVisit,
+	/**  The live (or just-voided) invoice; `None` = unbilled. */
+	invoice: InvoiceView | null,
+	/**  Prefilled lines when unbilled. */
+	proposal: LineDto[] | null,
+	/**  Patient running dues after this operation. */
+	patientDuesPaise: number,
+	/**  Clinic VPA is set. */
+	upiConfigured: boolean,
+	/**  GSTIN (snapshot if issued, else current). */
+	gstin: string | null,
+};
+
+/**  Invoice status. */
+export type InvoiceStatus = 
+/**  Issued (live). */
+"issued" | 
+/**  Cancelled; number kept. */
+"void";
+
+/**  One saved invoice. */
+export type InvoiceView = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  Optimistic-concurrency version. */
+	rowVersion: number,
+	/**  Receipt number `2026-27/0001`. */
+	number: string,
+	/**  FY label. */
+	fy: string,
+	/**  Local issue date. */
+	issuedOn: string,
+	/**  Status. */
+	status: InvoiceStatus,
+	/**  Live lines (ids set). */
+	lines: LineDto[],
+	/**  Discount. */
+	discount: DiscountDto,
+	/**  Totals. */
+	totals: TotalsView,
+	/**  Paid (live payments). */
+	paidPaise: number,
+	/**  Balance. */
+	balancePaise: number,
+	/**  All payments incl. cancelled. */
+	payments: PaymentView[],
+	/**  Void reason when void. */
+	voidReason: string | null,
+};
+
+/**  `invoice_void`. */
+export type InvoiceVoidRequest = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  Why (required, <= 200 chars). */
+	reason: string,
+	/**  Row version the editor loaded (stale = conflict). */
+	expectedRowVersion: number,
+};
+
 /**
  *  The licence kind the UI renders. `Trial` is the only R1 value; the others
  *  leave room for the full `Active`/`ReadOnly`/`Unlicensed` states (design §6)
@@ -696,6 +1098,29 @@ export type LicenceStatus = {
 	/**  Whether the trial/licence has expired at the effective now. */
 	expired: boolean,
 };
+
+/**  One invoice line on the wire. */
+export type LineDto = {
+	/**  Stored line id (`Some` once saved). */
+	id: string | null,
+	/**  Line kind. */
+	kind: LineKind,
+	/**  Description. */
+	description: string,
+	/**  Quantity. */
+	qty: number,
+	/**  Rate per unit, paise. */
+	ratePaise: number,
+};
+
+/**  Invoice line kind. */
+export type LineKind = 
+/**  Consultation fee. */
+"consultation" | 
+/**  Medicine (free text + manual rate until R4). */
+"medicine" | 
+/**  Any other charge. */
+"other";
 
 /**  Family-link input (`patient_link_family`, PAT-006). */
 export type LinkFamilyRequest = {
@@ -768,6 +1193,46 @@ export type LockState = {
 	autolockMinutes: number,
 };
 
+/**  One mode row (always 4 rows: cash, upi, card, other). */
+export type ModeRow = {
+	/**  Payment mode. */
+	mode: PaymentMode,
+	/**  Number of live payments. */
+	count: number,
+	/**  Sum, paise. */
+	amountPaise: number,
+};
+
+/**  `report_monthly_summary` response. */
+export type MonthlySummary = {
+	/**  `YYYY-MM`. */
+	month: string,
+	/**  Every calendar day of the month. */
+	days: DayRow[],
+	/**  Month total (`date` = the month). */
+	total: DayRow,
+};
+
+/**  `report_monthly_summary` request. */
+export type MonthlySummaryRequest = {
+	/**  Month `YYYY-MM`. */
+	month: string,
+};
+
+/**  `settings_move_data_folder` request. */
+export type MoveDataFolderRequest = {
+	/**  The parent folder returned by the picker. */
+	parentPath: string,
+};
+
+/**  `settings_move_data_folder` response. */
+export type MoveDataFolderResponse = {
+	/**  `<parent>/HomeoClinic`, now live. */
+	dataFolder: string,
+	/**  `<old>/moved-out-<stamp>`, or the old folder if retiring failed. */
+	safetyCopyFolder: string,
+};
+
 /**
  *  Preview of the next patient code (`patient_next_code`, PAT-002). The
  *  sequence is consumed only on create, so Cancel leaves no gap (S06 open-Q).
@@ -804,6 +1269,18 @@ export type OpenAttachmentResponse = {
 	dataBase64: string,
 };
 
+/**  One open invoice (dues dialog). */
+export type OpenInvoice = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  Receipt number. */
+	number: string,
+	/**  Local issue date. */
+	issuedOn: string,
+	/**  Balance. */
+	balancePaise: number,
+};
+
 /**  `case_visit_open_or_create` request (VIS-001). */
 export type OpenOrCreateRequest = {
 	/**  Patient the visit belongs to. */
@@ -834,7 +1311,7 @@ export type OpenOrCreateResponse = {
 /**
  *  The single patient dashboard payload (PAT-005): demographics, alerts,
  *  family, the visit timeline and the last prescription (an R4 preview) are
- *  REAL; `dues_paise` is 0 (billing is R5, R-DEL-002).
+ *  REAL; `dues_paise` is the R5 running patient balance.
  */
 export type PatientDashboard = {
 	/**  Real demographics. */
@@ -843,7 +1320,7 @@ export type PatientDashboard = {
 	allergies: string | null,
 	/**  Other alerts, or `None`. */
 	alerts: string | null,
-	/**  Outstanding dues, integer paise. ALWAYS 0 for R2 (billing is R5). */
+	/**  Outstanding dues (running patient balance), integer paise (R5). */
 	duesPaise: number,
 	/**  Visit timeline (newest first), non-deleted visits, bounded. */
 	visits: VisitSummary[],
@@ -851,6 +1328,16 @@ export type PatientDashboard = {
 	lastPrescription: RxSummary | null,
 	/**  Linked family (REAL, PAT-006). */
 	family: FamilyMember[],
+};
+
+/**  `patient_dues_get` response. */
+export type PatientDues = {
+	/**  Patient id. */
+	patientId: string,
+	/**  Running dues. */
+	duesPaise: number,
+	/**  Open invoices, oldest first. */
+	openInvoices: OpenInvoice[],
 };
 
 /**
@@ -897,6 +1384,12 @@ export type PatientFilter = {
 	casenoteText: string | null,
 };
 
+/**  `patient_dues_get`. */
+export type PatientIdRequest = {
+	/**  Patient id. */
+	patientId: string,
+};
+
 /**
  *  `patient_list_attachments` request (M3-RWv4 §5.4 / §9). Lists ALL of a
  *  patient's attachments across visits — the shared two-way store behind the
@@ -915,6 +1408,61 @@ export type PatientSort = {
 	dir: SortDir,
 };
 
+/**  `payment_add`. */
+export type PaymentAddRequest = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  The payment. */
+	payment: PaymentInput,
+};
+
+/**  A payment as entered. */
+export type PaymentInput = {
+	/**  Amount, paise (1..=balance). */
+	amountPaise: number,
+	/**  Mode. */
+	mode: PaymentMode,
+	/**  Optional UTR / slip reference. */
+	reference: string | null,
+	/**  Local date `YYYY-MM-DD` the money was received. */
+	paidOn: string,
+};
+
+/**  Payment mode. */
+export type PaymentMode = 
+/**  Cash. */
+"cash" | 
+/**  UPI. */
+"upi" | 
+/**  Card. */
+"card" | 
+/**  Other. */
+"other";
+
+/**  One payment as shown. */
+export type PaymentView = {
+	/**  Payment id. */
+	paymentId: string,
+	/**  Local date. */
+	paidOn: string,
+	/**  Amount. */
+	amountPaise: number,
+	/**  Mode. */
+	mode: PaymentMode,
+	/**  Reference. */
+	reference: string | null,
+	/**  Cancelled (payment void). */
+	voided: boolean,
+};
+
+/**  `payment_void`. */
+export type PaymentVoidRequest = {
+	/**  Payment id. */
+	paymentId: string,
+	/**  Why (required, <= 200 chars). */
+	reason: string,
+};
+
 /**
  *  Permanent-delete input (`patient_permanent_delete`, PAT-008). Requires the
  *  app PIN (re-verified). `pin` is a request-only secret; never logged.
@@ -924,6 +1472,12 @@ export type PermanentDeleteRequest = {
 	patientId: string,
 	/**  The app PIN, re-verified before the hard delete (PAT-008, R-DATA-003). */
 	pin: string,
+};
+
+/**  `settings_pick_data_folder` response (`None` = cancelled). */
+export type PickDataFolderResponse = {
+	/**  The chosen parent folder. */
+	parentPath: string | null,
 };
 
 /**
@@ -937,6 +1491,18 @@ export type PickReportFileResponse = {
 	sourcePath: string | null,
 };
 
+/**
+ *  Result of `backup_pick_restore_file` (BAK-003, S17 restore Step 1): the
+ *  chosen absolute `.hcbak` path, or `None` if the doctor cancelled. The UI
+ *  passes it to `restore_preview` / `restore_apply` without ever constructing
+ *  a filesystem path (architecture rule). The dialog grants no filesystem
+ *  read; the backup engine reads the archive itself.
+ */
+export type PickRestoreFileResponse = {
+	/**  The chosen absolute `.hcbak` path, or `None` on cancel. */
+	sourcePath: string | null,
+};
+
 /**  One pre-loaded previous complaint (VIS-002). */
 export type PrevComplaint = {
 	/**  Complaint key (section/complaint identifier). */
@@ -945,6 +1511,52 @@ export type PrevComplaint = {
 	text: string,
 	/**  Complaint location, or empty if none. */
 	location: string,
+};
+
+/**  `receipt_get` response: everything the receipt prints. */
+export type ReceiptDoc = {
+	/**  Clinic name. */
+	clinicName: string,
+	/**  Clinic address. */
+	clinicAddress: string,
+	/**  Clinic phone, if set. */
+	clinicPhone: string | null,
+	/**  Clinic GSTIN snapshot at issue (printed only when set, BILL-006). */
+	gstin: string | null,
+	/**  Doctor name. */
+	doctorName: string,
+	/**  Doctor qualification. */
+	doctorQualification: string,
+	/**  Doctor registration number. */
+	doctorRegNo: string,
+	/**  Receipt number `2026-27/0001`. */
+	number: string,
+	/**  Local issue date `YYYY-MM-DD`. */
+	issuedOn: string,
+	/**  Patient display name. */
+	patientName: string,
+	/**  Patient code. */
+	patientCode: string,
+	/**  RFC3339 visit instant. */
+	visitOn: string,
+	/**  Invoice lines. */
+	lines: LineDto[],
+	/**  Totals. */
+	totals: TotalsView,
+	/**  Discount. */
+	discount: DiscountDto,
+	/**  Live payments only. */
+	payments: PaymentView[],
+	/**  Paid (live payments), paise. */
+	paidPaise: number,
+	/**  Balance, paise. */
+	balancePaise: number,
+	/**  `amount_in_words(paid_paise)`. */
+	paidInWords: string,
+	/**  CANCELLED watermark. */
+	void: boolean,
+	/**  UPI QR when balance > 0 and a VPA is set. */
+	upiQrDataUrl: string | null,
 };
 
 /**  Recent-list input (`patient_recent`, PSR-007). */
@@ -993,6 +1605,35 @@ export type RemovableDrives = {
 	/**  The mounted removable drives found, newest-first order not guaranteed. */
 	drives: RemovableDrive[],
 };
+
+/**  `report_export` request. */
+export type ReportExportRequest = {
+	/**  Which report. */
+	report: ReportSpec,
+	/**  CSV or xlsx. */
+	format: ExportFormat,
+};
+
+/**  `report_export` response (no path ever crosses to the UI). */
+export type ReportExportResult = {
+	/**  `false` when the picker was cancelled. */
+	saved: boolean,
+	/**  Saved file name (never a path). */
+	fileName: string | null,
+	/**  Body rows written. */
+	rowCount: number,
+};
+
+/**  Which report to export. */
+export type ReportSpec = 
+/**  The daily collection of one local date. */
+{ type: "daily"; 
+/**  Local date `YYYY-MM-DD`. */
+date: string } | 
+/**  The monthly summary of one month. */
+{ type: "monthly"; 
+/**  Month `YYYY-MM`. */
+month: string };
 
 /**  Result of `restore_apply` (BAK-003). */
 export type RestoreApplyResponse = {
@@ -1123,6 +1764,24 @@ export type SaveDoctorProfileResponse = {
 	doctorId: string,
 };
 
+/**  `settings_save_general` request: the whole General form. */
+export type SaveGeneralSettingsRequest = {
+	/**  Doctor section. */
+	doctor: DoctorSettings,
+	/**  Clinic section. */
+	clinic: ClinicSettings,
+	/**  App preferences. */
+	app: AppPrefs,
+};
+
+/**  `settings_save_general` response. */
+export type SaveGeneralSettingsResponse = {
+	/**  Fresh settings after the save. */
+	settings: SettingsView,
+	/**  `false` = nothing differed; no row and no audit row was written. */
+	changed: boolean,
+};
+
 /**
  *  Global-search input (`patient_search`, PSR-001..004). `query` is the single
  *  free-text box; `cursor` pages forward (PSR-005).
@@ -1146,8 +1805,8 @@ export type SearchResponse = {
 
 /**
  *  One row for the S04 search list and S05 patient list (PSR-005/008). Full
- *  demographics the row renders; `dues_paise` is always 0 at R2 (billing is R5,
- *  R-DEL-002); `match_type` is the ranking tag ("" for list rows).
+ *  demographics the row renders; `dues_paise` is the running patient balance
+ *  (R5); `match_type` is the ranking tag ("" for list rows).
  */
 export type SearchRow = {
 	/**  UUIDv7 id. */
@@ -1166,7 +1825,10 @@ export type SearchRow = {
 	city: string | null,
 	/**  RFC3339 most-recent-visit instant, or `None` (NULL at R2). */
 	lastVisitAt: string | null,
-	/**  Outstanding dues, integer paise. ALWAYS 0 for R2 (R-DEL-002, R-DATA-004). */
+	/**
+	 *  Outstanding dues (running patient balance), integer paise (R5,
+	 *  R-DATA-004).
+	 */
 	duesPaise: number,
 	/**
 	 *  Match-type tag for the ranking display (PSR-004): one of `exact_id`,
@@ -1240,6 +1902,22 @@ export type SetVisibilityRequest = {
 	hidden: boolean,
 };
 
+/**  `settings_get` response. */
+export type SettingsView = {
+	/**  Doctor section. */
+	doctor: DoctorSettings,
+	/**  Clinic section. */
+	clinic: ClinicSettings,
+	/**  App preferences. */
+	app: AppPrefs,
+	/**  Next running number, 6-digit zero-padded, e.g. `"000124"`. */
+	nextNumber: string,
+	/**  Current data folder, display only. */
+	dataFolder: string,
+	/**  LIC-006: name / reg no / council read-only when true. */
+	identityLocked: boolean,
+};
+
 /**  Wizard progress snapshot (`setup_get_state`). */
 export type SetupState = {
 	/**  Whether first-run setup has completed. */
@@ -1248,6 +1926,12 @@ export type SetupState = {
 	currentStep: number,
 	/**  The resolved data directory (display only; UI never builds paths). */
 	dataDir: string,
+	/**
+	 *  MS (ADR 0020 §7): the pointed data folder when it is NOT present at
+	 *  boot (display only). `None` normally. The UI shows the "data folder
+	 *  not available" screen before anything else when it is set.
+	 */
+	dataFolderMissing: string | null,
 };
 
 /**  Soft-delete input (`patient_soft_delete`, PAT-008). */
@@ -1352,12 +2036,14 @@ export type TodayPatientRow = {
 	photoPath: string | null,
 	/**  Next-follow-up date (RFC3339 date), or `None`. */
 	nextFollowupOn: string | null,
-	/**  Outstanding dues in paise (0 at R3 — billing not built, R-DEL-002). */
+	/**  Outstanding dues in paise (the running patient balance, R5). */
 	duesPaise: number,
 };
 
 /**  A Today-list registered-visit row (today's registered visits). */
 export type TodayVisitRow = {
+	/**  R5: the visit id (Bill button target). */
+	visitId: string,
 	/**  Patient id. */
 	patientId: string,
 	/**  Patient code. */
@@ -1370,6 +2056,20 @@ export type TodayVisitRow = {
 	visitAt: string,
 	/**  Visit type. */
 	type: string,
+	/**  R5: the visit's live bill, or `None`. */
+	bill: VisitBill | null,
+};
+
+/**  Computed totals. */
+export type TotalsView = {
+	/**  Per-line amounts, input order. */
+	lineAmountsPaise: number[],
+	/**  Subtotal. */
+	subtotalPaise: number,
+	/**  Discount. */
+	discountPaise: number,
+	/**  Total. */
+	totalPaise: number,
 };
 
 /**
@@ -1444,6 +2144,18 @@ export type UpdatePatientRequest = {
 	consentAt: string | null,
 };
 
+/**  `invoice_upi_qr` response. */
+export type UpiQrView = {
+	/**  A QR can be shown. */
+	available: boolean,
+	/**  `upi://pay?...`. */
+	upiUrl: string | null,
+	/**  `data:image/svg+xml;base64,...`. */
+	qrDataUrl: string | null,
+	/**  Amount encoded (the balance). */
+	amountPaise: number,
+};
+
 /**
  *  The ONLY error shape the UI ever receives.
  * 
@@ -1471,6 +2183,36 @@ export type VerifyBackupResponse = {
 	decryptOk: boolean,
 };
 
+/**  Bill summary of one visit. */
+export type VisitBill = {
+	/**  Invoice id. */
+	invoiceId: string,
+	/**  Receipt number. */
+	number: string,
+	/**  Total. */
+	totalPaise: number,
+	/**  Balance. */
+	balancePaise: number,
+};
+
+/**  `billing_visit_status` response. */
+export type VisitBillingStatus = {
+	/**  Visit id. */
+	visitId: string,
+	/**  Patient id. */
+	patientId: string,
+	/**  Patient running dues. */
+	patientDuesPaise: number,
+	/**  This visit's live bill, if any. */
+	bill: VisitBill | null,
+};
+
+/**  `billing_visit_status`. */
+export type VisitIdRequest = {
+	/**  Visit id. */
+	visitId: string,
+};
+
 /**  A visit timeline entry (PAT-005): one saved visit of the patient. */
 export type VisitSummary = {
 	/**  Visit id. */
@@ -1484,6 +2226,11 @@ export type VisitSummary = {
 	kind: string,
 	/**  Headline remedy label, or `None` (the Rx engine is R4). */
 	headlineRemedyLabel: string | null,
+	/**
+	 *  R5: this visit's live bill (number, total, balance), or `None` when
+	 *  not billed.
+	 */
+	bill: VisitBill | null,
 };
 
 /* Tauri Specta runtime */

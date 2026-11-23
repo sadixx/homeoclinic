@@ -1,7 +1,7 @@
 // @req SET-002
 // @tier regression
 // @area settings
-// @targets linux
+// @targets linux, windows
 //
 // HC-MVP1-M3set: S01 Step 1 registration council is a dropdown of VERIFIED
 // Indian homoeopathic registering authorities plus "Other (type manually)"

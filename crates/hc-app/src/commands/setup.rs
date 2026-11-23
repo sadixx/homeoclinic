@@ -11,6 +11,8 @@
 //! mints the DEK, opens the encrypted DB, flushes the rows, and stashes the
 //! open pool (unlocked) into [`AppState::lock`].
 
+use std::path::Path;
+
 use tauri::State;
 
 use crate::error::{map_error, to_user_result, AppError, UserFacingError};
@@ -22,20 +24,26 @@ use crate::setup::{
 };
 use crate::state::AppState;
 
-/// Build a [`SetupService`] over the managed state's injected dependencies.
-fn service(state: &AppState) -> SetupService<'_> {
-    SetupService::new(
-        state.keystore.as_ref(),
-        state.clock.as_ref(),
-        &state.data_dir,
-    )
+/// Build a [`SetupService`] over the managed state's injected dependencies and
+/// the CURRENT data folder (`data_dir`, from [`AppState::data_dir`]).
+fn service<'a>(state: &'a AppState, data_dir: &'a Path) -> SetupService<'a> {
+    SetupService::new(state.keystore.as_ref(), state.clock.as_ref(), data_dir)
 }
 
 /// Current wizard state (`setup_get_state`).
 #[tauri::command]
 #[specta::specta]
 pub fn setup_get_state(state: State<'_, AppState>) -> Result<SetupState, UserFacingError> {
-    to_user_result(service(&state).get_state())
+    let dir = state.data_dir();
+    let mut setup = to_user_result(service(&state, &dir).get_state())?;
+    // ADR 0020 §7: report a missing pointed folder (display only).
+    setup.data_folder_missing = state
+        .data_folder_missing
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .as_ref()
+        .map(|p| p.display().to_string());
+    Ok(setup)
 }
 
 /// Validate and stage the doctor profile (SET-002).
@@ -45,7 +53,7 @@ pub fn setup_save_doctor_profile(
     state: State<'_, AppState>,
     req: SaveDoctorProfileRequest,
 ) -> Result<SaveDoctorProfileResponse, UserFacingError> {
-    let resp = to_user_result(service(&state).save_doctor_profile(req.clone()))?;
+    let resp = to_user_result(service(&state, &state.data_dir()).save_doctor_profile(req.clone()))?;
     // Stage the validated request for the eventual DB flush in set_pin.
     state
         .staging
@@ -62,7 +70,7 @@ pub fn setup_save_clinic_profile(
     state: State<'_, AppState>,
     req: SaveClinicProfileRequest,
 ) -> Result<SaveClinicProfileResponse, UserFacingError> {
-    let resp = to_user_result(service(&state).save_clinic_profile(req.clone()))?;
+    let resp = to_user_result(service(&state, &state.data_dir()).save_clinic_profile(req.clone()))?;
     state
         .staging
         .lock()
@@ -82,7 +90,8 @@ pub fn setup_set_pin(
 ) -> Result<SetPinResponse, UserFacingError> {
     let autolock = req.autolock_minutes;
     let pin = req.pin.clone();
-    let svc = service(&state);
+    let dir = state.data_dir();
+    let svc = service(&state, &dir);
 
     // Replay the staged doctor/clinic requests into the service so set_pin
     // flushes them (same path as the service tests).
@@ -150,7 +159,7 @@ pub fn setup_start_trial(
 ) -> Result<StartTrialResponse, UserFacingError> {
     let lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
     match lock.pool.as_ref() {
-        Some(pool) => to_user_result(service(&state).start_trial(pool)),
+        Some(pool) => to_user_result(service(&state, &state.data_dir()).start_trial(pool)),
         None => Err(map_error(&AppError::NotFound)),
     }
 }
@@ -163,7 +172,7 @@ pub fn setup_complete(
 ) -> Result<CompleteSetupResponse, UserFacingError> {
     let lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
     match lock.pool.as_ref() {
-        Some(pool) => to_user_result(service(&state).complete(pool)),
+        Some(pool) => to_user_result(service(&state, &state.data_dir()).complete(pool)),
         None => Err(map_error(&AppError::NotFound)),
     }
 }

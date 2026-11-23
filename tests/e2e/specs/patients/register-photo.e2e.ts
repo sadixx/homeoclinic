@@ -1,7 +1,7 @@
 // @req PAT-001 PAT-002 PAT-038 PSR-001
 // @tier stable
 // @area patients
-// @targets linux
+// @targets linux, windows
 //
 // R2 patient-register demo (HC-MVP1-216), part 1: register a patient via the
 // S06 form WITH a photo, exercising the full photo lifecycle —

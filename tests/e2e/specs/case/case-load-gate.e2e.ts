@@ -1,7 +1,7 @@
 // @req CASE-001 CASE-003 CASE-005
 // @tier stable
 // @area case
-// @targets linux
+// @targets linux, windows
 //
 // M3-RWv6 build-18: CaseForm case-open LOAD GATE. TipTap's useEditor swaps the
 // empty pre-load editor for the loaded one in a passive effect AFTER the

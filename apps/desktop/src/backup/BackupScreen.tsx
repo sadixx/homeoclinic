@@ -22,6 +22,7 @@ import { commands, type BackupStatus, type RestorePreview } from '@/bindings';
 import {
   backupErrorDetails,
   backupErrorMessage,
+  isRestoreReopenFailed,
   isWrongBackupPassword,
 } from '@/backup/backupErrors';
 import { run } from '@/shared/command';
@@ -35,6 +36,16 @@ const PASSWORD_MIN = 8;
 
 /** Restore wizard phase: closed, or on one of the three steps. */
 type RestoreStep = 0 | 1 | 2 | 3;
+
+/**
+ * The display name of a picker-returned path: its last segment, split on
+ * either separator so a Windows path renders the same. Display only; the full
+ * path is passed back to the typed commands untouched.
+ */
+function fileNameOf(path: string): string {
+  const parts = path.split(/[\\/]/);
+  return parts[parts.length - 1] ?? path;
+}
 
 /** One line in the Details expander, shared by the two action panels. */
 function DetailsExpander({
@@ -198,17 +209,36 @@ export function BackupScreen(): JSX.Element {
     setRestoreDetails(null);
   }, []);
 
+  // Step 1 file chooser (b23-n1-d1): the typed `.hcbak` picker returns the
+  // chosen archive path; the UI never builds it. Cancel changes nothing; a
+  // failure is shown inline in plain language (never a path or stack).
+  const [choosingFile, setChoosingFile] = useState(false);
+  const [chooseError, setChooseError] = useState<string | null>(null);
+
   const onChooseBackupFile = useCallback(async () => {
-    // A typed file picker returns the chosen .hcbak path; the UI never builds
-    // it. On this build the USB enumerator stands in for the OS file dialog;
-    // the real file dialog is wired behind the same typed command boundary.
-    const res = await run(commands.listRemovableDrives());
-    const first = res.drives[0];
-    if (first !== undefined) {
-      setRestoreFile(first.path);
+    if (choosingFile) return;
+    setChooseError(null);
+    setChoosingFile(true);
+    try {
+      const res = await run(commands.backupPickRestoreFile());
+      if (res.sourcePath === null) {
+        // Cancelled: leave the wizard (and any chosen file) untouched.
+        return;
+      }
+      // A new file starts Step 1 afresh (no stale preview/errors).
+      setRestoreFile(res.sourcePath);
+      setRestorePreview(null);
+      setRestoreDone(false);
+      setRestorePasswordError(null);
+      setRestoreError(null);
+      setRestoreDetails(null);
+      setRestoreStep(1);
+    } catch (err) {
+      setChooseError(backupErrorMessage(err));
+    } finally {
+      setChoosingFile(false);
     }
-    setRestoreStep(1);
-  }, []);
+  }, [choosingFile]);
 
   const onRestoreNextFromStep1 = useCallback(async () => {
     if (restoreBusy) return;
@@ -249,7 +279,11 @@ export function BackupScreen(): JSX.Element {
       setRestoreDone(true);
       await refreshStatus();
     } catch (err) {
-      if (isWrongBackupPassword(err)) {
+      if (isRestoreReopenFailed(err)) {
+        // The backend locked the app (b23-n1-d2): go to the unlock screen.
+        // Hash route, so this works without a router context.
+        window.location.hash = '#/lock';
+      } else if (isWrongBackupPassword(err)) {
         setRestoreStep(1);
         setRestorePasswordError(backupErrorMessage(err));
       } else {
@@ -505,10 +539,20 @@ export function BackupScreen(): JSX.Element {
             type="button"
             data-testid="backup-restore-choose"
             onClick={() => void onChooseBackupFile()}
+            disabled={choosingFile || restoreBusy}
             className="h-10 rounded border border-slate-300 px-3"
           >
             {t('backup.restore.choose')}
           </button>
+          {chooseError !== null ? (
+            <p
+              data-testid="backup-restore-choose-error"
+              role="alert"
+              className="mt-1 text-sm text-red-700"
+            >
+              {chooseError}
+            </p>
+          ) : null}
         </div>
 
         {restoreStep >= 1 ? (
@@ -537,7 +581,9 @@ export function BackupScreen(): JSX.Element {
                   <span className="text-slate-600">
                     {t('backup.restore.chosenLabel')}
                   </span>{' '}
-                  <span data-testid="backup-restore-file">{restoreFile}</span>
+                  <span data-testid="backup-restore-file">
+                    {fileNameOf(restoreFile)}
+                  </span>
                 </p>
                 <div className="flex flex-col gap-1">
                   <label
@@ -715,7 +761,7 @@ export function BackupScreen(): JSX.Element {
                     type="button"
                     data-testid="backup-restore-next"
                     onClick={() => void onRestoreNextFromStep1()}
-                    disabled={restoreBusy}
+                    disabled={restoreBusy || restoreFile === ''}
                     className="h-10 rounded bg-blue-600 px-4 font-semibold text-white disabled:opacity-60"
                   >
                     {t('backup.restore.next')}

@@ -2,7 +2,8 @@
 #
 # Task HC-MVP1-013/014/015 (M0 real pipeline). Lints, tests, audits and builds
 # DEBUG Tauri artifacts for Linux and Windows on every push/PR to main, and
-# runs the R0 walking-skeleton E2E smoke on Linux. Satisfies:
+# runs the E2E suite on Linux (all specs) and on Windows (specs whose
+# `@targets` header lists windows). Satisfies:
 #   - R-DEL-001  : main is always releasable (Win + Linux artifacts build green)
 #   - requirements/05 S6: "Build artifacts for Windows and Linux on every
 #                          main-branch commit" (HC-MVP1-013)
@@ -43,9 +44,24 @@ concurrency:
 permissions:
   contents: read
 
+# RUNNER IMAGE PINNING: every job runs on an EXACT image label, never
+# ubuntu-latest / windows-latest. The `-latest` labels migrate gradually to a
+# new OS (ubuntu-latest moving to Ubuntu 26.04 renamed the WebKit WebDriver
+# package and broke the E2E job), so a pinned label means only an explicit edit
+# here can move CI to a new OS. The labels below are the images the last green
+# run used (run 41682950871, staging-main bbe9bd2, 2026-11-03), read from each
+# job's "Runner Image" log group:
+#   ubuntu jobs : Image: ubuntu-26.04         (Ubuntu 26.04.1 LTS, 20261025.179.1)
+#   windows job : Image: windows-2025-vs2026  (Windows Server 2025 10.0.26100,
+#                                               20261030.294.1)
+# Both are documented YAML labels in actions/runner-images README. `runs-on`
+# cannot read the workflow `env` context, so the labels are written literally
+# in each job; change them together.
+
 env:
   NODE_VERSION: "20"
-  # Ubuntu 24.04 Tauri 2 system deps (see docs/dev/environment.md section 2.1).
+  # Ubuntu Tauri 2 system deps (see docs/dev/environment.md section 2.1).
+  # Same package names on the pinned ubuntu-26.04 image as on 24.04.
   LINUX_TAURI_DEPS: >-
     libwebkit2gtk-4.1-dev
     build-essential
@@ -60,7 +76,7 @@ env:
 jobs:
   lint-and-test:
     name: Lint and test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -145,7 +161,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # Pinned images (see RUNNER IMAGE PINNING at the top).
+        os: [ubuntu-26.04, windows-2025-vs2026]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -213,7 +230,7 @@ jobs:
     # Linux only: the WebdriverIO + tauri-driver harness targets WebKitWebDriver
     # under xvfb (hc-e2e-testing). It rebuilds the debug binary here so the E2E
     # job is self-contained; the build matrix artifacts are not downloaded.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -232,9 +249,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install Ubuntu system dependencies
-        # ubuntu-latest moved to Ubuntu 26.04, where the WebKit WebDriver
-        # package was renamed webkit2gtk-driver -> webkitgtk-webdriver.
-        # Install whichever name this image provides, then make sure the
+        # On Ubuntu 26.04 (the pinned image) the WebKit WebDriver package is
+        # webkitgtk-webdriver; older images call it webkit2gtk-driver. Keep
+        # the fallback so a deliberate re-pin in either direction still
+        # works. Install whichever name this image provides, then make sure the
         # WebKitWebDriver binary is on PATH (the harness resolves it with
         # `command -v WebKitWebDriver`).
         run: |
@@ -319,6 +337,162 @@ jobs:
           path: |
             .e2e-out/**
 
+  e2e-smoke-windows:
+    name: E2E smoke (Windows)
+    needs: build
+    # Same WebdriverIO + tauri-driver harness as the Linux job, but the native
+    # driver is Microsoft Edge WebDriver (msedgedriver), which drives the
+    # WebView2 runtime Tauri uses on Windows. No xvfb: the hosted Windows
+    # runner has an interactive desktop session.
+    #
+    # SPEC SELECTION: HC_E2E_TARGET=windows makes wdio.conf.ts run only the
+    # specs whose `// @targets` header lists `windows`. Linux-only specs (X11 /
+    # GTK / xvfb / XDG_DATA_HOME dependent, e.g. real-picker-smoke and the
+    # window-resize specs) are never started here.
+    #
+    # Self-contained like the Linux E2E job: it rebuilds the debug binary with
+    # e2e-test-keys; the build matrix artifacts are not downloaded.
+    runs-on: windows-2025-vs2026
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Edge WebDriver matching the WebView2 runtime
+        # msedgedriver must match the Chromium build of the webview it drives.
+        # For a Tauri app that is the WebView2 Evergreen runtime (registry
+        # value `pv` under its EdgeUpdate client GUID), which tracks Edge
+        # stable but can differ by build; fall back to the installed Edge
+        # version only if the WebView2 key is absent. The image's preinstalled
+        # driver (EDGEWEBDRIVER) is reused only when its version is an exact
+        # match; otherwise the exact matching build is fetched from
+        # Microsoft's official Edge WebDriver endpoint. The result is checked
+        # with `msedgedriver --version` and exported as HC_NATIVE_DRIVER (an
+        # absolute path; tauri-driver rejects a bare name).
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $wv2Guid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $keys = @(
+            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$wv2Guid",
+            "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$wv2Guid",
+            "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$wv2Guid"
+          )
+          $ver = $null
+          foreach ($k in $keys) {
+            if (Test-Path $k) {
+              $pv = (Get-ItemProperty -Path $k -Name pv -ErrorAction SilentlyContinue).pv
+              if ($pv -and $pv -ne '0.0.0.0') { $ver = $pv; Write-Host "WebView2 runtime: $pv ($k)"; break }
+            }
+          }
+          if (-not $ver) {
+            $edgeExe = @(
+              "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+              "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe"
+            ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $edgeExe) { Write-Host '::error::Neither WebView2 runtime nor Edge found'; exit 1 }
+            $ver = (Get-Item $edgeExe).VersionInfo.ProductVersion
+            Write-Host "::warning::WebView2 registry key not found; using Edge $ver from $edgeExe"
+          }
+          if ($ver -notmatch '^\d+\.\d+\.\d+\.\d+$') { Write-Host "::error::Unexpected version '$ver'"; exit 1 }
+
+          $drv = $null
+          if ($env:EDGEWEBDRIVER) {
+            $pre = Join-Path $env:EDGEWEBDRIVER 'msedgedriver.exe'
+            if ((Test-Path $pre) -and ((& $pre --version) -match [regex]::Escape($ver))) {
+              $drv = $pre
+              Write-Host "Reusing preinstalled msedgedriver $ver at $pre"
+            }
+          }
+          if (-not $drv) {
+            $dir = Join-Path $env:RUNNER_TEMP "msedgedriver-$ver"
+            $zip = Join-Path $env:RUNNER_TEMP "edgedriver_win64-$ver.zip"
+            $url = "https://msedgedriver.microsoft.com/$ver/edgedriver_win64.zip"
+            Write-Host "Downloading $url"
+            Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+            Expand-Archive -Path $zip -DestinationPath $dir -Force
+            $drv = Join-Path $dir 'msedgedriver.exe'
+          }
+          $reported = & $drv --version
+          Write-Host "msedgedriver: $reported"
+          if ($reported -notmatch [regex]::Escape($ver)) {
+            Write-Host "::error::msedgedriver '$reported' does not match webview $ver"
+            exit 1
+          }
+          "HC_NATIVE_DRIVER=$drv" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Install JS dependencies (app)
+        run: npm ci
+        working-directory: apps/desktop
+
+      - name: Build debug Tauri bundle
+        # E2E-only e2e-test-keys build, exactly as the Linux E2E job. This
+        # throwaway bundle is NOT a published artifact.
+        run: npm run tauri build -- --debug --features e2e-test-keys
+        working-directory: apps/desktop
+
+      - name: Build hc-seed binary (E2E fixture seeding)
+        run: cargo build -p hc-seed --bin hc-seed
+
+      - name: Install E2E dependencies
+        run: npm ci
+        working-directory: tests/e2e
+
+      - name: List Windows-targeted specs
+        # Informational + guard: shows which specs the @targets filter keeps
+        # and fails early if none would run (a filter that selects nothing
+        # must not pass green).
+        run: |
+          $sel = Get-ChildItem -Path specs -Recurse -Filter '*.e2e.ts' | Where-Object {
+            $line = Select-String -Path $_.FullName -Pattern '^//\s*@targets\s+(.+)$' | Select-Object -First 1
+            $line -and (($line.Matches[0].Groups[1].Value -split '[,\s]+') -contains 'windows')
+          }
+          if (-not $sel) { Write-Host '::error::No spec lists windows in @targets'; exit 1 }
+          $sel | ForEach-Object { Write-Host "windows spec: $($_.FullName.Substring($PWD.Path.Length + 1))" }
+        working-directory: tests/e2e
+
+      - name: Run Windows-targeted specs
+        # HC_E2E_TARGET=windows: wdio.conf.ts filters specs by @targets.
+        # HC_NATIVE_DRIVER was exported by the Edge WebDriver step. Binaries
+        # are the .exe paths in the workspace-root target dir.
+        env:
+          HC_E2E_TARGET: windows
+          HC_E2E_OUTDIR: ${{ github.workspace }}\.e2e-out
+          HC_APP_BINARY: ${{ github.workspace }}\target\debug\homeoclinic-desktop.exe
+          HC_SEED_BIN: ${{ github.workspace }}\target\debug\hc-seed.exe
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:HC_E2E_OUTDIR | Out-Null
+          npx wdio run wdio.conf.ts
+          exit $LASTEXITCODE
+        working-directory: tests/e2e
+
+      - name: Upload Windows E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: homeoclinic-e2e-report-windows
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            .e2e-out/**
+
   perf-gate:
     name: NFR-002 performance gate (50k + 100k)
     needs: lint-and-test
@@ -328,7 +502,7 @@ jobs:
     # NFR-002 p95 budget is missed, which fails this job and the build. The
     # heavy run is a release BINARY, not `cargo test`, so the lint-and-test
     # `cargo test --workspace` gate stays fast; this job runs it explicitly.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4

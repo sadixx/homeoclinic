@@ -10,7 +10,7 @@
 // removed in or before the release named here once its module ships.
 //
 //   patients  -> M1 (patient register + case file)
-//   settings  -> M1 (settings screen)
+//   settings  -> MS (S18 Settings, editable General tab; on at MS)
 //
 // At M0 every flag is false: only Today ships as a reachable screen.
 
@@ -18,7 +18,7 @@
 export interface Features {
   /** Patients module (register, search, case file). Turns on at M1. */
   readonly patients: boolean;
-  /** Settings module. Turns on at M1. */
+  /** Settings module (S18). Turns on at MS (SET-002..007). */
   readonly settings: boolean;
   /**
    * Backup and restore module (S17 / BAK-001..004). Turns on at M1 Slice D:

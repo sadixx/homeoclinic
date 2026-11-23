@@ -298,7 +298,11 @@ describe('HC-MVP1-217 R3 demo PHASE C: follow-up entry with its own vitals, next
 
     // ---- Next follow-up = today -> Today: Due today -----------------------
     const today = todayIso();
+    // Commit-on-blur (S08, review data-2): pick the date with the field
+    // focused, then leave it with a real click elsewhere.
+    await nf.focusCustom();
     await nf.setCustom(today);
+    await nf.blurCustomByClickingHeader();
     await nf.waitDisplay(`Next F/U: ${dash(today)}`, 'next follow-up today');
     await caseRichPage.save();
     expect(await caseRichPage.waitForSaved()).toMatch(/^Saved/);

@@ -586,8 +586,8 @@ pub fn list_family(conn: &Connection, patient_id: &str) -> Result<Vec<FamilyMemb
 // ---------------------------------------------------------------------------
 
 /// The patient columns the S04 search row and S05 list row render (PSR-005,
-/// PSR-008). A read-only projection; `dues_paise`/`match_type` are added by the
-/// service (0 for R2, the rank tag from the search engine).
+/// PSR-008). A read-only projection; `match_type` is added by the service (the
+/// rank tag from the search engine). `balance_paise` is the R5 running dues.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatientListRow {
     /// UUIDv7 id.
@@ -612,11 +612,13 @@ pub struct PatientListRow {
     pub next_followup_on: Option<String>,
     /// Opaque photo attachment ref, or `None`.
     pub photo_path: Option<String>,
+    /// Running dues in paise (R5, kept in step by every billing write).
+    pub balance_paise: i64,
 }
 
 /// Column list for the list/search row projection (keeps the SELECTs aligned).
 const LIST_ROW_COLUMNS: &str = "id, code, name, sex, dob, age_years, mobile, city, \
-     last_visit_at, next_followup_on, photo_path";
+     last_visit_at, next_followup_on, photo_path, balance_paise";
 
 /// Map a row selected with [`LIST_ROW_COLUMNS`] into a [`PatientListRow`].
 fn map_list_row(r: &rusqlite::Row<'_>) -> Result<PatientListRow, rusqlite::Error> {
@@ -632,6 +634,7 @@ fn map_list_row(r: &rusqlite::Row<'_>) -> Result<PatientListRow, rusqlite::Error
         last_visit_at: r.get(8)?,
         next_followup_on: r.get(9)?,
         photo_path: r.get(10)?,
+        balance_paise: r.get(11)?,
     })
 }
 

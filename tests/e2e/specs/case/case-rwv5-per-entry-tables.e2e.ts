@@ -1,7 +1,7 @@
 // @req CASE-001, CASE-003, CASE-005, VIS-001
 // @tier stable
 // @area case
-// @targets linux
+// @targets linux, windows
 //
 // M3-RWv5 A + C (case editor): ONE TABLE PER TYPE PER ENTRY for all six record
 // kinds, a follow-up entry starting its OWN tables, bullet (not numbered)

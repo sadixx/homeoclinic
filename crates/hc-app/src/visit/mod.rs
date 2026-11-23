@@ -261,7 +261,7 @@ pub struct TodayPatientRow {
     pub photo_path: Option<String>,
     /// Next-follow-up date (RFC3339 date), or `None`.
     pub next_followup_on: Option<String>,
-    /// Outstanding dues in paise (0 at R3 — billing not built, R-DEL-002).
+    /// Outstanding dues in paise (the running patient balance, R5).
     #[specta(type = specta_typescript::Number)]
     pub dues_paise: i64,
 }
@@ -270,6 +270,8 @@ pub struct TodayPatientRow {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TodayVisitRow {
+    /// R5: the visit id (Bill button target).
+    pub visit_id: String,
     /// Patient id.
     pub patient_id: String,
     /// Patient code.
@@ -283,6 +285,8 @@ pub struct TodayVisitRow {
     /// Visit type.
     #[serde(rename = "type")]
     pub visit_type: String,
+    /// R5: the visit's live bill, or `None`.
+    pub bill: Option<crate::billing::VisitBill>,
 }
 
 /// `today_get_overview` request (VIS-005).
@@ -717,9 +721,14 @@ impl<'a> VisitService<'a> {
                 .into_iter()
                 .map(today_patient_row)
                 .collect();
-            let reg = visit_repo::registered_today(conn, &today, TODAY_LIMIT)?
+            let reg_rows = visit_repo::registered_today(conn, &today, TODAY_LIMIT)?;
+            let ids: Vec<String> = reg_rows.iter().map(|r| r.visit_id.clone()).collect();
+            let bills = hc_storage::billing::live_invoices_for_visits(conn, &ids)?;
+            let reg = reg_rows
                 .into_iter()
                 .map(|r| TodayVisitRow {
+                    bill: crate::billing::visit_bill_for(&bills, &r.visit_id),
+                    visit_id: r.visit_id,
                     patient_id: r.patient_id,
                     code: r.code,
                     name: r.name,
@@ -1251,7 +1260,7 @@ fn age_label(dob: Option<&str>, age_years: Option<i64>) -> String {
 }
 
 /// Map a storage Today patient row to the command row, filling the age label
-/// and the honest `dues_paise = 0` (billing not built at R3, R-DEL-002).
+/// and the running patient balance as `dues_paise` (R5).
 fn today_patient_row(r: visit_repo::TodayPatientRow) -> TodayPatientRow {
     let age_label = age_label(r.dob.as_deref(), r.age_years);
     TodayPatientRow {
@@ -1262,6 +1271,6 @@ fn today_patient_row(r: visit_repo::TodayPatientRow) -> TodayPatientRow {
         sex: r.sex,
         photo_path: r.photo_path,
         next_followup_on: r.next_followup_on,
-        dues_paise: 0,
+        dues_paise: r.balance_paise,
     }
 }

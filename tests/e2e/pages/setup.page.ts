@@ -15,6 +15,15 @@ function byTestId(id: string): ChainablePromiseElement {
 export const DEFAULT_COUNCIL_LABEL =
   'Maharashtra: Maharashtra Council of Homoeopathy';
 
+/** Step 2 consultation fees, as typed (rupees, up to 2 decimals). */
+export interface ClinicFees {
+  first: string;
+  followup: string;
+}
+
+/** The fees every shared-setup spec types unless it asks for others. */
+export const DEFAULT_CLINIC_FEES: ClinicFees = { first: '500', followup: '300' };
+
 /** One recorded setup IPC call (see SetupPage.installIpcSpy). */
 export interface SpiedCall {
   cmd: string;
@@ -176,12 +185,15 @@ export class SetupPage {
     await this.nextAndWaitForStep(2, 'clinic');
   }
 
-  /** Fill step 2 (clinic) and advance. */
-  async fillClinicAndNext(): Promise<void> {
+  /**
+   * Fill step 2 (clinic) and advance. `fees` are the rupee strings typed into
+   * the two fee boxes (default first 500, follow-up 300).
+   */
+  async fillClinicAndNext(fees: ClinicFees = DEFAULT_CLINIC_FEES): Promise<void> {
     await this.setField('setup-clinic-name', 'Rao Homoeo Clinic');
     await this.setField('setup-clinic-address', '12 MG Road, Pune 411001');
-    await this.setField('setup-clinic-fee-first', '500');
-    await this.setField('setup-clinic-fee-followup', '300');
+    await this.setField('setup-clinic-fee-first', fees.first);
+    await this.setField('setup-clinic-fee-followup', fees.followup);
     await this.next.click();
     await browser.waitUntil(
       async () => (await this.stepIndicator.getText()).includes(' 3 '),

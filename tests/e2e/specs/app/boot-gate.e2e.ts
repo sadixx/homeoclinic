@@ -1,7 +1,7 @@
 // @req SET-001 SET-004
 // @tier regression
 // @area settings
-// @targets linux
+// @targets linux, windows
 //
 // Boot-gate launch routing (AppShell.tsx; R1 demo as a genuine fresh-launch
 // flow). Unlike first-run.e2e.ts — which reaches #/setup and #/lock by FORCING

@@ -16,7 +16,8 @@ previous releases plus the new features of that release.
 | `HomeoClinic-User-Guide-R1.md` / `.pdf` | R0 + R1 (M0 + M1) |
 | `HomeoClinic-User-Guide-R2.md` / `.pdf` | R0 + R1 + R2 (M0 + M1 + M2) |
 | `HomeoClinic-User-Guide-R3.md` / `.pdf` | R0 + R1 + R2 + R3 (M0 + M1 + M2 + M3) |
-| `HomeoClinic-User-Guide-R4.*` (future) | R0 + R1 + R2 + R3 + R4 |
+| `HomeoClinic-User-Guide-R5.md` / `.pdf` | R0 to R3 + Settings (MS) + R5 Clinic basics (M8); development build, R4 not yet built |
+| `HomeoClinic-User-Guide-R4.*` (future) | adds R4 prescriptions and printing |
 | ... | ... |
 
 When a new milestone ships, copy the previous edition to the new release

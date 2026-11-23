@@ -66,11 +66,15 @@ pub struct TodayPatientRow {
     pub photo_path: Option<String>,
     /// Next-follow-up date (RFC3339 date), or `None`.
     pub next_followup_on: Option<String>,
+    /// Running dues in paise (R5).
+    pub balance_paise: i64,
 }
 
 /// A Today-list registered-visit row (today's registered visits).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TodayVisitRow {
+    /// Visit id (R5: the Bill button target).
+    pub visit_id: String,
     /// Patient id.
     pub patient_id: String,
     /// Patient code.
@@ -310,7 +314,7 @@ pub fn set_patient_next_followup(
 
 /// Column list for the Today patient-row projection.
 const TODAY_PATIENT_COLUMNS: &str =
-    "id, code, name, sex, dob, age_years, photo_path, next_followup_on";
+    "id, code, name, sex, dob, age_years, photo_path, next_followup_on, balance_paise";
 
 /// Map a Today patient row.
 fn map_today_patient(r: &rusqlite::Row<'_>) -> Result<TodayPatientRow, rusqlite::Error> {
@@ -323,6 +327,7 @@ fn map_today_patient(r: &rusqlite::Row<'_>) -> Result<TodayPatientRow, rusqlite:
         age_years: r.get(5)?,
         photo_path: r.get(6)?,
         next_followup_on: r.get(7)?,
+        balance_paise: r.get(8)?,
     })
 }
 
@@ -377,7 +382,7 @@ pub fn registered_today(
     today: &str,
     limit: i64,
 ) -> Result<Vec<TodayVisitRow>, StorageError> {
-    let sql = "SELECT v.patient_id, p.code, p.name, p.photo_path, v.visit_at, v.type \
+    let sql = "SELECT v.patient_id, p.code, p.name, p.photo_path, v.visit_at, v.type, v.id \
          FROM visit v JOIN patient p ON p.id = v.patient_id \
          WHERE v.deleted_at IS NULL AND p.deleted_at IS NULL \
            AND date(v.visit_at) = date(?1) \
@@ -392,6 +397,7 @@ pub fn registered_today(
                 photo_path: r.get(3)?,
                 visit_at: r.get(4)?,
                 visit_type: r.get(5)?,
+                visit_id: r.get(6)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;

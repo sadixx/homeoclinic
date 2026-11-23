@@ -51,6 +51,24 @@ export function resolveNativeDriver(): string {
     return abs;
   }
 
+  if (process.platform === 'win32') {
+    // Windows: Edge WebDriver, which must match the installed WebView2
+    // runtime exactly (the CI job resolves and exports HC_NATIVE_DRIVER).
+    try {
+      const found = execFileSync('where', ['msedgedriver.exe'], { encoding: 'utf8' })
+        .split(/\r?\n/)[0]
+        ?.trim();
+      if (found && existsSync(found)) return path.resolve(found);
+    } catch {
+      // not on PATH
+    }
+    throw new Error(
+      'infra_incomplete: msedgedriver.exe not found on PATH. Download the Edge ' +
+        'WebDriver build that matches the WebView2 runtime version and set ' +
+        'HC_NATIVE_DRIVER to its absolute path.',
+    );
+  }
+
   try {
     const found = execFileSync('sh', ['-c', 'command -v WebKitWebDriver'], {
       encoding: 'utf8',
@@ -146,6 +164,22 @@ async function waitForPort(port: number, timeoutMs = 20000): Promise<void> {
  *     only via the tauri:options config, not on argv).
  */
 function reapDriverChain(appBinary?: string): void {
+  const binary = appBinary ?? process.env.HC_APP_BINARY;
+  if (process.platform === 'win32') {
+    // No pkill on Windows: taskkill by image name, whole tree (/T), forced
+    // (/F). The runner is node.exe, so none of these names can hit it. The app
+    // is matched by its image name (the binary's file name).
+    const images = ['tauri-driver.exe', 'msedgedriver.exe'];
+    if (binary) images.push(path.basename(binary));
+    for (const image of images) {
+      try {
+        execFileSync('taskkill', ['/F', '/T', '/IM', image], { stdio: 'ignore' });
+      } catch {
+        // taskkill exits non-zero when no process matched; that is fine.
+      }
+    }
+    return;
+  }
   for (const name of ['tauri-driver', 'WebKitWebDriver']) {
     try {
       execFileSync('pkill', ['-9', '-x', name], { stdio: 'ignore' });
@@ -153,7 +187,6 @@ function reapDriverChain(appBinary?: string): void {
       // pkill exits non-zero when no process matched; that is fine.
     }
   }
-  const binary = appBinary ?? process.env.HC_APP_BINARY;
   if (binary) {
     try {
       execFileSync('pkill', ['-9', '-f', binary], { stdio: 'ignore' });

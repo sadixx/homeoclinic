@@ -41,10 +41,20 @@ export class LockPage {
     await this.card.waitForDisplayed({ timeout });
   }
 
-  /** Type a PIN and press Unlock. */
+  /**
+   * Type a PIN and press Unlock. The PIN input is React-controlled and Unlock
+   * is disabled while it is empty (LockScreen.tsx), so the click waits until
+   * the field holds the whole PIN and Unlock is enabled: a click before that
+   * would never reach auth_unlock (build-6 round-4 saw one unlock that never
+   * opened the DB). Callers still wait for the shell or the error themselves.
+   */
   async attempt(pin: string): Promise<void> {
     await this.pin.waitForDisplayed({ timeout: 10000 });
     await this.pin.setValue(pin);
+    await browser.waitUntil(
+      async () => (await this.pin.getValue()) === pin && (await this.unlock.isEnabled()),
+      { timeout: 10000, timeoutMsg: 'lock: the PIN field did not hold the PIN with Unlock enabled' },
+    );
     await this.unlock.click();
   }
 

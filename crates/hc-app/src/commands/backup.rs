@@ -19,9 +19,9 @@ use tauri::State;
 use hc_storage::clock::SystemClock;
 
 use crate::backup::{
-    list_removable_drives as enumerate_drives, BackupNowResponse, BackupService, BackupStatus,
-    RemovableDrives, RestoreApplyResponse, RestorePreview, SetAutoBackupResponse,
-    VerifyBackupResponse, MOVE_TO_NEW_COMPUTER_ENABLED,
+    list_removable_drives as enumerate_drives, restore_apply_in_state, BackupNowResponse,
+    BackupService, BackupStatus, PickRestoreFileResponse, RemovableDrives, RestoreApplyResponse,
+    RestorePreview, SetAutoBackupResponse, VerifyBackupResponse, MOVE_TO_NEW_COMPUTER_ENABLED,
 };
 use crate::error::{map_error, to_user_result, AppError, UserFacingError};
 use crate::state::AppState;
@@ -36,7 +36,8 @@ fn with_service<T>(
     let lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
     let pool = lock.pool.as_ref().ok_or(AppError::NotFound)?;
     let clock = SystemClock;
-    let svc = BackupService::new(pool, &state.data_dir, &clock);
+    let data_dir = state.data_dir();
+    let svc = BackupService::new(pool, &data_dir, &clock);
     f(&svc)
 }
 
@@ -66,6 +67,81 @@ pub fn set_auto_backup(
 #[specta::specta]
 pub fn list_removable_drives() -> Result<RemovableDrives, UserFacingError> {
     to_user_result(enumerate_drives())
+}
+
+/// (`backup_pick_restore_file`) Open the OS file-open dialog filtered to
+/// `.hcbak` and return the chosen archive path for S17 restore Step 1
+/// (BAK-003, b23-n1-d1). Lets the UI obtain a `file_path` for
+/// `restore_preview` / `restore_apply` without constructing a filesystem path
+/// (architecture rule). Gated by the `dialog:allow-open` capability only (no
+/// fs/shell/opener scope); the dialog grants no filesystem read. When a
+/// removable drive is mounted the dialog starts there (backups usually live on
+/// a USB stick); otherwise it uses the OS default. No DB access, so it works
+/// whether or not the app is unlocked. The chosen path is never logged
+/// (R-PRIV-001). Interactive, so E2E-tested (real-picker smoke), not
+/// cargo-tested.
+///
+/// Determinism seam (DEV/E2E ONLY, feature `e2e-test-keys`, ADR 0017): the
+/// native GTK chooser cannot be driven by webdriver, so under the E2E-only
+/// build feature this command FIRST consults `HC_E2E_RESTORE_FILE`; if it
+/// names a path that exists, that path is returned and the dialog is skipped.
+/// Same pattern as `HC_E2E_REPORT_FILE` in `visit_pick_report_file`. Compiled
+/// OUT of the release/public build, which always opens the native picker.
+///
+/// Threading (M3-RWv5): this MUST be an async command. A sync command runs
+/// inline on the GTK main thread, where a blocking dialog wait deadlocks the
+/// main loop. The non-blocking `pick_file(callback)` is bridged through a
+/// tokio oneshot and awaited on the async runtime instead; the drive lookup
+/// (directory reads) runs on the blocking pool.
+#[tauri::command]
+#[specta::specta]
+pub async fn backup_pick_restore_file(
+    app: tauri::AppHandle,
+) -> Result<PickRestoreFileResponse, UserFacingError> {
+    use tauri_plugin_dialog::DialogExt as _;
+
+    // DEV/E2E ONLY (feature e2e-test-keys): deterministic headless seam.
+    // Compiled out of release (ADR 0017); the path is never logged.
+    #[cfg(feature = "e2e-test-keys")]
+    {
+        if let Some(path) = std::env::var_os("HC_E2E_RESTORE_FILE") {
+            let path = std::path::PathBuf::from(path);
+            if path.exists() {
+                return Ok(PickRestoreFileResponse {
+                    source_path: Some(path.to_string_lossy().to_string()),
+                });
+            }
+        }
+    }
+
+    // USB convenience: start in the first mounted removable drive, if any.
+    // Directory reads run on the blocking pool, never on the async worker; a
+    // failed lookup just falls back to the OS default folder.
+    let start_dir = tauri::async_runtime::spawn_blocking(enumerate_drives)
+        .await
+        .ok()
+        .and_then(|r| r.ok())
+        .and_then(|d| d.drives.into_iter().next())
+        .map(|d| std::path::PathBuf::from(d.path));
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let mut dialog = app
+        .dialog()
+        .file()
+        .add_filter("HomeoClinic backup", &["hcbak"]);
+    if let Some(dir) = start_dir {
+        dialog = dialog.set_directory(dir);
+    }
+    dialog.pick_file(move |picked| {
+        // A dropped receiver only means the command future went away.
+        let _ = tx.send(picked);
+    });
+    // A dropped sender (dialog torn down without a callback) == cancelled.
+    let chosen = rx.await.ok().flatten();
+
+    let source_path =
+        chosen.and_then(|p| p.into_path().ok().map(|p| p.to_string_lossy().to_string()));
+    Ok(PickRestoreFileResponse { source_path })
 }
 
 /// (`backup_now`) Manual backup to a chosen folder or USB with a password
@@ -104,6 +180,12 @@ pub fn restore_preview(
 /// re-key under THIS install's DEK → migrate-if-older. Requires the app to be
 /// unlocked so the retained target DEK is available (design §5 / ADR 0014); a
 /// wrong backup password is refused before anything live changes (AC4).
+///
+/// The session continues on the restored data (b23-n1-d2): the old pool is
+/// closed before the swap and a migrated pool on the restored `clinic.db` is
+/// stored back in [`AppState`]. If the restored DB cannot be reopened, the app
+/// is locked and `restore_reopen_failed` is returned so the UI routes to the
+/// unlock screen. See [`restore_apply_in_state`].
 #[tauri::command]
 #[specta::specta]
 pub fn restore_apply(
@@ -111,23 +193,12 @@ pub fn restore_apply(
     file_path: String,
     password: String,
 ) -> Result<RestoreApplyResponse, UserFacingError> {
-    // Clone a handle to the retained DEK provider out from under the lock so the
-    // engine can borrow it as `&dyn KeyProvider` without holding the mutex
-    // across the whole restore. A sealed app (no key) is a generic error.
-    let (pool_present, key) = {
-        let lock = state.lock.lock().unwrap_or_else(|p| p.into_inner());
-        (lock.pool.is_some(), lock.key.clone())
-    };
-    if !pool_present {
-        return Err(map_error(&AppError::NotFound));
-    }
-    let key = match key {
-        Some(k) => k,
-        None => return Err(map_error(&AppError::NotFound)),
-    };
-    to_user_result(with_service(&state, |svc| {
-        svc.restore_apply(&file_path, &password, key.as_ref())
-    }))
+    to_user_result(restore_apply_in_state(
+        &state,
+        &SystemClock,
+        &file_path,
+        &password,
+    ))
 }
 
 /// (`verify_backup`) Checksum + decrypt-test an existing archive (BAK-004).

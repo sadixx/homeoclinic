@@ -23,6 +23,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { commands } from '@/bindings';
 import { isUserFacingError, run } from '@/shared/command';
+import { AUTOLOCK_OPTIONS } from '@/shared/autolock';
 import { features } from '@/shared/features';
 import { parseRupeesToPaise } from '@/shared/money';
 import { t } from '@/shared/strings';
@@ -35,9 +36,11 @@ import {
 import type { TimingsBoxes } from './ClinicTimingsInput';
 import type { ClinicSession } from './clinicTimings';
 import {
-  REGISTRATION_COUNCIL_LABELS,
-  councilSelectionFor,
-} from './registrationCouncils';
+  COUNCIL_OTHER_VALUE,
+  CouncilSelect,
+  councilStateFor,
+} from './CouncilSelect';
+import type { CouncilState } from './CouncilSelect';
 
 /** Called by the wizard once setup completes, to route to Today. */
 export interface SetupWizardProps {
@@ -68,28 +71,7 @@ function isValidPin(pin: string): boolean {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Auto-lock options in minutes (SET-004; default 15). */
-const AUTOLOCK_OPTIONS = [5, 10, 15, 30, 60] as const;
-
 type FieldErrors = Record<string, string>;
-
-/**
- * Dropdown value of the "Other (type manually)" option. Not a valid council
- * label, so it can never collide with a listed authority or be stored.
- */
-const COUNCIL_OTHER_VALUE = '__other__';
-
-/** Dropdown + Other-text state that re-opens a stored council string. */
-function initialCouncilState(stored: string): {
-  readonly choice: string;
-  readonly other: string;
-} {
-  const sel = councilSelectionFor(stored);
-  if (sel.choice === 'listed') return { choice: sel.text, other: '' };
-  if (sel.choice === 'other')
-    return { choice: COUNCIL_OTHER_VALUE, other: sel.text };
-  return { choice: '', other: '' };
-}
 
 /** First-run setup wizard (4 steps). */
 export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
@@ -107,12 +89,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
   // chosen. Both are seeded from the stored string so a value not in the list
   // re-opens as Other with its text kept. The wizard has no stored profile to
   // pre-fill yet, so the seed is empty; Back from step 2 keeps this state.
-  const [councilChoice, setCouncilChoice] = useState(
-    () => initialCouncilState('').choice,
+  const [council, setCouncil] = useState<CouncilState>(() =>
+    councilStateFor(''),
   );
-  const [councilOther, setCouncilOther] = useState(
-    () => initialCouncilState('').other,
-  );
+  const councilChoice = council.choice;
+  const councilOther = council.other;
   const isCouncilOther = councilChoice === COUNCIL_OTHER_VALUE;
   const [docPhone, setDocPhone] = useState('');
   const [docEmail, setDocEmail] = useState('');
@@ -505,60 +486,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps): JSX.Element {
                 required: true,
               },
             )}
-            <div className="flex flex-col">
-              <label
-                htmlFor="setup-doctor-council-input"
-                className="text-sm text-slate-700"
-              >
-                {t('setup.doctor.council')}
-                <span aria-hidden="true">{t('setup.requiredMark')}</span>
-              </label>
-              <select
-                id="setup-doctor-council-input"
-                data-testid="setup-doctor-council"
-                aria-required
-                aria-invalid={errors['setup-doctor-council'] !== undefined}
-                value={councilChoice}
-                onChange={(e) => setCouncilChoice(e.target.value)}
-                className="h-10 rounded border border-slate-300 px-3 focus:outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                <option value="">{t('setup.doctor.councilPlaceholder')}</option>
-                {REGISTRATION_COUNCIL_LABELS.map((label) => (
-                  <option key={label} value={label}>
-                    {label}
-                  </option>
-                ))}
-                <option value={COUNCIL_OTHER_VALUE}>
-                  {t('setup.doctor.councilOtherOption')}
-                </option>
-              </select>
-              {inlineError('setup-doctor-council')}
-            </div>
-            {isCouncilOther ? (
-              <div className="flex flex-col">
-                <label
-                  htmlFor="setup-doctor-council-other-input"
-                  className="text-sm text-slate-700"
-                >
-                  {t('setup.doctor.councilOther')}
-                  <span aria-hidden="true">{t('setup.requiredMark')}</span>
-                </label>
-                <input
-                  id="setup-doctor-council-other-input"
-                  data-testid="setup-doctor-council-other"
-                  type="text"
-                  aria-required
-                  aria-invalid={
-                    errors['setup-doctor-council-other'] !== undefined
-                  }
-                  placeholder={t('setup.doctor.councilOtherPlaceholder')}
-                  value={councilOther}
-                  onChange={(e) => setCouncilOther(e.target.value)}
-                  className="h-10 rounded border border-slate-300 px-3 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
-                {inlineError('setup-doctor-council-other')}
-              </div>
-            ) : null}
+            <CouncilSelect
+              idBase="setup-doctor-council"
+              value={council}
+              onChange={setCouncil}
+              errors={errors}
+            />
             {field(
               'setup-doctor-phone',
               t('setup.doctor.phone'),

@@ -14,6 +14,7 @@ const CODE_TO_KEY: Partial<Record<ErrorCode, StringKey>> = {
   backup_too_new: 'backup.error.tooNew',
   backup_destination_unavailable: 'backup.error.destUnavailable',
   backup_out_of_space: 'backup.error.outOfSpace',
+  restore_reopen_failed: 'backup.error.reopenFailed',
 };
 
 /** Resolve a thrown value to a plain-language backup message. */
@@ -44,4 +45,13 @@ export function backupErrorDetails(err: unknown): string {
 /** True when the thrown value is specifically a wrong-backup-password error. */
 export function isWrongBackupPassword(err: unknown): boolean {
   return isUserFacingError(err) && err.code === 'wrong_backup_password';
+}
+
+/**
+ * True when the restore swapped the database but the backend could not reopen
+ * it and LOCKED the app (b23-n1-d2). The screen routes to the unlock screen;
+ * the PIN unlock reopens and migrates the live database.
+ */
+export function isRestoreReopenFailed(err: unknown): boolean {
+  return isUserFacingError(err) && err.code === 'restore_reopen_failed';
 }

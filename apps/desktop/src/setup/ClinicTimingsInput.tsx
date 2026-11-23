@@ -127,7 +127,10 @@ export interface TimingsValidation {
 }
 
 /** Validate every box and build the stored timings string. */
-export function validateTimings(boxes: TimingsBoxes): TimingsValidation {
+export function validateTimings(
+  boxes: TimingsBoxes,
+  idBase: string = TIMINGS_ID,
+): TimingsValidation {
   const errors: Record<string, string> = {};
   let firstErrorSession: ClinicSession | null = null;
   const sessions: Partial<Record<ClinicSession, SessionTimes>> = {};
@@ -138,7 +141,7 @@ export function validateTimings(boxes: TimingsBoxes): TimingsValidation {
   for (const session of SESSIONS) {
     const s = boxes[session];
     if (isSessionEmpty(s)) continue;
-    const id = `${TIMINGS_ID}-${session}`;
+    const id = `${idBase}-${session}`;
     const read = (
       edge: SessionEdge,
       hourRaw: string,
@@ -194,6 +197,11 @@ export interface ClinicTimingsInputProps {
   readonly onActiveSessionChange: (session: ClinicSession) => void;
   /** Inline errors keyed as {@link validateTimings} produces them. */
   readonly errors: Readonly<Record<string, string>>;
+  /**
+   * testid / id / error-key base (default {@link TIMINGS_ID}); S18 passes
+   * `settings-clinic-timings`.
+   */
+  readonly idBase?: string;
 }
 
 const BOX_CLASS =
@@ -206,6 +214,7 @@ export function ClinicTimingsInput({
   activeSession,
   onActiveSessionChange,
   errors,
+  idBase = TIMINGS_ID,
 }: ClinicTimingsInputProps): JSX.Element {
   const tabRefs = useRef<Partial<Record<ClinicSession, HTMLButtonElement>>>({});
 
@@ -259,7 +268,7 @@ export function ClinicTimingsInput({
       edge === 'from' ? 'setup.clinic.timings.from' : 'setup.clinic.timings.to',
     );
     const sessionLabel = t(SESSION_LABEL[session]);
-    const id = `${TIMINGS_ID}-${session}-${edge}`;
+    const id = `${idBase}-${session}-${edge}`;
     const hourId = `${id}-hour`;
     const minuteId = `${id}-minute`;
     return (
@@ -307,13 +316,13 @@ export function ClinicTimingsInput({
   };
 
   return (
-    <div className="flex flex-col" data-testid={`${TIMINGS_ID}-group`}>
-      <span id={`${TIMINGS_ID}-label`} className="text-sm text-slate-700">
+    <div className="flex flex-col" data-testid={`${idBase}-group`}>
+      <span id={`${idBase}-label`} className="text-sm text-slate-700">
         {t('setup.clinic.timings')}
       </span>
       <div
         role="tablist"
-        aria-labelledby={`${TIMINGS_ID}-label`}
+        aria-labelledby={`${idBase}-label`}
         className="mt-1 flex gap-2"
       >
         {SESSIONS.map((session) => {
@@ -326,10 +335,10 @@ export function ClinicTimingsInput({
               }}
               type="button"
               role="tab"
-              id={`${TIMINGS_ID}-tab-${session}-btn`}
-              data-testid={`${TIMINGS_ID}-tab-${session}`}
+              id={`${idBase}-tab-${session}-btn`}
+              data-testid={`${idBase}-tab-${session}`}
               aria-selected={selected}
-              aria-controls={`${TIMINGS_ID}-panel-${session}`}
+              aria-controls={`${idBase}-panel-${session}`}
               tabIndex={selected ? 0 : -1}
               onClick={() => onActiveSessionChange(session)}
               onKeyDown={onTabKey}
@@ -348,15 +357,24 @@ export function ClinicTimingsInput({
         <div
           key={session}
           role="tabpanel"
-          id={`${TIMINGS_ID}-panel-${session}`}
-          data-testid={`${TIMINGS_ID}-panel-${session}`}
-          aria-labelledby={`${TIMINGS_ID}-tab-${session}-btn`}
+          id={`${idBase}-panel-${session}`}
+          data-testid={`${idBase}-panel-${session}`}
+          aria-labelledby={`${idBase}-tab-${session}-btn`}
           hidden={session !== activeSession}
           className="mt-2 flex flex-col gap-2 rounded border border-slate-200 p-3"
         >
-          {edgeRow(session, 'from')}
-          {edgeRow(session, 'to')}
-          {errorLine(`${TIMINGS_ID}-${session}`)}
+          {/* The session group carries the session-level error key
+              (`<idBase>-<session>`) so Save can focus it. */}
+          <div
+            role="group"
+            aria-labelledby={`${idBase}-tab-${session}-btn`}
+            data-testid={`${idBase}-${session}`}
+            className="flex flex-col gap-2"
+          >
+            {edgeRow(session, 'from')}
+            {edgeRow(session, 'to')}
+          </div>
+          {errorLine(`${idBase}-${session}`)}
         </div>
       ))}
       <p className="mt-1 text-sm text-slate-500">
@@ -364,7 +382,7 @@ export function ClinicTimingsInput({
       </p>
       {value.legacy !== '' ? (
         <p
-          data-testid={`${TIMINGS_ID}-legacy`}
+          data-testid={`${idBase}-legacy`}
           className="mt-1 text-sm text-slate-700"
         >
           {t('setup.clinic.timings.legacy')} {value.legacy}

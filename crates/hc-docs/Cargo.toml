@@ -6,3 +6,15 @@ license.workspace = true
 
 [dependencies]
 hc-domain = { path = "../hc-domain" }
+# R5 (HC-MVP1-151/153, ADR 0021): clinic UPI QR (SVG only) and xlsx export.
+# Pure Rust, no network at runtime; pinned exactly (R-SEC-008).
+qrcode = { version = "=0.14.1", default-features = false, features = ["svg"] }
+rust_xlsxwriter = { version = "=0.102.0", default-features = false }
+# SVG -> data: URL for the receipt/invoice <img> (same pin as hc-app).
+base64 = "=0.22.1"
+thiserror = { workspace = true }
+
+[dev-dependencies]
+# Test oracle only: unzip the rendered xlsx to inspect its cells. Same version
+# and feature set rust_xlsxwriter already pulls in (no new crate).
+zip = { version = "=9.3.0", default-features = false, features = ["deflate"] }

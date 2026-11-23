@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-03T12:13:53.288Z",
+  "generatedAt": "2026-11-06T11:23:18.913Z",
   "specs": [
     {
       "path": "tests/e2e/specs/app/boot-gate.e2e.ts",
@@ -10,7 +10,8 @@
       "tier": "regression",
       "area": "settings",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -50,11 +51,25 @@
       "tier": "regression",
       "area": "backup",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
       "path": "tests/e2e/specs/backup/restore-clean-install.e2e.ts",
+      "reqs": [
+        "BAK-002",
+        "BAK-003"
+      ],
+      "tier": "regression",
+      "area": "backup",
+      "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/backup/restore-wizard-step2.e2e.ts",
       "reqs": [
         "BAK-002",
         "BAK-003"
@@ -73,7 +88,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -86,7 +102,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -116,7 +133,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -142,7 +160,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -156,7 +175,8 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -171,13 +191,15 @@
       "tier": "stable",
       "area": "case",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
       "path": "tests/e2e/specs/case/real-picker-smoke.e2e.ts",
       "reqs": [
-        "PAT-009"
+        "PAT-009",
+        "BAK-003"
       ],
       "tier": "smoke",
       "area": "case",
@@ -194,7 +216,8 @@
       "tier": "stable",
       "area": "home",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -208,7 +231,8 @@
       "tier": "stable",
       "area": "patients",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -222,7 +246,8 @@
       "tier": "stable",
       "area": "patients",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -236,7 +261,8 @@
       "tier": "stable",
       "area": "patients",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -274,10 +300,29 @@
       ]
     },
     {
+      "path": "tests/e2e/specs/release/r5-demo.e2e.ts",
+      "reqs": [
+        "BILL-001",
+        "BILL-002",
+        "BILL-003",
+        "BILL-004"
+      ],
+      "tier": "regression",
+      "area": "release",
+      "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
       "path": "tests/e2e/specs/release/upgrade-path.e2e.ts",
       "reqs": [
         "NFR-011",
-        "NFR-042"
+        "NFR-042",
+        "BILL-001",
+        "SET-003",
+        "VIS-004",
+        "VIS-005"
       ],
       "tier": "regression",
       "area": "release",
@@ -297,7 +342,64 @@
       "tier": "stable",
       "area": "search",
       "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/settings/settings-camera.e2e.ts",
+      "reqs": [
+        "SET-007",
+        "PAT-038"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
         "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/settings/settings-data-folder.e2e.ts",
+      "reqs": [
+        "SET-006",
+        "SET-004"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/settings/settings-general.e2e.ts",
+      "reqs": [
+        "SET-002",
+        "SET-003",
+        "SET-004",
+        "SET-005",
+        "PAT-002",
+        "SUX-005",
+        "LIC-006"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux",
+        "windows"
+      ]
+    },
+    {
+      "path": "tests/e2e/specs/settings/settings-tabs-guard.e2e.ts",
+      "reqs": [
+        "SET-001",
+        "SET-002",
+        "LIC-006"
+      ],
+      "tier": "regression",
+      "area": "settings",
+      "targets": [
+        "linux",
+        "windows"
       ]
     },
     {
@@ -324,7 +426,8 @@
       "tier": "regression",
       "area": "settings",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -336,7 +439,8 @@
       "tier": "stable",
       "area": "settings",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     },
     {
@@ -350,7 +454,8 @@
       "tier": "stable",
       "area": "visit",
       "targets": [
-        "linux"
+        "linux",
+        "windows"
       ]
     }
   ]

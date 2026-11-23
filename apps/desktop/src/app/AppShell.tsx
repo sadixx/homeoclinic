@@ -5,13 +5,16 @@
 // R-DEL-002: only shipped features get a route. Patients ships at M2 Slice D
 // (R2), so when the compile-time flag features.patients is on (vite.config.ts)
 // the shell mounts a real /patients route AND the global S04 search overlay —
-// there is no dead-end nav. Settings is still gated OFF at M0/M1: its nav item
-// renders (disabled, see SideNav) but has no route and no "coming soon" screen.
+// there is no dead-end nav. Settings (S18) ships at MS behind features.settings
+// and sits inside the same completion route-guard as every shell route.
 //   /today    -> S03 Today (empty state at R0), the default route
 //   /patients -> S05/S06/S07 patient UI (list / register+edit / dashboard),
 //                deep-linked via ?id=<patientId> or ?view=new (search overlay)
 //   /backup   -> S17 backup/restore (BAK-001..004)
+//   /settings -> S18 settings (MS, SET-002..007)
 //   /lock     -> S02 lock stub (full-window overlay, no nav)
+//   /data-missing -> "data folder not available" (ADR 0020 §7, outside the
+//                    shell like /lock)
 // Unknown routes redirect to /today.
 //
 // Launch boot-gate (SET-001, SET-004; handoff 34): before the router mounts,
@@ -24,8 +27,10 @@
 // failing) always goes to /setup so a brand-new, PIN-less user is never
 // stranded on the lock screen; only a provisioned install whose lock read is
 // uncertain fails safe to /lock (handoff 46). The resolved autolockMinutes is
-// threaded into ShellFrame's idle timer (replacing the hardcoded fallback when
-// a value is present). UI -> typed commands only.
+// threaded into ShellFrame's idle timer until the saved prefs are read
+// (useAppPrefs, read after every unlock; F5). A data folder that the pointer
+// names but that is not present wins over everything (/data-missing).
+// UI -> typed commands only.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
@@ -40,17 +45,26 @@ import {
 } from 'react-router-dom';
 
 import { AppBar } from '@/app/AppBar';
+import { DataFolderMissing } from '@/app/DataFolderMissing';
+import { rootFontPx } from '@/app/fontScale';
 import { LockScreen } from '@/app/LockScreen';
 import { SearchOverlay } from '@/app/SearchOverlay';
+import { LeaveGuardProvider, useLeaveGuardHost } from '@/app/leaveGuard';
 import { SideNav, type NavRoute } from '@/app/SideNav';
 import { StatusBar } from '@/app/StatusBar';
 import { TopBar } from '@/app/TopBar';
+import { AppPrefsProvider, useAppPrefs } from '@/app/useAppPrefs';
 import { useZoom } from '@/app/useZoom';
 import { BackupScreen } from '@/backup/BackupScreen';
+import { InvoiceScreen } from '@/billing/InvoiceScreen';
+import { heldInvoiceDraftRoute } from '@/billing/invoiceDraft';
 import { commands } from '@/bindings';
 import { CaseForm } from '@/case/CaseForm';
 import { TodayScreen } from '@/home/TodayScreen';
 import { PatientsPage } from '@/patients/PatientsPage';
+import { ReceiptPreview } from '@/print/ReceiptPreview';
+import { ReportsScreen } from '@/reports/ReportsScreen';
+import { SettingsScreen } from '@/settings/SettingsScreen';
 import { SetupWizard } from '@/setup/SetupWizard';
 import { run } from '@/shared/command';
 import { features } from '@/shared/features';
@@ -65,15 +79,8 @@ import { FollowupVisit } from '@/visit/FollowupVisit';
  */
 const DEFAULT_AUTOLOCK_MINUTES = 15;
 
-/**
- * The `:root` (html) font-size baseline in px (SET-005 / 00-conventions §1,
- * src/index.css). The zoom scale multiplies this to drive the document-root
- * font-size so all rem-based text and layout scale together (C8 fix).
- */
-const ZOOM_ROOT_BASELINE_PX = 14;
-
 /** The launch route chosen by the boot-gate. */
-type BootRoute = '/setup' | '/lock' | '/today';
+type BootRoute = '/setup' | '/lock' | '/today' | '/data-missing';
 
 /**
  * Boot-gate state: `undefined` while the two reads are in flight (render the
@@ -130,6 +137,19 @@ function useBootDecision(): BootDecision | undefined {
       try {
         const setup = await run(commands.setupGetState());
         completed = setup.completed;
+        // ADR 0020 §7: the pointed data folder is not present (e.g. an
+        // unplugged drive). Nothing else may run until the doctor decides.
+        const missing = setup.dataFolderMissing;
+        if (typeof missing === 'string' && missing !== '') {
+          if (!cancelled) {
+            setDecision({
+              route: '/data-missing',
+              autolockMinutes: null,
+              completed,
+            });
+          }
+          return;
+        }
       } catch {
         if (!cancelled) {
           setDecision({
@@ -184,6 +204,21 @@ function useBootDecision(): BootDecision | undefined {
   return decision;
 }
 
+/**
+ * True when a key event targets a text control (input / textarea / select /
+ * contenteditable): shell shortcuts never steal keys the doctor is typing.
+ */
+function isTextControl(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return (
+    tag === 'INPUT' ||
+    tag === 'TEXTAREA' ||
+    tag === 'SELECT' ||
+    target.isContentEditable
+  );
+}
+
 /** Inner shell chrome; assumes a router is present above it. */
 function ShellFrame({
   autolockMinutes,
@@ -216,55 +251,82 @@ function ShellFrame({
   // font-size (14px baseline, src/index.css), scaling the root scales text AND
   // layout together. Applying it to a mid-tree div was the C8 no-op bug.
   const zoom = useZoom();
+  // Saved app prefs (SET-004/005/007), read after every unlock (F5).
+  const prefs = useAppPrefs();
 
-  // C8 fix: apply the zoom scale to the document-root font-size so all
-  // rem-based text and layout scale. The 14px baseline comes from `:root` in
-  // src/index.css; `14 * scale` px keeps rem anchored to the scaled root. On
-  // reset the scale returns to 1.0 (14px); on unmount the inline override is
-  // cleared so the CSS baseline resumes. No network call, no patient data.
+  // C8 fix + SET-005: apply the chosen font size (Normal 14 / Large 16 /
+  // Extra large 18 px, 00-conventions §1) times the zoom scale to the
+  // document-root font-size so all rem-based text and layout scale. Ctrl+0
+  // resets the zoom to 1.0, i.e. back to the CHOSEN size (design §6). On
+  // unmount (lock / setup) the inline override is cleared so the CSS baseline
+  // (14px) resumes. No network call, no patient data.
   useEffect(() => {
     const root = document.documentElement;
-    root.style.fontSize = `${ZOOM_ROOT_BASELINE_PX * zoom.scale}px`;
+    root.style.fontSize = `${rootFontPx(prefs.fontSize, zoom.scale)}px`;
+    root.setAttribute('data-hc-font-size', prefs.fontSize);
     return () => {
       // Clear the inline override on unmount so the CSS `:root` baseline (14px)
       // resumes rather than a stale scaled value lingering on the element.
       root.style.fontSize = '';
+      root.removeAttribute('data-hc-font-size');
     };
-  }, [zoom.scale]);
+  }, [prefs.fontSize, zoom.scale]);
 
-  const goToLock = useCallback(() => navigate('/lock'), [navigate]);
-  const onNavigate = useCallback(
-    (route: NavRoute) => navigate(route),
-    [navigate],
+  // Leave guard (R5 design §7, r5-review-2/15/16): EVERY shell navigation
+  // goes through `guardLeave` via `go` (side nav, AppBar Back, Alt+Left, the
+  // status-bar backup chip, the search overlay, F5/F8 and every callback the
+  // shell hands to a screen), so a screen with unsaved non-autosaved work
+  // (S15) can ask Save / Discard first. `navigate` is called raw ONLY for the
+  // lock (below) and inside `goBackNow`, which only runs under `guardLeave`.
+  // The full list of exits is .worklog/HC-MVP1-dev-r5-settings/handoffs/
+  // R5-leave-guard-exits.md and AppShell.leaveGuard.test.tsx iterates it.
+  const leaveGuard = useLeaveGuardHost();
+  const { guardLeave, lockNow } = leaveGuard;
+  const go = useCallback(
+    (to: string): void => guardLeave(() => navigate(to)),
+    [guardLeave, navigate],
   );
-  const goToBackup = useCallback(() => navigate('/backup'), [navigate]);
+
+  // Lock is deliberately NOT guarded: an explicit or idle lock must never be
+  // held open by a dialog (SET-004). `lockNow` first lets the open screen keep
+  // its unsaved work (S15 holds its draft in memory and gets it back after the
+  // unlock, billing/invoiceDraft.ts, r5-review-17), then locks at once.
+  // `replace` so the unlock's return lands where the locked screen was and its
+  // history-based Back still goes to the screen before it.
+  const goToLock = useCallback(
+    () => lockNow(() => navigate('/lock', { replace: true })),
+    [lockNow, navigate],
+  );
+  const onNavigate = useCallback((route: NavRoute) => go(route), [go]);
+  const goToBackup = useCallback(() => go('/backup'), [go]);
+  const goToSettings = useCallback(() => go('/settings'), [go]);
 
   // Enter on a search result opens that patient's dashboard: navigate into the
   // /patients route carrying the id in the hash query so PatientsPage deep-
   // links straight to the S07 dashboard (consistent with its initialPatientId).
   const openPatient = useCallback(
     (patientId: string): void => {
-      navigate(`/patients?id=${encodeURIComponent(patientId)}`);
+      go(`/patients?id=${encodeURIComponent(patientId)}`);
     },
-    [navigate],
+    [go],
   );
   // The no-results "New patient" action opens the register form (S06).
   const openNewPatient = useCallback((): void => {
-    navigate('/patients?view=new');
-  }, [navigate]);
+    go('/patients?view=new');
+  }, [go]);
 
   // Navigate to the S08 case form for an already-resolved visit (CASE / S08).
   // The deep-linkable URL carries both ids so the form is reachable directly
   // and the completion guard still wraps it (it is a shell route).
   const openCaseVisit = useCallback(
     (patientId: string, visitId: string): void => {
-      navigate(
+      go(
         `/patient/${encodeURIComponent(patientId)}/case/${encodeURIComponent(
           visitId,
         )}`,
       );
     },
-    [navigate],
+    [go],
   );
 
   // Navigate to the JOURNAL case form in FOLLOW-UP mode (ADR 0018 #2 /
@@ -277,14 +339,41 @@ function ShellFrame({
   // chain regexes still match (`/patient/:id/case/`), and CaseForm autosaves.
   const openCaseFollowup = useCallback(
     (patientId: string, visitId: string): void => {
-      navigate(
+      go(
         `/patient/${encodeURIComponent(patientId)}/case/${encodeURIComponent(
           visitId,
         )}/followup`,
       );
     },
-    [navigate],
+    [go],
   );
+
+  // R5 billing routes (design §7/§8): the S15 invoice of a visit and the
+  // receipt preview of an invoice, both under /patient/:id/ so the Back chain
+  // and the open-patient context keep working.
+  const openInvoice = useCallback(
+    (patientId: string, visitId: string): void => {
+      go(
+        `/patient/${encodeURIComponent(patientId)}/visit/${encodeURIComponent(
+          visitId,
+        )}/invoice`,
+      );
+    },
+    [go],
+  );
+  const openReceipt = useCallback(
+    (patientId: string, invoiceId: string): void => {
+      go(
+        `/patient/${encodeURIComponent(patientId)}/receipt/${encodeURIComponent(
+          invoiceId,
+        )}`,
+      );
+    },
+    [go],
+  );
+  const openDuesList = useCallback((): void => {
+    go('/patients?dues=1');
+  }, [go]);
 
   // Start (open-or-create) a First visit for a patient and route into the
   // case form (S08 entry points: dashboard "New visit / Take case" and F5).
@@ -364,10 +453,17 @@ function ShellFrame({
   //   list / anything else -> Today (/today)
   // It never fires mid-IME-composition and never steals a keystroke typed
   // inside a text field (input / textarea / contenteditable), so typing a
-  // left-arrow in a clinical note is untouched. Back never discards data — the
-  // clinical forms autosave (CASE-005).
-  const goBack = useCallback((): void => {
+  // left-arrow in a clinical note is untouched. Back never discards data: the
+  // clinical forms autosave (CASE-005), and the S15 invoice (no autosave)
+  // registers a leave guard that asks Save / Discard first (design R5 §7).
+  const goBackNow = useCallback((): void => {
     const path = location.pathname;
+    const billMatch =
+      /^\/patient\/([^/]+)\/(?:visit\/[^/]+\/invoice$|receipt\/)/.exec(path);
+    if (billMatch && billMatch[1] !== undefined) {
+      navigate(`/patients?id=${encodeURIComponent(billMatch[1])}`);
+      return;
+    }
     const caseMatch = /^\/patient\/([^/]+)\/case\//.exec(path);
     if (caseMatch && caseMatch[1] !== undefined) {
       navigate(`/patients?id=${encodeURIComponent(caseMatch[1])}`);
@@ -385,23 +481,16 @@ function ShellFrame({
     // The list, Today or any other shell screen -> Today (the top).
     navigate('/today');
   }, [location.pathname, location.search, navigate]);
+  const goBack = useCallback(
+    (): void => guardLeave(goBackNow),
+    [guardLeave, goBackNow],
+  );
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key !== 'ArrowLeft' || !e.altKey || e.isComposing) return;
       // Do not hijack a left-arrow a doctor is typing inside a text control.
-      const el = e.target as HTMLElement | null;
-      if (el !== null) {
-        const tag = el.tagName;
-        if (
-          tag === 'INPUT' ||
-          tag === 'TEXTAREA' ||
-          tag === 'SELECT' ||
-          el.isContentEditable
-        ) {
-          return;
-        }
-      }
+      if (isTextControl(e.target)) return;
       e.preventDefault();
       goBack();
     };
@@ -475,15 +564,68 @@ function ShellFrame({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [openPatientId, startVisitForPatient]);
 
+  // F8 "bill" (S15 keyboard, design §9): on a case route bill THAT visit; on
+  // a patient dashboard bill the latest visit (same as the Bill button), or
+  // say "Start a visit first" when there is none (no silent no-op). Elsewhere
+  // it does nothing. Never fires mid-IME composition or inside a text control
+  // (like Alt+Left). A failed read is surfaced like a failed open (R-UI-008),
+  // no patient data logged.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'F8' || e.isComposing || isTextControl(e.target)) return;
+      const caseMatch = /^\/patient\/([^/]+)\/case\/([^/]+)/.exec(
+        location.pathname,
+      );
+      if (
+        caseMatch &&
+        caseMatch[1] !== undefined &&
+        caseMatch[2] !== undefined
+      ) {
+        e.preventDefault();
+        openInvoice(
+          decodeURIComponent(caseMatch[1]),
+          decodeURIComponent(caseMatch[2]),
+        );
+        return;
+      }
+      if (location.pathname !== '/patients') return;
+      const id = new URLSearchParams(location.search).get('id');
+      if (id === null || id === '') return;
+      e.preventDefault();
+      void (async (): Promise<void> => {
+        try {
+          const dash = await run(
+            commands.patientGetDashboard({ patientId: id }),
+          );
+          const latest = dash.visits[0];
+          if (latest !== undefined) openInvoice(id, latest.visitId);
+          else setOpenError(t('billing.startVisitFirst'));
+        } catch {
+          setOpenError(t('app.bill.openFailed'));
+          console.error('[AppShell] bill open failed');
+        }
+      })();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [location.pathname, location.search, openInvoice]);
+
   // Idle auto-lock (SET-004): after the configured idle timeout with no user
-  // activity, lock the app. Any clinical edit is already autosaved (CASE-005),
-  // so locking never loses data. Ctrl+L (TopBar) is the explicit path. The
-  // configured value from authGetLockState is used when present; otherwise the
-  // default fallback keeps the timer running.
-  const effectiveMinutes =
+  // activity, lock the app. Any clinical edit is already autosaved (CASE-005)
+  // and an unsaved S15 bill is held in memory and given back after the unlock
+  // (billing/invoiceDraft.ts), so locking never loses data. Ctrl+L (TopBar)
+  // is the explicit path; it shares `goToLock` with this timer. The
+  // saved value (useAppPrefs: read after unlock, updated by a Settings Save)
+  // wins; until it is read the value from authGetLockState is used; otherwise
+  // the default fallback keeps the timer running.
+  const bootMinutes =
     autolockMinutes != null && autolockMinutes > 0
       ? autolockMinutes
       : DEFAULT_AUTOLOCK_MINUTES;
+  const effectiveMinutes =
+    prefs.loaded && prefs.autolockMinutes > 0
+      ? prefs.autolockMinutes
+      : bootMinutes;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const timeoutMs = effectiveMinutes * 60 * 1000;
@@ -491,7 +633,7 @@ function ShellFrame({
       if (timerRef.current !== null) {
         clearTimeout(timerRef.current);
       }
-      timerRef.current = setTimeout(() => navigate('/lock'), timeoutMs);
+      timerRef.current = setTimeout(goToLock, timeoutMs);
     };
     const activity: ReadonlyArray<keyof WindowEventMap> = [
       'mousemove',
@@ -510,16 +652,20 @@ function ShellFrame({
         clearTimeout(timerRef.current);
       }
     };
-  }, [navigate, effectiveMinutes]);
+  }, [goToLock, effectiveMinutes]);
 
   const activeRoute: NavRoute | undefined =
     location.pathname === '/today' || location.pathname === '/'
       ? '/today'
       : location.pathname === '/patients'
         ? '/patients'
-        : location.pathname === '/backup'
-          ? '/backup'
-          : undefined;
+        : location.pathname === '/reports'
+          ? '/reports'
+          : location.pathname === '/backup'
+            ? '/backup'
+            : location.pathname === '/settings'
+              ? '/settings'
+              : undefined;
 
   // The content root carries the zoom VARIABLE only (`--hc-font-scale`), so any
   // layout math that reads the scale still works. The actual text/layout
@@ -572,58 +718,94 @@ function ShellFrame({
           data-testid="content-area"
           style={contentStyle}
         >
-          <Routes>
-            <Route path="/" element={<Navigate to="/today" replace />} />
-            <Route
-              path="/today"
-              element={
-                <TodayScreen
-                  onNewPatient={openNewPatient}
-                  onOpenPatient={openPatient}
-                  onOpenBackup={goToBackup}
-                />
-              }
-            />
-            {features.patients ? (
+          <LeaveGuardProvider registry={leaveGuard.registry}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/today" replace />} />
               <Route
-                path="/patients"
+                path="/today"
                 element={
-                  <PatientsRoute
-                    onTakeCase={startCaseForPatient}
-                    onNewFollowup={startFollowupForPatient}
+                  <TodayScreen
+                    onNewPatient={openNewPatient}
+                    onOpenPatient={openPatient}
+                    onOpenBackup={goToBackup}
+                    onOpenDuesList={openDuesList}
+                    onOpenInvoice={openInvoice}
                   />
                 }
               />
-            ) : null}
-            {features.case ? (
+              {features.patients ? (
+                <Route
+                  path="/patients"
+                  element={
+                    <PatientsRoute
+                      onTakeCase={startCaseForPatient}
+                      onNewFollowup={startFollowupForPatient}
+                      onOpenInvoice={openInvoice}
+                      onPrintReceipt={openReceipt}
+                    />
+                  }
+                />
+              ) : null}
+              {features.case ? (
+                <Route
+                  path="/patient/:patientId/case/:visitId"
+                  element={
+                    <CaseRoute
+                      onBack={openPatient}
+                      onOpenInvoice={openInvoice}
+                      onPrintReceipt={openReceipt}
+                    />
+                  }
+                />
+              ) : null}
+              {features.case ? (
+                <Route
+                  path="/patient/:patientId/case/:visitId/followup"
+                  element={
+                    <CaseRoute
+                      onBack={openPatient}
+                      onOpenInvoice={openInvoice}
+                      onPrintReceipt={openReceipt}
+                      visitType="follow_up"
+                    />
+                  }
+                />
+              ) : null}
+              {features.case ? (
+                // Legacy structured S09 route (retired from the NAV PATH by ADR
+                // 0018 #2 — the dashboard follow-up now opens the journal CaseForm
+                // above). Kept as a dormant, deep-link-only surface so an existing
+                // bookmark/URL still resolves; nothing in the app navigates here.
+                <Route
+                  path="/patient/:patientId/visit/:visitId/followup"
+                  element={<FollowupRoute onBack={openPatient} />}
+                />
+              ) : null}
+              {/* R5 billing (S15 invoice, receipt preview) and S16 reports. */}
               <Route
-                path="/patient/:patientId/case/:visitId"
-                element={<CaseRoute onBack={openPatient} />}
-              />
-            ) : null}
-            {features.case ? (
-              <Route
-                path="/patient/:patientId/case/:visitId/followup"
+                path="/patient/:patientId/visit/:visitId/invoice"
                 element={
-                  <CaseRoute onBack={openPatient} visitType="follow_up" />
+                  <InvoiceRoute
+                    onPrintReceipt={openReceipt}
+                    onBack={openPatient}
+                    onOpenSettings={goToSettings}
+                  />
                 }
               />
-            ) : null}
-            {features.case ? (
-              // Legacy structured S09 route (retired from the NAV PATH by ADR
-              // 0018 #2 — the dashboard follow-up now opens the journal CaseForm
-              // above). Kept as a dormant, deep-link-only surface so an existing
-              // bookmark/URL still resolves; nothing in the app navigates here.
               <Route
-                path="/patient/:patientId/visit/:visitId/followup"
-                element={<FollowupRoute onBack={openPatient} />}
+                path="/patient/:patientId/receipt/:invoiceId"
+                element={<ReceiptRoute onBack={openPatient} />}
               />
-            ) : null}
-            {features.backup ? (
-              <Route path="/backup" element={<BackupScreen />} />
-            ) : null}
-            <Route path="*" element={<Navigate to="/today" replace />} />
-          </Routes>
+              <Route path="/reports" element={<ReportsScreen />} />
+              {features.backup ? (
+                <Route path="/backup" element={<BackupScreen />} />
+              ) : null}
+              {features.settings ? (
+                <Route path="/settings" element={<SettingsScreen />} />
+              ) : null}
+              <Route path="*" element={<Navigate to="/today" replace />} />
+            </Routes>
+          </LeaveGuardProvider>
         </main>
       </div>
       <StatusBar onOpenBackup={goToBackup} />
@@ -653,13 +835,19 @@ function ShellFrame({
 function PatientsRoute({
   onTakeCase,
   onNewFollowup,
+  onOpenInvoice,
+  onPrintReceipt,
 }: {
   readonly onTakeCase: (patientId: string) => void;
   readonly onNewFollowup: (patientId: string, prevVisitId?: string) => void;
+  readonly onOpenInvoice: (patientId: string, visitId: string) => void;
+  readonly onPrintReceipt: (patientId: string, invoiceId: string) => void;
 }): JSX.Element {
   const [params] = useSearchParams();
   const id = params.get('id') ?? undefined;
   const view = params.get('view') === 'new' ? 'new' : 'list';
+  // R5 (design §9): Today's Clear dues lands on the list filtered to dues > 0.
+  const dues = params.get('dues') === '1';
   // `exactOptionalPropertyTypes` is on: pass initialPatientId only when it is a
   // real id, never an explicit `undefined`. The `key` forces a fresh
   // PatientsPage when the deep-linked id changes (a new search Enter re-opens
@@ -670,13 +858,18 @@ function PatientsRoute({
       initialPatientId={id}
       onTakeCase={onTakeCase}
       onNewFollowup={onNewFollowup}
+      onOpenInvoice={onOpenInvoice}
+      onPrintReceipt={onPrintReceipt}
     />
   ) : (
     <PatientsPage
-      key={view}
+      key={`${view}-${dues ? 'dues' : 'all'}`}
       initialView={view}
+      initialDuesPositive={dues}
       onTakeCase={onTakeCase}
       onNewFollowup={onNewFollowup}
+      onOpenInvoice={onOpenInvoice}
+      onPrintReceipt={onPrintReceipt}
     />
   );
 }
@@ -696,9 +889,13 @@ function PatientsRoute({
  */
 function CaseRoute({
   onBack,
+  onOpenInvoice,
+  onPrintReceipt,
   visitType = 'first',
 }: {
   readonly onBack: (patientId: string) => void;
+  readonly onOpenInvoice: (patientId: string, visitId: string) => void;
+  readonly onPrintReceipt: (patientId: string, invoiceId: string) => void;
   readonly visitType?: 'first' | 'follow_up';
 }): JSX.Element {
   const params = useParams<{ patientId: string; visitId: string }>();
@@ -747,6 +944,66 @@ function CaseRoute({
       sex={sex}
       ageYears={ageYears}
       onBack={() => onBack(patientId)}
+      onOpenInvoice={onOpenInvoice}
+      onPrintReceipt={onPrintReceipt}
+    />
+  );
+}
+
+/**
+ * `/patient/:patientId/visit/:visitId/invoice` route (S15, R5 design §7).
+ * Back returns to where the doctor came from (case form / dashboard / Today)
+ * when there is in-app history, else to the patient's dashboard.
+ */
+function InvoiceRoute({
+  onBack,
+  onPrintReceipt,
+  onOpenSettings,
+}: {
+  readonly onBack: (patientId: string) => void;
+  readonly onPrintReceipt: (patientId: string, invoiceId: string) => void;
+  readonly onOpenSettings: () => void;
+}): JSX.Element {
+  const params = useParams<{ patientId: string; visitId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const patientId = params.patientId ?? '';
+  const visitId = params.visitId ?? '';
+  return (
+    <InvoiceScreen
+      key={visitId}
+      patientId={patientId}
+      visitId={visitId}
+      onBack={() => {
+        if (location.key !== 'default') navigate(-1);
+        else onBack(patientId);
+      }}
+      onPrintReceipt={(invoiceId) => onPrintReceipt(patientId, invoiceId)}
+      onOpenSettings={onOpenSettings}
+    />
+  );
+}
+
+/** `/patient/:patientId/receipt/:invoiceId` route (S14-lite, R5 design §8). */
+function ReceiptRoute({
+  onBack,
+}: {
+  readonly onBack: (patientId: string) => void;
+}): JSX.Element {
+  const params = useParams<{ patientId: string; invoiceId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const patientId = params.patientId ?? '';
+  const invoiceId = params.invoiceId ?? '';
+  return (
+    <ReceiptPreview
+      key={invoiceId}
+      patientId={patientId}
+      invoiceId={invoiceId}
+      onBack={() => {
+        if (location.key !== 'default') navigate(-1);
+        else onBack(patientId);
+      }}
     />
   );
 }
@@ -794,11 +1051,14 @@ function ageYearsOf(ageLabel: string): number {
   return match && match[1] !== undefined ? Number(match[1]) : 0;
 }
 
-/** `/lock` route: unlock returns to Today (or the previous screen). */
+/**
+ * `/lock` route: unlock returns to Today, or to the bill whose unsaved draft
+ * was held across the lock (r5-review-17), so no work is lost.
+ */
 function LockRoute(): JSX.Element {
   const navigate = useNavigate();
   const goHome = useCallback(
-    () => navigate('/today', { replace: true }),
+    () => navigate(heldInvoiceDraftRoute() ?? '/today', { replace: true }),
     [navigate],
   );
   return <LockScreen onUnlocked={goHome} />;
@@ -877,7 +1137,11 @@ function ShellRoute({
   if (!completed) {
     return <Navigate to="/setup" replace />;
   }
-  return <ShellFrame autolockMinutes={autolockMinutes} />;
+  return (
+    <AppPrefsProvider>
+      <ShellFrame autolockMinutes={autolockMinutes} />
+    </AppPrefsProvider>
+  );
 }
 
 /**
@@ -918,6 +1182,10 @@ function BootRouter({
           element={<SetupRoute onCompleted={markCompleted} />}
         />
         <Route path="/lock" element={<LockRoute />} />
+        <Route
+          path="/data-missing"
+          element={<DataFolderMissing onResolved={setLiveCompleted} />}
+        />
         <Route
           path="*"
           element={

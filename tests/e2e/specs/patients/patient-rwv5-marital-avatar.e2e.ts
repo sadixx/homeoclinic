@@ -1,7 +1,7 @@
 // @req PAT-001, PAT-005, PAT-038, PSR-001
 // @tier stable
 // @area patients
-// @targets linux
+// @targets linux, windows
 //
 // M3-RWv5 C1 + C2 (patient form / dashboard / search):
 //   C1 marital status offers exactly Single / Married / Divorced / Widowed (plus

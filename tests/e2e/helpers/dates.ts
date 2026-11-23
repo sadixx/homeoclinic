@@ -23,3 +23,21 @@ export function isoPlusDays(days: number): string {
   d.setDate(d.getDate() + days);
   return toIsoDate(d);
 }
+
+/**
+ * Local today + months (same day, clamped to the target month's end), as
+ * YYYY-MM-DD — mirrors shared/datetime.isoDatePlusMonths ("1 month").
+ */
+export function isoPlusMonths(months: number): string {
+  const now = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth() + months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(now.getDate(), lastDay));
+  return toIsoDate(target);
+}
+
+/** Day `day` of the month `months` after the current local month, as YYYY-MM-DD. */
+export function isoDayOfMonthAhead(months: number, day: number): string {
+  const now = new Date();
+  return toIsoDate(new Date(now.getFullYear(), now.getMonth() + months, day));
+}
