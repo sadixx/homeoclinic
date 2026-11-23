@@ -13,9 +13,12 @@
 // `hc_domain::billing::compute_totals` (non-empty description, qty >= 1) and
 // rejects a request that contains a blank line.
 //
+// Timing: fake timers; the 100 ms totals debounce is elapsed explicitly with
+// `vi.advanceTimersByTimeAsync`, never slept (R-TEST-006).
+//
 // CUT: the REAL <InvoiceScreen />. Only `@/bindings` is faked. Synthetic data.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -82,11 +85,19 @@ function backendTotals(req: ComputeTotalsRequest) {
   });
 }
 
-/** Let the screen's 100 ms totals debounce fire and its response land. */
+/**
+ * Let the screen's 100 ms totals debounce fire and its response land. Fake
+ * time is elapsed explicitly (R-TEST-006): the test never sleeps.
+ */
 async function afterDebounce(): Promise<void> {
   await act(async () => {
-    await new Promise((r) => setTimeout(r, TOTALS_DEBOUNCE_MS * 3));
+    await vi.advanceTimersByTimeAsync(TOTALS_DEBOUNCE_MS * 3);
   });
+}
+
+/** user-event driven by the fake clock so its internal delays do not hang. */
+function user() {
+  return userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
 }
 
 /**
@@ -136,6 +147,7 @@ async function renderInvoice(lineCount = 1) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
   for (const f of [invoiceGetForVisit, invoiceComputeTotals, invoiceUpiQr]) {
     f.mockReset();
   }
@@ -144,35 +156,39 @@ beforeEach(() => {
   invoiceUpiQr.mockResolvedValue(ok(upiQr));
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('S15 Invoice — adding a blank line keeps the cumulative total', () => {
   it('keeps the total (not a dash) after clicking "+ medicine"', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
     expect(total()).toHaveTextContent('300.00');
 
-    await user.click(screen.getByTestId('invoice-add-medicine'));
+    await u.click(screen.getByTestId('invoice-add-medicine'));
 
     expect(byPrefix('invoice-line-desc-')).toHaveLength(2);
     await expectTotalStays('300.00');
   });
 
   it('keeps the total (not a dash) after clicking "+ other line"', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
 
-    await user.click(screen.getByTestId('invoice-add-line'));
+    await u.click(screen.getByTestId('invoice-add-line'));
 
     expect(byPrefix('invoice-line-kind-')[1]).toHaveValue('other');
     await expectTotalStays('300.00');
   });
 
   it('keeps subtotal, discount and the amounts of the valid lines, not dashes', async () => {
-    const user = userEvent.setup();
+    const u = user();
     twoValidLines();
     await renderInvoice(2);
     expect(total()).toHaveTextContent('450.00');
 
-    await user.click(screen.getByTestId('invoice-add-medicine'));
+    await u.click(screen.getByTestId('invoice-add-medicine'));
 
     await expectTotalStays('450.00');
     expect(screen.getByTestId('invoice-subtotal')).toHaveTextContent('450.00');
@@ -186,43 +202,43 @@ describe('S15 Invoice — adding a blank line keeps the cumulative total', () =>
   });
 
   it('keeps the total after adding several blank lines in a row', async () => {
-    const user = userEvent.setup();
+    const u = user();
     twoValidLines();
     await renderInvoice(2);
 
-    await user.click(screen.getByTestId('invoice-add-medicine'));
-    await user.click(screen.getByTestId('invoice-add-line'));
-    await user.click(screen.getByTestId('invoice-add-medicine'));
+    await u.click(screen.getByTestId('invoice-add-medicine'));
+    await u.click(screen.getByTestId('invoice-add-line'));
+    await u.click(screen.getByTestId('invoice-add-medicine'));
 
     expect(byPrefix('invoice-line-desc-')).toHaveLength(5);
     await expectTotalStays('450.00');
   });
 
   it('keeps the discounted total when a blank line is added', async () => {
-    const user = userEvent.setup();
+    const u = user();
     twoValidLines();
     await renderInvoice(2);
-    await user.click(
+    await u.click(
       within(screen.getByTestId('invoice-discount-type')).getByRole('radio', {
         name: /percent|%/i,
       }),
     );
-    await user.type(screen.getByTestId('invoice-discount-value'), '5');
+    await u.type(screen.getByTestId('invoice-discount-value'), '5');
     await waitFor(() => expect(total()).toHaveTextContent('427.50'));
 
-    await user.click(screen.getByTestId('invoice-add-line'));
+    await u.click(screen.getByTestId('invoice-add-line'));
 
     await expectTotalStays('427.50');
   });
 
   it('keeps the total of an already saved bill when a blank line is added', async () => {
-    const user = userEvent.setup();
+    const u = user();
     invoiceGetForVisit.mockResolvedValue(ok(billedScreen()));
     render(<InvoiceScreen patientId="p-1" visitId="v-1" />);
     await screen.findByTestId('invoice-number');
     expect(total()).toHaveTextContent('427.50');
 
-    await user.click(screen.getByTestId('invoice-add-medicine'));
+    await u.click(screen.getByTestId('invoice-add-medicine'));
 
     expect(byPrefix('invoice-line-desc-')).toHaveLength(3);
     await expectTotalStays('427.50');
@@ -231,59 +247,59 @@ describe('S15 Invoice — adding a blank line keeps the cumulative total', () =>
 
 describe('S15 Invoice — a line that is being filled in', () => {
   it('keeps the total while the new line has a description but no rate yet', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
-    await user.click(screen.getByTestId('invoice-add-medicine'));
+    await u.click(screen.getByTestId('invoice-add-medicine'));
 
-    await user.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
+    await u.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
 
     await expectTotalStays('300.00');
   });
 
   it('drops the new line from the total again when its typed rate is cleared', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
-    await user.click(screen.getByTestId('invoice-add-medicine'));
-    await user.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
-    await user.type(byPrefix('invoice-line-rate-')[1]!, '150');
+    await u.click(screen.getByTestId('invoice-add-medicine'));
+    await u.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
+    await u.type(byPrefix('invoice-line-rate-')[1]!, '150');
     await expectTotalSettles('450.00');
 
-    await user.clear(byPrefix('invoice-line-rate-')[1]!);
+    await u.clear(byPrefix('invoice-line-rate-')[1]!);
 
     await expectTotalSettles('300.00');
     expect(byPrefix('invoice-line-amount-')[1]).toHaveTextContent(DASH);
   });
 
   it('keeps the total while the new line has a rate but no description yet', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
-    await user.click(screen.getByTestId('invoice-add-line'));
+    await u.click(screen.getByTestId('invoice-add-line'));
 
-    await user.type(byPrefix('invoice-line-rate-')[1]!, '150');
+    await u.type(byPrefix('invoice-line-rate-')[1]!, '150');
 
     await expectTotalStays('300.00');
   });
 
   it('keeps the total while the new line quantity is cleared', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
-    await user.click(screen.getByTestId('invoice-add-medicine'));
-    await user.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
-    await user.type(byPrefix('invoice-line-rate-')[1]!, '150');
+    await u.click(screen.getByTestId('invoice-add-medicine'));
+    await u.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
+    await u.type(byPrefix('invoice-line-rate-')[1]!, '150');
     await waitFor(() => expect(total()).toHaveTextContent('450.00'));
 
-    await user.clear(byPrefix('invoice-line-qty-')[1]!);
+    await u.clear(byPrefix('invoice-line-qty-')[1]!);
 
     await expectTotalSettles('300.00');
   });
 
   it('adds the new line to the total once description and rate are typed', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
-    await user.click(screen.getByTestId('invoice-add-medicine'));
+    await u.click(screen.getByTestId('invoice-add-medicine'));
 
-    await user.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
-    await user.type(byPrefix('invoice-line-rate-')[1]!, '150');
+    await u.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
+    await u.type(byPrefix('invoice-line-rate-')[1]!, '150');
 
     await expectTotalSettles('450.00');
     expect(byPrefix('invoice-line-amount-')[1]).toHaveTextContent('150.00');
@@ -291,14 +307,14 @@ describe('S15 Invoice — a line that is being filled in', () => {
   });
 
   it('multiplies by the typed quantity once the new line is valid', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
-    await user.click(screen.getByTestId('invoice-add-medicine'));
-    await user.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
-    await user.type(byPrefix('invoice-line-rate-')[1]!, '150');
+    await u.click(screen.getByTestId('invoice-add-medicine'));
+    await u.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
+    await u.type(byPrefix('invoice-line-rate-')[1]!, '150');
 
-    await user.clear(byPrefix('invoice-line-qty-')[1]!);
-    await user.type(byPrefix('invoice-line-qty-')[1]!, '3');
+    await u.clear(byPrefix('invoice-line-qty-')[1]!);
+    await u.type(byPrefix('invoice-line-qty-')[1]!, '3');
 
     await expectTotalSettles('750.00');
     expect(byPrefix('invoice-line-amount-')[1]).toHaveTextContent('450.00');
@@ -307,25 +323,25 @@ describe('S15 Invoice — a line that is being filled in', () => {
 
 describe('S15 Invoice — removing lines with a blank line present', () => {
   it('removing the blank line leaves the cumulative total of the valid lines', async () => {
-    const user = userEvent.setup();
+    const u = user();
     twoValidLines();
     await renderInvoice(2);
-    await user.click(screen.getByTestId('invoice-add-line'));
+    await u.click(screen.getByTestId('invoice-add-line'));
     await expectTotalStays('450.00');
 
-    await user.click(byPrefix('invoice-remove-line-')[2]!);
+    await u.click(byPrefix('invoice-remove-line-')[2]!);
 
     expect(byPrefix('invoice-line-desc-')).toHaveLength(2);
     await expectTotalStays('450.00');
   });
 
   it('removing a valid line while a blank line is present drops only that amount', async () => {
-    const user = userEvent.setup();
+    const u = user();
     twoValidLines();
     await renderInvoice(2);
-    await user.click(screen.getByTestId('invoice-add-medicine'));
+    await u.click(screen.getByTestId('invoice-add-medicine'));
 
-    await user.click(byPrefix('invoice-remove-line-')[1]!);
+    await u.click(byPrefix('invoice-remove-line-')[1]!);
 
     expect(byPrefix('invoice-line-desc-')).toHaveLength(2);
     await expectTotalSettles('300.00');
@@ -334,10 +350,10 @@ describe('S15 Invoice — removing lines with a blank line present', () => {
 
 describe('S15 Invoice — the dash that stays', () => {
   it('shows the dash only when the bill has no lines at all', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
 
-    await user.click(byPrefix('invoice-remove-line-')[0]!);
+    await u.click(byPrefix('invoice-remove-line-')[0]!);
 
     expect(screen.queryAllByTestId(/^invoice-line-desc-\d+$/)).toHaveLength(0);
     await waitFor(() => expect(total()).toHaveTextContent(DASH));

@@ -1,4 +1,6 @@
 // R5 — S15 Invoice: Save must still reject an incomplete line.
+// Requirement: BILL-001 (invoice lines, discount, total; docs/ui/S15-invoice.md
+// "Line description / qty / rate").
 // Regression guard for the totals fix (9e6fda9): the live totals now skip an
 // incomplete line instead of blanking, but the SAVE path (`onSave` ->
 // `toDtos`) stays all-or-nothing. A bill with a blank, rate-less or
@@ -6,11 +8,15 @@
 // save/issue command (`invoiceSave`), so an incomplete line is never saved or
 // issued silently.
 //
+// Timing: fake timers; the 100 ms totals debounce is elapsed explicitly with
+// `vi.advanceTimersByTimeAsync`, never slept, and the system date is pinned
+// (R-TEST-006).
+//
 // CUT: the REAL <InvoiceScreen />. Only `@/bindings` is faked. The fake
 // totals backend validates like `hc_domain::billing::compute_totals`
 // (non-empty description, qty >= 1). Synthetic data.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -35,7 +41,6 @@ vi.mock('@/bindings', () => ({
 }));
 
 import type { ComputeTotalsRequest, InvoiceSaveRequest } from '@/bindings';
-import { todayIsoDate } from '@/shared/datetime';
 import {
   billedScreen,
   consultationLine,
@@ -74,11 +79,19 @@ function backendTotals(req: ComputeTotalsRequest) {
   });
 }
 
-/** Let the screen's 100 ms totals debounce fire and its response land. */
+/**
+ * Let the screen's 100 ms totals debounce fire and its response land. Fake
+ * time is elapsed explicitly (R-TEST-006): the test never sleeps.
+ */
 async function afterDebounce(): Promise<void> {
   await act(async () => {
-    await new Promise((r) => setTimeout(r, TOTALS_DEBOUNCE_MS * 3));
+    await vi.advanceTimersByTimeAsync(TOTALS_DEBOUNCE_MS * 3);
   });
+}
+
+/** user-event driven by the fake clock so its internal delays do not hang. */
+function user() {
+  return userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
 }
 
 /** The total settles on `amount` and stays there, never a dash. */
@@ -90,10 +103,8 @@ async function expectTotalSettles(amount: string): Promise<void> {
 }
 
 /** Press Save and assert the line-validation error with NO backend save. */
-async function saveIsRejected(
-  user: ReturnType<typeof userEvent.setup>,
-): Promise<void> {
-  await user.click(screen.getByTestId('invoice-save'));
+async function saveIsRejected(u: ReturnType<typeof user>): Promise<void> {
+  await u.click(screen.getByTestId('invoice-save'));
   expect(await screen.findByTestId('invoice-save-error')).toHaveTextContent(
     LINES_ERROR,
   );
@@ -113,7 +124,14 @@ async function renderInvoice() {
   await waitFor(() => expect(total()).toHaveTextContent('300.00'));
 }
 
+/** The pinned local calendar day the screen reads as "today". */
+const PINNED_TODAY = '2026-08-15';
+
 beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  // Pin the clock mid-day so a run can never cross local midnight and the
+  // screen and the expected request always agree on `localToday`.
+  vi.setSystemTime(new Date(2026, 7, 15, 10, 0, 0));
   for (const f of [
     invoiceGetForVisit,
     invoiceComputeTotals,
@@ -128,54 +146,58 @@ beforeEach(() => {
   invoiceUpiQr.mockResolvedValue(ok(upiQr));
 });
 
-describe('S15 Invoice — Save rejects a bill with an incomplete line', () => {
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('BILL-001 S15 Invoice — Save rejects a bill with an incomplete line', () => {
   it('rejects a blank line added with "+ medicine" while the total shows the valid amount', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
 
-    await user.click(screen.getByTestId('invoice-add-medicine'));
+    await u.click(screen.getByTestId('invoice-add-medicine'));
     expect(byPrefix('invoice-line-desc-')).toHaveLength(2);
     await expectTotalSettles('300.00');
 
-    await saveIsRejected(user);
+    await saveIsRejected(u);
     expect(total()).toHaveTextContent('300.00');
   });
 
   it('rejects a line that has a description but no rate', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
-    await user.click(screen.getByTestId('invoice-add-medicine'));
-    await user.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
+    await u.click(screen.getByTestId('invoice-add-medicine'));
+    await u.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
     await expectTotalSettles('300.00');
 
-    await saveIsRejected(user);
+    await saveIsRejected(u);
   });
 
   it('rejects a line whose quantity was cleared', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
-    await user.click(screen.getByTestId('invoice-add-medicine'));
-    await user.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
-    await user.type(byPrefix('invoice-line-rate-')[1]!, '150');
+    await u.click(screen.getByTestId('invoice-add-medicine'));
+    await u.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
+    await u.type(byPrefix('invoice-line-rate-')[1]!, '150');
     await expectTotalSettles('450.00');
 
-    await user.clear(byPrefix('invoice-line-qty-')[1]!);
+    await u.clear(byPrefix('invoice-line-qty-')[1]!);
     await expectTotalSettles('300.00');
 
-    await saveIsRejected(user);
+    await saveIsRejected(u);
   });
 
   it('saves once the incomplete line is filled in, sending exactly the full line list', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
-    await user.click(screen.getByTestId('invoice-add-medicine'));
+    await u.click(screen.getByTestId('invoice-add-medicine'));
     await expectTotalSettles('300.00');
-    await saveIsRejected(user);
+    await saveIsRejected(u);
 
-    await user.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
-    await user.type(byPrefix('invoice-line-rate-')[1]!, '150');
+    await u.type(byPrefix('invoice-line-desc-')[1]!, 'Test Remedy 30C');
+    await u.type(byPrefix('invoice-line-rate-')[1]!, '150');
     await expectTotalSettles('450.00');
-    await user.click(screen.getByTestId('invoice-save'));
+    await u.click(screen.getByTestId('invoice-save'));
 
     await waitFor(() => expect(invoiceSave).toHaveBeenCalledTimes(1));
     const expected: InvoiceSaveRequest = {
@@ -194,7 +216,7 @@ describe('S15 Invoice — Save rejects a bill with an incomplete line', () => {
       ],
       discount: { kind: 'none' },
       payment: null,
-      localToday: todayIsoDate(),
+      localToday: PINNED_TODAY,
     };
     expect(invoiceSave.mock.calls[0]![0]).toEqual(expected);
     expect(await screen.findByTestId('invoice-number')).toHaveTextContent(
@@ -204,13 +226,13 @@ describe('S15 Invoice — Save rejects a bill with an incomplete line', () => {
   });
 
   it('shows a dash total and rejects Save when the only line is incomplete', async () => {
-    const user = userEvent.setup();
+    const u = user();
     await renderInvoice();
 
-    await user.clear(byPrefix('invoice-line-rate-')[0]!);
+    await u.clear(byPrefix('invoice-line-rate-')[0]!);
 
     await waitFor(() => expect(total()).toHaveTextContent(DASH));
-    await saveIsRejected(user);
+    await saveIsRejected(u);
     expect(total()).toHaveTextContent(DASH);
   });
 });

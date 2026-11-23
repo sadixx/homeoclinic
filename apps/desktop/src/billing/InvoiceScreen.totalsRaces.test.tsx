@@ -1,4 +1,5 @@
-// R5 — S15 Invoice: races and mid-edit states of the live totals.
+// R5 — S15 Invoice: races and mid-edit states of the live totals (BILL-001:
+// invoice total, discount and balance recompute live).
 // Review findings on 9e6fda9 (invoice totals are now requested for the
 // COMPLETE lines only and mapped back to rows by line key). Each test below
 // is a user-visible edge case of that change and is written FAILING-FIRST
@@ -196,7 +197,7 @@ afterEach(() => {
   clearInvoiceDraft();
 });
 
-describe('S15 Invoice — a stale totals response after Save (A, hc-review-1)', () => {
+describe('BILL-001 S15 Invoice — a stale totals response after Save (A, hc-review-1)', () => {
   /**
    * Edit the bill (add "Test Remedy 30C" at 150.00) with the totals response
    * held in flight, then Save. Save succeeds and adopts the saved bill, whose
@@ -252,7 +253,7 @@ describe('S15 Invoice — a stale totals response after Save (A, hc-review-1)', 
   });
 });
 
-describe('S15 Invoice — no backend error banner while a line is incomplete (B, hc-review-2)', () => {
+describe('BILL-001 S15 Invoice — no backend error banner while a line is incomplete (B, hc-review-2)', () => {
   it('shows no banner while a line is incomplete, and the right total once it is complete again', async () => {
     const u = user();
     await renderSavedBill();
@@ -292,7 +293,7 @@ describe('S15 Invoice — no backend error banner while a line is incomplete (B,
   });
 });
 
-describe('S15 Invoice — the failed-Save message survives an unrelated totals response (C, hc-review-3)', () => {
+describe('BILL-001 S15 Invoice — the failed-Save message survives an unrelated totals response (C, hc-review-3)', () => {
   /** Add a blank line and press Save: the lines message is shown. */
   async function failSaveWithBlankLine(u: ReturnType<typeof user>) {
     await renderUnbilled();
