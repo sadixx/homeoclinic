@@ -169,7 +169,52 @@ describe('R5 demo PHASE A: bill a visit with consultation + medicine lines and a
     expect(await billingPage.lineKindValue(1)).toBe('consultation');
     await billingPage.waitForLineAmount(1, '500.00');
 
-    await billingPage.addMedicine(2, MEDICINE, '2', '150');
+    // HC-MVP1 invoice totals fix (9e6fda9 / 0c6e172): a newly added, still
+    // incomplete line keeps the cumulative total and the other line amounts
+    // (the total used to turn into the dash), Save still rejects it, and no
+    // error banner shows mid-edit. Observed over 1.5 s (15x the 100 ms totals
+    // debounce) so a late flip to the dash is caught too.
+    const DASH = '—';
+    await billingPage.addBlankLine('other', 2);
+    expect(await billingPage.lineCount()).toBe(2);
+    expect(await billingPage.lineKindValue(2)).toBe('other');
+    const otherSeen = await billingPage.observeTotals(2, 1500);
+    for (const r of otherSeen) {
+      expect(r.total).not.toBe(DASH);
+      expect(r.total).toContain('500.00');
+      expect(r.total).toBe(r.subtotal);
+      expect(r.amount).toBe(DASH);
+    }
+    expect(await billingPage.lineAmount(1).getText()).toContain('500.00');
+    expect(await billingPage.saveError.isExisting()).toBe(false);
+    evidence(
+      `[r5demo] A: + other line (blank line 2) -> readings ${JSON.stringify(otherSeen)}; line 1 ` +
+        `${await billingPage.lineAmount(1).getText()}; no banner mid-edit`,
+    );
+    // Save rejects the incomplete line: an error, no receipt number.
+    await billingPage.save.waitForClickable({ timeout: 15000 });
+    await billingPage.save.click();
+    const saveErr = await billingPage.waitForSaveError();
+    expect(saveErr).toBe('Fill in the description, quantity and rate of every line.');
+    expect(await billingPage.number.getText()).not.toMatch(/\d{4}-\d{2}\/\d{4}/);
+    expect(await billingPage.total.getText()).toContain('500.00');
+    await billingPage.removeLine(2);
+    await billingPage.waitForNoSaveError();
+    expect(await billingPage.total.getText()).toContain('500.00');
+    evidence(`[r5demo] A: Save with blank line 2 rejected "${saveErr}", no receipt number; line removed, banner cleared`);
+
+    await billingPage.addBlankLine('medicine', 2);
+    expect(await billingPage.lineKindValue(2)).toBe('medicine');
+    const medSeen = await billingPage.observeTotals(2, 1500);
+    for (const r of medSeen) {
+      expect(r.total).not.toBe(DASH);
+      expect(r.total).toContain('500.00');
+      expect(r.total).toBe(r.subtotal);
+      expect(r.amount).toBe(DASH);
+    }
+    expect(await billingPage.saveError.isExisting()).toBe(false);
+    evidence(`[r5demo] A: + medicine (blank line 2) -> readings ${JSON.stringify(medSeen)}`);
+    await billingPage.fillLine(2, MEDICINE, '2', '150');
     expect(await billingPage.lineKindValue(2)).toBe('medicine');
     await billingPage.waitForLineAmount(2, '300.00');
     await browser.waitUntil(async () => (await billingPage.total.getText()).includes('800.00'), {

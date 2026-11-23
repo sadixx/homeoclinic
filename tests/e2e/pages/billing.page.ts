@@ -113,15 +113,81 @@ export class BillingPage {
     });
   }
 
+  get subtotal(): ChainablePromiseElement {
+    return byTestId('invoice-subtotal');
+  }
+
   /** Add a medicine line and fill it (it becomes line `n`). */
   async addMedicine(n: number, desc: string, qty: string, rate: string, timeout = 15000): Promise<void> {
-    const add = byTestId('invoice-add-medicine');
+    await this.addBlankLine('medicine', n, timeout);
+    await this.fillLine(n, desc, qty, rate);
+  }
+
+  /**
+   * Click "+ medicine" (`medicine`) or "+ other line" (`other`) and wait for
+   * the new, still incomplete line `n` (description and rate empty).
+   */
+  async addBlankLine(kind: 'medicine' | 'other', n: number, timeout = 15000): Promise<void> {
+    const add = byTestId(kind === 'medicine' ? 'invoice-add-medicine' : 'invoice-add-line');
     await add.waitForClickable({ timeout });
     await add.click();
     await this.lineDesc(n).waitForDisplayed({ timeout });
+  }
+
+  /** Fill description, quantity and rate of line `n`. */
+  async fillLine(n: number, desc: string, qty: string, rate: string): Promise<void> {
     await this.lineDesc(n).setValue(desc);
     await this.lineQty(n).setValue(qty);
     await this.lineRate(n).setValue(rate);
+  }
+
+  /** Remove line `n` with its row button and wait until the row count drops. */
+  async removeLine(n: number, timeout = 15000): Promise<void> {
+    const before = await this.lineCount();
+    const btn = byTestId(`invoice-remove-line-${n}`);
+    await btn.waitForClickable({ timeout });
+    await btn.click();
+    await browser.waitUntil(async () => (await this.lineCount()) === before - 1, {
+      timeout,
+      timeoutMsg: `invoice line ${n} was not removed`,
+    });
+  }
+
+  /**
+   * Sample subtotal, total and line `n`'s amount every ~100 ms for `ms`
+   * (bounded observation window, no sleep), so a later flip to the dash is
+   * caught as well as the first render. Returns every distinct reading.
+   */
+  async observeTotals(n: number, ms: number): Promise<{ subtotal: string; total: string; amount: string }[]> {
+    const seen = new Map<string, { subtotal: string; total: string; amount: string }>();
+    const until = Date.now() + ms;
+    await browser.waitUntil(
+      async () => {
+        const r = {
+          subtotal: await this.subtotal.getText(),
+          total: await this.total.getText(),
+          amount: await this.lineAmount(n).getText(),
+        };
+        seen.set(JSON.stringify(r), r);
+        return Date.now() >= until;
+      },
+      { timeout: ms + 5000, interval: 100 },
+    );
+    return [...seen.values()];
+  }
+
+  /** Wait until the Save error banner is shown and return its text. */
+  async waitForSaveError(timeout = 15000): Promise<string> {
+    await this.saveError.waitForDisplayed({ timeout });
+    return this.saveError.getText();
+  }
+
+  /** Wait until no Save error banner is shown. */
+  async waitForNoSaveError(timeout = 15000): Promise<void> {
+    await browser.waitUntil(async () => !(await this.saveError.isExisting()), {
+      timeout,
+      timeoutMsg: 'invoice Save error banner never cleared',
+    });
   }
 
   /** Pick the payment mode radio (cash | upi | card | other). */
