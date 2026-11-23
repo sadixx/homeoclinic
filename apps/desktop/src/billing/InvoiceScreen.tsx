@@ -108,25 +108,52 @@ function paiseToInput(paise: number): string {
   return formatPaise(paise).replace(/,/g, '');
 }
 
-/** Wire lines from the edit state, or `null` when any line is incomplete. */
+/** The wire line of one edit line, or `null` when the line is incomplete. */
+function toDto(l: EditLine): LineDto | null {
+  const qty = /^\d+$/.test(l.qty.trim()) ? Number(l.qty.trim()) : NaN;
+  const rate = parseRupeesToPaise(l.rate);
+  if (l.description.trim() === '' || !Number.isInteger(qty) || qty < 1) {
+    return null;
+  }
+  if (rate === null) return null;
+  return {
+    id: l.id,
+    kind: l.kind,
+    description: l.description.trim(),
+    qty,
+    ratePaise: rate,
+  };
+}
+
+/**
+ * Wire lines from the edit state, or `null` when any line is incomplete.
+ * All-or-nothing: this is the SAVE validation (an incomplete line must never
+ * be saved or issued silently). The live totals use `completeLines` instead.
+ */
 function toDtos(lines: readonly EditLine[]): LineDto[] | null {
   const out: LineDto[] = [];
   for (const l of lines) {
-    const qty = /^\d+$/.test(l.qty.trim()) ? Number(l.qty.trim()) : NaN;
-    const rate = parseRupeesToPaise(l.rate);
-    if (l.description.trim() === '' || !Number.isInteger(qty) || qty < 1) {
-      return null;
-    }
-    if (rate === null) return null;
-    out.push({
-      id: l.id,
-      kind: l.kind,
-      description: l.description.trim(),
-      qty,
-      ratePaise: rate,
-    });
+    const dto = toDto(l);
+    if (dto === null) return null;
+    out.push(dto);
   }
   return out;
+}
+
+/** The complete lines only (for the live totals), each with its row key. */
+function completeLines(lines: readonly EditLine[]): {
+  dtos: LineDto[];
+  keys: number[];
+} {
+  const dtos: LineDto[] = [];
+  const keys: number[] = [];
+  for (const l of lines) {
+    const dto = toDto(l);
+    if (dto === null) continue;
+    dtos.push(dto);
+    keys.push(l.key);
+  }
+  return { dtos, keys };
 }
 
 /** Wire discount from the edit state, or `null` when the value is malformed. */
@@ -154,6 +181,9 @@ export function InvoiceScreen({
   const [discountKind, setDiscountKind] = useState<DiscountKind>('none');
   const [discountValue, setDiscountValue] = useState('');
   const [totals, setTotals] = useState<TotalsView | null>(null);
+  // The row keys `totals.lineAmountsPaise` belongs to, in order. Only the
+  // complete lines are priced, so a row's amount is found by its key.
+  const [totalsKeys, setTotalsKeys] = useState<readonly number[]>([]);
   const [dirty, setDirty] = useState(false);
   const [paid, setPaid] = useState('');
   const [mode, setMode] = useState<PaymentMode>('cash');
@@ -211,7 +241,9 @@ export function InvoiceScreen({
       const inv = next.invoice;
       if (!resetLines) return;
       if (inv !== null) {
-        setLines(editLinesFrom(inv.lines));
+        const billed = editLinesFrom(inv.lines);
+        setLines(billed);
+        setTotalsKeys(billed.map((l) => l.key));
         setDiscountKind(inv.discount.kind);
         setDiscountValue(
           inv.discount.kind === 'percent'
@@ -222,7 +254,9 @@ export function InvoiceScreen({
         );
         setTotals(inv.totals);
       } else {
-        setLines(editLinesFrom(next.proposal ?? []));
+        const proposed = editLinesFrom(next.proposal ?? []);
+        setLines(proposed);
+        setTotalsKeys(proposed.map((l) => l.key));
         setDiscountKind('none');
         setDiscountValue('');
         setTotals(null);
@@ -247,6 +281,8 @@ export function InvoiceScreen({
     setPaidOn(draft.paidOn);
     setPaymentTouched(draft.paymentTouched);
     setDirty(draft.dirty);
+    // A clean draft still matches the loaded totals row for row.
+    if (!draft.dirty) setTotalsKeys(draft.lines.map((l) => l.key));
     setDraftNotice('restored');
   }, []);
 
@@ -303,13 +339,19 @@ export function InvoiceScreen({
   const saved = invoice !== null && !isVoid;
 
   // Live totals from the backend after an edit (debounced, last response
-  // wins). Incomplete lines are not sent; the totals show as pending.
+  // wins). Only the COMPLETE lines are sent (the backend validates every line
+  // it gets and the UI never sums money itself, R-ARCH-003); an incomplete
+  // line is skipped until it is filled in. The totals show as pending only
+  // when no line is complete or the discount value is malformed. Saving still
+  // validates every line (`onSave`), so skipping here never lets one through.
   useEffect(() => {
     if (!dirty) return undefined;
-    const dtos = toDtos(lines);
+    const { dtos, keys } = completeLines(lines);
     const discount = toDiscount(discountKind, discountValue);
-    if (dtos === null || discount === null || dtos.length === 0) {
+    if (discount === null || dtos.length === 0) {
+      totalsSeq.current += 1;
       setTotals(null);
+      setTotalsKeys([]);
       return undefined;
     }
     const seq = ++totalsSeq.current;
@@ -321,11 +363,13 @@ export function InvoiceScreen({
           );
           if (seq === totalsSeq.current) {
             setTotals(next);
+            setTotalsKeys(keys);
             setError(null);
           }
         } catch (err) {
           if (seq === totalsSeq.current) {
             setTotals(null);
+            setTotalsKeys([]);
             setError(billingErrorMessage(err));
           }
         }
@@ -668,10 +712,12 @@ export function InvoiceScreen({
   }
 
   const readOnly = isVoid;
-  const amounts =
-    totals !== null && totals.lineAmountsPaise.length === lines.length
-      ? totals.lineAmountsPaise
-      : null;
+  /** The backend amount of a row, `undefined` while it is incomplete. */
+  const amountOf = (key: number): number | undefined => {
+    if (totals === null) return undefined;
+    const at = totalsKeys.indexOf(key);
+    return at < 0 ? undefined : totals.lineAmountsPaise[at];
+  };
   const visitOn = formatDate(data.visit.visitAt) ?? t('common.none');
   const numberText =
     invoice !== null
@@ -782,7 +828,7 @@ export function InvoiceScreen({
           <tbody>
             {lines.map((l, i) => {
               const n = i + 1;
-              const amount = amounts?.[i];
+              const amount = amountOf(l.key);
               return (
                 <tr key={l.key} className="border-b border-slate-100">
                   <td className="py-1 pr-2">
