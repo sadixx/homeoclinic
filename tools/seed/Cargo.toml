@@ -24,7 +24,7 @@ hc-storage = { path = "../../crates/hc-storage", features = ["testing"] }
 hc-search = { path = "../../crates/hc-search" }
 # Same pin as hc-storage/hc-search; seed binds INSERT params on a Connection and
 # opens the pool. bundled feature compiles in FTS5 + trigram (trigger sync).
-rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
+rusqlite = { version = "0.42", features = ["bundled-sqlcipher-vendored-openssl"] }
 # SAME pin already used by hc-storage; seeded StdRng (determinism contract).
 rand = { version = "0.8.5" }
 thiserror = { workspace = true }   # SeedError (R-RUST-001)
