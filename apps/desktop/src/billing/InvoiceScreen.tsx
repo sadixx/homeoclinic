@@ -240,6 +240,10 @@ export function InvoiceScreen({
       setData(next);
       const inv = next.invoice;
       if (!resetLines) return;
+      // The lines are re-keyed and the totals replaced below: a totals
+      // response still in flight was computed for the previous lines, so it
+      // must not land on the new rows.
+      totalsSeq.current += 1;
       if (inv !== null) {
         const billed = editLinesFrom(inv.lines);
         setLines(billed);
@@ -281,8 +285,11 @@ export function InvoiceScreen({
     setPaidOn(draft.paidOn);
     setPaymentTouched(draft.paymentTouched);
     setDirty(draft.dirty);
-    // A clean draft still matches the loaded totals row for row.
-    if (!draft.dirty) setTotalsKeys(draft.lines.map((l) => l.key));
+    // A clean draft still matches the loaded totals row for row. A dirty one
+    // does not: its row keys may collide with the loaded lines' keys, so no
+    // row shows an amount until the recompute for the draft lands.
+    if (draft.dirty) setTotalsKeys([]);
+    else setTotalsKeys(draft.lines.map((l) => l.key));
     setDraftNotice('restored');
   }, []);
 
@@ -347,6 +354,10 @@ export function InvoiceScreen({
   useEffect(() => {
     if (!dirty) return undefined;
     const { dtos, keys } = completeLines(lines);
+    // While any line is incomplete the backend only sees part of the bill, so
+    // its verdict (e.g. a discount larger than the partial subtotal) is not
+    // surfaced, and it must not clear the message of a failed Save.
+    const allComplete = dtos.length === lines.length;
     const discount = toDiscount(discountKind, discountValue);
     if (discount === null || dtos.length === 0) {
       totalsSeq.current += 1;
@@ -364,13 +375,13 @@ export function InvoiceScreen({
           if (seq === totalsSeq.current) {
             setTotals(next);
             setTotalsKeys(keys);
-            setError(null);
+            if (allComplete) setError(null);
           }
         } catch (err) {
           if (seq === totalsSeq.current) {
             setTotals(null);
             setTotalsKeys([]);
-            setError(billingErrorMessage(err));
+            if (allComplete) setError(billingErrorMessage(err));
           }
         }
       })();
