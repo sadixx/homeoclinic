@@ -10,7 +10,7 @@ hc-storage = { path = "../hc-storage" }
 # Same pin as hc-storage; search executes parameterised SQL (FTS5 MATCH, keyset
 # paging) against a rusqlite Connection. The bundled SQLCipher build compiles in
 # FTS5 + the trigram tokeniser used by patient_trgm (R-SEC-008 pinned).
-rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
+rusqlite = { version = "0.42", features = ["bundled-sqlcipher-vendored-openssl"] }
 thiserror = { workspace = true }   # SearchError enum (R-RUST-001)
 tracing = { workspace = true }     # structured logs, hashed ids only (R-PRIV-001)
 # UUIDv7 ids for the test/insert fixtures and the insert helper (same pin as hc-storage).
@@ -28,4 +28,4 @@ testing = ["dep:tempfile"]
 # under a plain `cargo test` without forcing the feature on library consumers
 # (R-TEST-009).
 hc-search = { path = ".", features = ["testing"] }
-rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
+rusqlite = { version = "0.42", features = ["bundled-sqlcipher-vendored-openssl"] }
