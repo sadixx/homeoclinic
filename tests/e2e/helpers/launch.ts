@@ -167,6 +167,14 @@ function requireState(): SpecDataState {
 
 /** Build the env overrides that point the app at `dir` as its data dir. */
 function dataDirEnv(dir: string): NodeJS.ProcessEnv {
+  if (process.platform === 'win32') {
+    // Windows: app_data_dir() is the %APPDATA% Known Folder and ignores the
+    // environment, so XDG_DATA_HOME / HOME do nothing there. The app built with
+    // the e2e-test-keys feature honours HC_E2E_APP_DATA_BASE instead
+    // (apps/desktop/src-tauri/src/lib.rs `resolve_home`): home becomes
+    // <dir>/<identifier>, the same layout Linux gets from XDG_DATA_HOME.
+    return { HC_E2E_APP_DATA_BASE: dir };
+  }
   // XDG_DATA_HOME drives Tauri's app_data_dir() on Linux
   // (dirs::data_dir() -> $XDG_DATA_HOME/<identifier>). HOME is pointed at the
   // same dir too so nothing leaks into the real ~/.local/share and the

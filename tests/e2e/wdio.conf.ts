@@ -15,11 +15,26 @@
 // there. Unset = every spec (the Linux job and local runs). `--spec` on the
 // command line still narrows further, as usual.
 //
-// WINDOWS DATA-DIR CAVEAT: the per-spec isolation below works through
+// WINDOWS DATA-DIR ISOLATION: the per-spec isolation below works through
 // XDG_DATA_HOME, which Tauri's app_data_dir() honours on Linux only. On
 // Windows app_data_dir() is the Known Folder %APPDATA%\dev.homeoclinic.desktop
-// and ignores the environment, so Windows specs share one data dir until the
-// app or the harness gains a Windows isolation lever.
+// and ignores the environment, so the e2e-test-keys build honours
+// HC_E2E_APP_DATA_BASE instead (apps/desktop/src-tauri/src/lib.rs
+// `resolve_home`; helpers/launch.ts dataDirEnv sets it on win32 only).
+//
+// WINDOWS INTEGRITY LEVEL: msedgedriver tells the app's WebView2 to open a
+// DevTools port through WEBVIEW2_* environment variables. WebView2 ignores
+// those overrides when the process runs at HIGH integrity, which is how every
+// GitHub-hosted Windows step runs (elevated admin, UAC off). The result is
+// "session not created: DevToolsActivePort file doesn't exist". The Windows
+// CI jobs therefore start wdio through .github/scripts/win-e2e-run.ps1, which
+// lowers it to Medium integrity (gsudo --integrity Medium). The line logged at
+// load time ([wdio] process integrity) shows which level this run has.
+//
+// CI KNOBS (all optional, defaults = historic behaviour):
+//   HC_E2E_BAIL=<n>                       stop after n failed spec files
+//   HC_E2E_CONNECTION_RETRY_COUNT=<n>     wdio session-create retries (3)
+//   HC_E2E_CONNECTION_RETRY_TIMEOUT=<ms>  per-request timeout (120000)
 //
 // ── DATA-DIR ISOLATION (CI parity with hc-e2e-orchestrator) ─────────────────
 // The app resolves its data dir from Tauri's app.path().app_data_dir(), which
@@ -37,6 +52,7 @@
 // (restart driver + reloadSession), which is the in-process equivalent of the
 // orchestrator's separate per-phase processes. maxInstances:1 keeps this
 // strictly serial so a single shared driver port (4444) is never contended.
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -80,6 +96,44 @@ process.env.HC_APP_BINARY = appBinary;
 resolveNativeDriver();
 
 const tauriDriverPort = 4444;
+
+/** Non-negative integer from an env var, or `fallback` when unset/empty. */
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (raw === undefined || raw === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(`${name}=${raw} must be a non-negative integer`);
+  }
+  return n;
+}
+
+/**
+ * Windows only: log the integrity level this process runs at. WebView2 ignores
+ * the WEBVIEW2_* overrides msedgedriver relies on when it is High (see the
+ * header), so a High run is flagged loudly. Never throws.
+ */
+function logWindowsIntegrity(): void {
+  if (process.platform !== 'win32') return;
+  try {
+    const out = execFileSync('whoami', ['/groups'], { encoding: 'utf8' });
+    const line = out.split(/\r?\n/).find((l) => l.includes('Mandatory Label'));
+    const level = line?.trim().split(/\s{2,}/)[0] ?? 'unknown';
+    // eslint-disable-next-line no-console
+    console.log(`[wdio] process integrity: ${level}`);
+    if (level.includes('High')) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '[wdio] WARNING: High integrity: WebView2 ignores the WEBVIEW2_* ' +
+          'overrides, so msedgedriver cannot reach the app (DevToolsActivePort ' +
+          'file doesn\'t exist). Start wdio via .github/scripts/win-e2e-run.ps1.',
+      );
+    }
+  } catch {
+    // diagnostics only
+  }
+}
+logWindowsIntegrity();
 
 /**
  * The spec list: every spec, or (HC_E2E_TARGET set) only those whose @targets
@@ -126,10 +180,10 @@ export const config: WebdriverIO.Config = {
 
   logLevel: 'debug',
   outputDir: process.env.HC_E2E_OUTDIR ?? './',
-  bail: 0,
+  bail: envInt('HC_E2E_BAIL', 0),
   waitforTimeout: 15000,
-  connectionRetryTimeout: 120000,
-  connectionRetryCount: 3,
+  connectionRetryTimeout: envInt('HC_E2E_CONNECTION_RETRY_TIMEOUT', 120000),
+  connectionRetryCount: envInt('HC_E2E_CONNECTION_RETRY_COUNT', 3),
 
   framework: 'mocha',
   mochaOpts: {
