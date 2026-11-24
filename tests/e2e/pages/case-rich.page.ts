@@ -515,31 +515,181 @@ export class CaseRichPage {
    * place. The caret stays in entry body text the whole time (never on the
    * complaint heading), so the DEFECT 1 list guard is not engaged.
    */
-  async exitListToNewParagraph(cid = DEFAULT_CID): Promise<void> {
+  //
+  // WHY REAL KEYS, ONE AT A TIME (Windows/WebView2 fix): this used to fire two
+  // `document.execCommand('insertParagraph')` calls back to back inside ONE
+  // browser.execute. That is a NATIVE DOM edit, not a key press: ProseMirror
+  // only sees the resulting DOM mutations and re-reads them on its observer
+  // flush. On WebKitGTK the two edits happened to land as two Enters; on
+  // Chromium/WebView2 both mutations were flushed together and read back as a
+  // single Enter (ProseMirror's "looks like Enter" DOM-change heuristic), so the
+  // caret stayed in a new EMPTY <li> of the bullet list. The next toggle then
+  // converted that <ul> into an <ol> in place (CI 45337219252: ul=0 on Windows).
+  // A real Enter keydown goes through the editor keymap (TipTap ListItem ->
+  // splitListItem, which lifts an empty item out of the list) on every engine,
+  // and waiting for the DOM after each press removes the timing dependency.
+  async exitListToNewParagraph(cid = DEFAULT_CID, timeout = 15000): Promise<void> {
     const ed = this.editor(cid);
     await ed.waitForDisplayed({ timeout: 15000 });
-    const ok = await browser.execute((selector: string) => {
-      const root = document.querySelector(selector);
+    const selector = `[data-testid="case-form-editor-${cid}"]`;
+    const before = await this.listShape(cid);
+    if (!before.endsInList) {
+      throw new Error(`exitListToNewParagraph: the editor does not end in a list (${before.tail})`);
+    }
+    await this.debugEditor('exitList:before', cid);
+    // Focus the contenteditable and collapse the caret to the very end (inside
+    // the last list item). A native click is avoided on purpose: the last <li>
+    // can sit under the bounded-scroll edge; the DOM selection is picked up by
+    // ProseMirror through its selectionchange listener.
+    const ok = await browser.execute((sel: string) => {
+      const root = document.querySelector(sel);
       const pm = (root?.querySelector('.ProseMirror') ?? root) as HTMLElement | null;
       if (pm === null) return false;
       pm.focus();
-      const sel = window.getSelection();
+      const s = window.getSelection();
       const range = document.createRange();
       range.selectNodeContents(pm);
-      range.collapse(false); // caret to the very end (inside the last list item)
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-      // First Enter: open a new (empty) list item. Second Enter on the empty
-      // item: ProseMirror lifts the caret out of the list into a paragraph.
-      document.execCommand('insertParagraph');
-      document.execCommand('insertParagraph');
+      range.collapse(false);
+      s?.removeAllRanges();
+      s?.addRange(range);
       return true;
-    }, `[data-testid="case-form-editor-${cid}"]`);
+    }, selector);
     if (ok !== true) {
-      throw new Error('could not exit the list into a fresh paragraph');
+      throw new Error('could not place the caret at the end of the editor list');
     }
+    // Wait until the editor itself has focus and its caret is inside the last
+    // list item (TipTap exposes the editor on the view DOM as `.editor`; if it
+    // is absent fall back to the DOM selection check only).
+    await browser.waitUntil(
+      async () =>
+        browser.execute((sel: string) => {
+          const root = document.querySelector(sel);
+          const pm = (root?.querySelector('.ProseMirror') ?? root) as
+            | (HTMLElement & {
+                editor?: {
+                  isFocused?: boolean;
+                  isActive: (n: string) => boolean;
+                  state: { selection: { to: number }; doc: { content: { size: number } } };
+                };
+              })
+            | null;
+          if (pm === null || document.activeElement !== pm) return false;
+          const domSel = window.getSelection();
+          const anchor = domSel?.anchorNode ?? null;
+          const inLi =
+            anchor !== null &&
+            (anchor instanceof Element ? anchor : anchor.parentElement)?.closest('li') ===
+              pm.querySelector(':scope > ul:last-child > li:last-child, :scope > ol:last-child > li:last-child');
+          if (!inLi) return false;
+          const e = pm.editor;
+          if (e === undefined) return true;
+          return e.isActive('listItem');
+        }, selector),
+      { timeout, timeoutMsg: 'editor caret did not settle inside the last list item before Enter' },
+    );
+    // Enter #1: split -> a new EMPTY list item at the end of the same list.
+    await browser.keys([Key.Enter]);
+    await browser.waitUntil(
+      async () => {
+        const s = await this.listShape(cid);
+        return s.endsInList && s.li === before.li + 1 && s.lastLiEmpty;
+      },
+      {
+        timeout,
+        timeoutMsg: `first Enter did not open an empty list item (before li=${before.li})`,
+      },
+    );
+    await this.debugEditor('exitList:after-enter-1', cid);
+    // Enter #2 on the empty item: the editor lifts it out of the list into a
+    // fresh top-level paragraph; the original list keeps its items.
+    await browser.keys([Key.Enter]);
+    await browser.waitUntil(
+      async () => {
+        const s = await this.listShape(cid);
+        return (
+          !s.endsInList &&
+          s.lastTag === 'P' &&
+          s.ul === before.ul &&
+          s.ol === before.ol &&
+          s.li === before.li
+        );
+      },
+      {
+        timeout,
+        timeoutMsg: `second Enter did not lift out of the list into a new paragraph (before ul=${before.ul} ol=${before.ol} li=${before.li})`,
+      },
+    );
+    await this.debugEditor('exitList:after-enter-2', cid);
     // Blur to flush autosave, mirroring typeProse().
     await this.complaintTitle.click();
+  }
+
+  /** Structural snapshot of the editor's list state at the END of the document. */
+  private async listShape(cid = DEFAULT_CID): Promise<{
+    ul: number;
+    ol: number;
+    li: number;
+    endsInList: boolean;
+    lastLiEmpty: boolean;
+    lastTag: string;
+    tail: string;
+  }> {
+    return browser.execute((sel: string) => {
+      const root = document.querySelector(sel);
+      const pm = (root?.querySelector('.ProseMirror') ?? root) as HTMLElement | null;
+      if (pm === null || root === null) {
+        return { ul: 0, ol: 0, li: 0, endsInList: false, lastLiEmpty: false, lastTag: '', tail: '' };
+      }
+      const last = pm.lastElementChild;
+      const lastTag = last?.tagName ?? '';
+      const endsInList = lastTag === 'UL' || lastTag === 'OL';
+      const lastLi = endsInList ? last?.querySelector(':scope > li:last-child') : null;
+      return {
+        ul: root.querySelectorAll('ul').length,
+        ol: root.querySelectorAll('ol').length,
+        li: root.querySelectorAll('li').length,
+        endsInList,
+        lastLiEmpty: lastLi !== null && lastLi !== undefined && (lastLi.textContent ?? '').trim() === '',
+        lastTag,
+        tail: (last?.outerHTML ?? '').slice(-300),
+      };
+    }, `[data-testid="case-form-editor-${cid}"]`) as Promise<{
+      ul: number;
+      ol: number;
+      li: number;
+      endsInList: boolean;
+      lastLiEmpty: boolean;
+      lastTag: string;
+      tail: string;
+    }>;
+  }
+
+  /**
+   * Diagnostics only (HC_E2E_DEBUG_EDITOR=1): log the tail of the editor HTML
+   * plus the ProseMirror selection so a CI log shows exactly what each step did.
+   */
+  async debugEditor(label: string, cid = DEFAULT_CID): Promise<void> {
+    if (process.env.HC_E2E_DEBUG_EDITOR !== '1') return;
+    const info = await browser.execute((sel: string) => {
+      const root = document.querySelector(sel);
+      const pm = (root?.querySelector('.ProseMirror') ?? root) as
+        | (HTMLElement & {
+            editor?: { state: { selection: { from: number; to: number }; doc: { content: { size: number } } } };
+          })
+        | null;
+      if (pm === null) return { html: '<no editor>', sel: '', focused: false };
+      const e = pm.editor;
+      return {
+        html: pm.innerHTML.slice(-1200),
+        sel:
+          e === undefined
+            ? 'no-editor-handle'
+            : `${e.state.selection.from}-${e.state.selection.to}/${e.state.doc.content.size}`,
+        focused: document.activeElement === pm,
+      };
+    }, `[data-testid="case-form-editor-${cid}"]`);
+    // eslint-disable-next-line no-console
+    console.log(`[editor-debug] ${label} focused=${info.focused} sel=${info.sel} html-tail=${info.html}`);
   }
 
   /** Counts of rendered list nodes inside the editor. */
