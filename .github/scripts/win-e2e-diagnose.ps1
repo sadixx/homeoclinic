@@ -76,10 +76,12 @@ if (Test-Path $App) {
   exit 1
 }
 
-Section 'ENVIRONMENT (allow-listed; other names only)'
-$allow = '^(PATH|TEMP|TMP|APPDATA|LOCALAPPDATA|USERPROFILE|USERNAME|COMPUTERNAME|PROCESSOR_ARCHITECTURE|OS|HC_.*|WEBVIEW2_.*|TAURI_.*|NODE_VERSION|RUNNER_.*|CARGO_HOME)$'
-Get-ChildItem Env: | Where-Object { $_.Name -match $allow } | Sort-Object Name | ForEach-Object { Write-Host "$($_.Name)=$($_.Value)" }
-Write-Host ('other variable names: ' + ((Get-ChildItem Env: | Where-Object { $_.Name -notmatch $allow } | ForEach-Object Name | Sort-Object) -join ', '))
+Section 'ENVIRONMENT (values only for a short allow-list; secret-like names never)'
+$allow = '^(PATH|TEMP|TMP|OS|PROCESSOR_ARCHITECTURE|COMPUTERNAME|HC_E2E_.*|HC_GSUDO|HC_NATIVE_DRIVER|RUNNER_OS|RUNNER_ARCH|RUNNER_TEMP)$'
+$secretLike = 'KEY|TOKEN|SECRET|PASSWORD|^TAURI_'
+$vars = @(Get-ChildItem Env: | Sort-Object Name)
+$vars | Where-Object { $_.Name -match $allow -and $_.Name -notmatch $secretLike } | ForEach-Object { Write-Host "$($_.Name)=$($_.Value)" }
+Write-Host ('names only (values hidden): ' + (($vars | Where-Object { $_.Name -notmatch $allow -or $_.Name -match $secretLike } | ForEach-Object Name) -join ', '))
 
 # ---------------------------------------------------------------- 2. probes
 $gsudo = $env:HC_GSUDO

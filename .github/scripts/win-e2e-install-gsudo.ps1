@@ -14,11 +14,15 @@
   This step fails fast (seconds, before the 12 minute app build) when gsudo
   cannot be installed or does not really lower the integrity level.
 
-  Source order: already present, the pinned portable zip from the gsudo
-  GitHub release, then Chocolatey (preinstalled on the runner image).
+  Source order: already present (only if its --version reports the pinned
+  version), the pinned portable zip from the gsudo GitHub release (SHA256
+  verified), then Chocolatey (preinstalled on the runner image).
 #>
 $ErrorActionPreference = 'Stop'
 $version = '2.6.1'
+# SHA256 of gsudo.portable.zip in release v2.6.1, as published by GitHub
+# (gh api repos/gerardog/gsudo/releases/tags/v2.6.1 --jq '.assets[]|{name,digest}').
+$zipSha256 = '21130bf178d7b9891207f00bff56f05b6b363ce9cec7b2d084e45fb12ee51f44'
 
 function Find-Gsudo {
   $candidates = @("$env:ProgramFiles\gsudo\Current\gsudo.exe")
@@ -30,6 +34,13 @@ function Find-Gsudo {
 }
 
 $gsudo = Find-Gsudo
+if ($gsudo) {
+  $found = "$(& $gsudo --version 2>&1)"
+  if ($found -notmatch [regex]::Escape($version)) {
+    Write-Host "Existing gsudo at $gsudo reports '$found', not $version; installing the pinned version"
+    $gsudo = $null
+  }
+}
 if (-not $gsudo) {
   try {
     $zip = Join-Path $env:RUNNER_TEMP "gsudo-$version.zip"
@@ -37,6 +48,11 @@ if (-not $gsudo) {
     $url = "https://github.com/gerardog/gsudo/releases/download/v$version/gsudo.portable.zip"
     Write-Host "Downloading $url"
     Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+    $actual = (Get-FileHash -Path $zip -Algorithm SHA256).Hash
+    if ($actual -ine $zipSha256) {
+      Remove-Item -Force $zip -ErrorAction SilentlyContinue
+      throw "SHA256 mismatch for gsudo.portable.zip: expected $zipSha256, got $actual"
+    }
     Expand-Archive -Path $zip -DestinationPath $dir -Force
     $all = @(Get-ChildItem -Path $dir -Recurse -Filter gsudo.exe)
     $x64 = $all | Where-Object { $_.FullName -match '[\\/]x64[\\/]' } | Select-Object -First 1

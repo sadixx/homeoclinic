@@ -159,7 +159,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~\.cargo\bin\tauri-driver.exe
-          key: tauri-driver-${{ runner.os }}-v1
+          key: tauri-driver-${{ runner.os }}-v1-${{ hashFiles('Cargo.lock') }}
 
       - name: Install tauri-driver
         if: steps.tauri-driver-cache.outputs.cache-hit != 'true'

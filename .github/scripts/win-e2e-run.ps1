@@ -26,7 +26,12 @@ $integrity = if ($env:HC_E2E_INTEGRITY) { $env:HC_E2E_INTEGRITY } else { 'Medium
 $wdio = 'node_modules/@wdio/cli/bin/wdio.js'
 if (-not (Test-Path $wdio)) { throw "wdio CLI not found at $wdio (run from tests/e2e after npm ci)" }
 $wdioArgs = @($wdio, 'run', 'wdio.conf.ts')
-if ($Spec) { $wdioArgs += @('--spec', $Spec) }
+if ($Spec) {
+  if ($Spec -notmatch '^specs/[\w./-]+\.e2e\.ts$' -or $Spec -match '\.\.') {
+    throw "Invalid spec path '$Spec' (expected specs/<name>.e2e.ts relative to tests/e2e)"
+  }
+  $wdioArgs += @('--spec', $Spec)
+}
 
 if ($integrity -eq 'High') {
   Write-Host "Running wdio at the runner's native (High) integrity level"
