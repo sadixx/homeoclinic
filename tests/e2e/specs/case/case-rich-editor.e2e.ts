@@ -222,6 +222,7 @@ describe('M3-RWv3 rich PHASE A: unified complaint-section record — add new com
       timeout: 15000,
       timeoutMsg: 'ordered-list toolbar did not render an <ol> in entry prose',
     });
+    await caseRichPage.debugEditor('after-ordered-list');
     const lists = await caseRichPage.listCounts();
     expect(lists.ul).toBeGreaterThanOrEqual(1);
     expect(lists.ol).toBeGreaterThanOrEqual(1);

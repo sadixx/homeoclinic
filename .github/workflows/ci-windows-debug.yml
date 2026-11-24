@@ -37,7 +37,7 @@ on:
       spec:
         description: "Spec to run, relative to tests/e2e"
         required: false
-        default: "specs/app/boot-gate.e2e.ts"
+        default: "specs/case/case-rich-editor.e2e.ts"
       integrity:
         description: "Integrity level for wdio: Medium (fix) or High (reproduce the original failure)"
         required: false
@@ -65,7 +65,7 @@ jobs:
       run:
         shell: pwsh
     env:
-      HC_DEBUG_SPEC: ${{ inputs.spec || 'specs/app/boot-gate.e2e.ts' }}
+      HC_DEBUG_SPEC: ${{ inputs.spec || 'specs/case/case-rich-editor.e2e.ts' }}
       HC_E2E_INTEGRITY: ${{ inputs.integrity || 'Medium' }}
     steps:
       - name: Checkout
@@ -218,6 +218,8 @@ jobs:
           HC_SEED_BIN: ${{ github.workspace }}\target\debug\hc-seed.exe
           HC_E2E_BAIL: "1"
           HC_E2E_CONNECTION_RETRY_COUNT: "0"
+          # Editor HTML/selection dumps from the case-rich page object.
+          HC_E2E_DEBUG_EDITOR: "1"
         run: |
           New-Item -ItemType Directory -Force -Path $env:HC_E2E_OUTDIR | Out-Null
           & "$env:GITHUB_WORKSPACE\.github\scripts\win-e2e-run.ps1" -Spec $env:HC_DEBUG_SPEC *>&1 |
