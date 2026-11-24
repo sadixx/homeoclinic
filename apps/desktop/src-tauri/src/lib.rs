@@ -17,6 +17,28 @@
 
 mod webview_permissions;
 
+/// Resolve the fixed home dir (ADR 0020): the OS per-user app data dir.
+///
+/// DEV/E2E ONLY seam (feature `e2e-test-keys`, never compiled into a release
+/// or public build): when `HC_E2E_APP_DATA_BASE` names an absolute directory,
+/// the home becomes `<base>/<identifier>`, exactly the layout Linux gets from
+/// `XDG_DATA_HOME`. Windows has no equivalent lever (`app_data_dir()` is the
+/// `%APPDATA%` Known Folder and ignores the environment), so the Windows E2E
+/// harness uses this to give every spec its own fresh data dir. Unset (every
+/// Linux run, every non-E2E build) the behaviour is unchanged. Nothing is
+/// logged here (no path, R-PRIV-001); no network, no socket.
+fn resolve_home(app: &tauri::App) -> tauri::Result<std::path::PathBuf> {
+    use tauri::Manager as _;
+    #[cfg(feature = "e2e-test-keys")]
+    if let Some(base) = std::env::var_os("HC_E2E_APP_DATA_BASE") {
+        let base = std::path::PathBuf::from(base);
+        if base.is_absolute() {
+            return Ok(base.join(&app.config().identifier));
+        }
+    }
+    app.path().app_data_dir()
+}
+
 /// Build and run the HomeoClinic desktop application.
 ///
 /// Initialises structured JSON logging (HC-MVP1-017) and mounts the single
@@ -84,7 +106,7 @@ pub fn run() {
             // The OS app data dir is the fixed home (ADR 0020): logs and the
             // data-location pointer always stay here; the data may live in a
             // folder the doctor chose in Settings.
-            let home = app.path().app_data_dir()?;
+            let home = resolve_home(app)?;
             let guard = hc_app::logging::init(&home, hc_app::logging::RotationPolicy::DEFAULT)?;
             app.manage(guard);
 

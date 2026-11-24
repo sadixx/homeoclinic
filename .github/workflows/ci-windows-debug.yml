@@ -1,0 +1,237 @@
+# HomeoClinic Windows E2E debug loop (ci-debug/**).
+#
+# WHY: the real "E2E smoke (Windows)" job in ci.yml takes ~15-20 minutes to get
+# to the first spec and used to spend another 100 minutes failing every session
+# (run 45180582138: "session not created: DevToolsActivePort file doesn't
+# exist"). This workflow reuses the SAME build and driver setup steps but runs
+# ONE spec, has a 30 minute cap, and runs direct-launch diagnostics BEFORE
+# wdio so a bad run explains itself in the first minute after the build.
+#
+# HOW TO TRIGGER:
+#   git push origin HEAD:refs/heads/ci-debug/win-e2e-1     (any ci-debug/** name)
+#   or Actions -> ci-windows-debug -> Run workflow (spec / integrity inputs).
+# This workflow runs ONLY for ci-debug/** pushes and manual dispatch. It never
+# runs for main / staging-main / pull requests, so ci.yml is the only gate.
+#
+# WHAT TO READ (artifact "windows-e2e-debug"):
+#   diag/probe-summary.json + job summary : direct-launch result at High vs
+#                                           Medium integrity (the A/B test).
+#   diag/diagnose-transcript.txt          : integrity, versions, env, probes.
+#   diag/probe-*.stdout/stderr.txt        : what the exe printed / exit code.
+#   diag/winevent-application.txt         : Application Error / WER crashes.
+#   diag/msedgedriver-*.log               : msedgedriver --verbose log with the
+#                                           exact way it launched the app.
+#   .e2e-out/wdio-console.log, junit.xml  : the wdio run itself.
+#
+# Keep the build/driver steps below in sync with the e2e-smoke-windows job in
+# ci.yml (they are deliberate copies; only --no-bundle differs, because the
+# installer bundle is irrelevant to the question and costs ~40 s).
+
+name: ci-windows-debug
+
+on:
+  push:
+    branches: ["ci-debug/**"]
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: "Spec to run, relative to tests/e2e"
+        required: false
+        default: "specs/app/boot-gate.e2e.ts"
+      integrity:
+        description: "Integrity level for wdio: Medium (fix) or High (reproduce the original failure)"
+        required: false
+        default: "Medium"
+        type: choice
+        options: [Medium, High]
+
+concurrency:
+  group: ci-windows-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # Same job id as ci.yml so rust-cache keys line up where the cache scope allows.
+  e2e-smoke-windows:
+    name: Windows E2E debug (one spec)
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      HC_DEBUG_SPEC: ${{ inputs.spec || 'specs/app/boot-gate.e2e.ts' }}
+      HC_E2E_INTEGRITY: ${{ inputs.integrity || 'Medium' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Save the (expensive) target dir even when a later step fails: a
+          # debug loop mostly fails.
+          cache-on-failure: true
+
+      - name: Install Edge WebDriver matching the WebView2 runtime
+        # msedgedriver must match the Chromium build of the webview it drives.
+        # For a Tauri app that is the WebView2 Evergreen runtime (registry
+        # value `pv` under its EdgeUpdate client GUID), which tracks Edge
+        # stable but can differ by build; fall back to the installed Edge
+        # version only if the WebView2 key is absent. The image's preinstalled
+        # driver (EDGEWEBDRIVER) is reused only when its version is an exact
+        # match; otherwise the exact matching build is fetched from
+        # Microsoft's official Edge WebDriver endpoint. The result is checked
+        # with `msedgedriver --version` and exported as HC_NATIVE_DRIVER (an
+        # absolute path; tauri-driver rejects a bare name).
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $wv2Guid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $keys = @(
+            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$wv2Guid",
+            "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$wv2Guid",
+            "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$wv2Guid"
+          )
+          $ver = $null
+          foreach ($k in $keys) {
+            if (Test-Path $k) {
+              $pv = (Get-ItemProperty -Path $k -Name pv -ErrorAction SilentlyContinue).pv
+              if ($pv -and $pv -ne '0.0.0.0') { $ver = $pv; Write-Host "WebView2 runtime: $pv ($k)"; break }
+            }
+          }
+          if (-not $ver) {
+            $edgeExe = @(
+              "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+              "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe"
+            ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $edgeExe) { Write-Host '::error::Neither WebView2 runtime nor Edge found'; exit 1 }
+            $ver = (Get-Item $edgeExe).VersionInfo.ProductVersion
+            Write-Host "::warning::WebView2 registry key not found; using Edge $ver from $edgeExe"
+          }
+          if ($ver -notmatch '^\d+\.\d+\.\d+\.\d+$') { Write-Host "::error::Unexpected version '$ver'"; exit 1 }
+
+          $drv = $null
+          if ($env:EDGEWEBDRIVER) {
+            $pre = Join-Path $env:EDGEWEBDRIVER 'msedgedriver.exe'
+            if ((Test-Path $pre) -and ((& $pre --version) -match [regex]::Escape($ver))) {
+              $drv = $pre
+              Write-Host "Reusing preinstalled msedgedriver $ver at $pre"
+            }
+          }
+          if (-not $drv) {
+            $dir = Join-Path $env:RUNNER_TEMP "msedgedriver-$ver"
+            $zip = Join-Path $env:RUNNER_TEMP "edgedriver_win64-$ver.zip"
+            $url = "https://msedgedriver.microsoft.com/$ver/edgedriver_win64.zip"
+            Write-Host "Downloading $url"
+            Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+            Expand-Archive -Path $zip -DestinationPath $dir -Force
+            $drv = Join-Path $dir 'msedgedriver.exe'
+          }
+          $reported = & $drv --version
+          Write-Host "msedgedriver: $reported"
+          if ($reported -notmatch [regex]::Escape($ver)) {
+            Write-Host "::error::msedgedriver '$reported' does not match webview $ver"
+            exit 1
+          }
+          "HC_NATIVE_DRIVER=$drv" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Install gsudo (Medium integrity launcher)
+        # Fails in seconds, before the build, if gsudo cannot lower integrity.
+        run: ./.github/scripts/win-e2e-install-gsudo.ps1
+
+      - name: Cache tauri-driver binary
+        id: tauri-driver-cache
+        uses: actions/cache@v4
+        with:
+          path: ~\.cargo\bin\tauri-driver.exe
+          key: tauri-driver-${{ runner.os }}-v1
+
+      - name: Install tauri-driver
+        if: steps.tauri-driver-cache.outputs.cache-hit != 'true'
+        run: cargo install tauri-driver --locked
+
+      - name: Install JS dependencies (app)
+        run: npm ci
+        working-directory: apps/desktop
+
+      - name: Build debug Tauri app (e2e-test-keys, no installer bundle)
+        run: npm run tauri build -- --debug --no-bundle --features e2e-test-keys
+        working-directory: apps/desktop
+
+      - name: Build hc-seed binary (E2E fixture seeding)
+        run: cargo build -p hc-seed --bin hc-seed
+
+      - name: Install E2E dependencies
+        run: npm ci
+        working-directory: tests/e2e
+
+      - name: Direct-launch diagnostics (before wdio)
+        # Starts the exe itself (no wdio, no tauri-driver) at High and Medium
+        # integrity with the same WEBVIEW2_* environment msedgedriver uses and
+        # reports whether WebView2's DevTools endpoint comes up. Never fails
+        # the job; the verdict is in the summary and the artifact.
+        continue-on-error: true
+        run: >
+          ./.github/scripts/win-e2e-diagnose.ps1
+          -OutDir "$env:GITHUB_WORKSPACE\diag"
+          -App "$env:GITHUB_WORKSPACE\target\debug\homeoclinic-desktop.exe"
+
+      - name: Wrap msedgedriver with --verbose logging
+        # tauri-driver spawns msedgedriver with fixed arguments and discards its
+        # stdout. A .cmd wrapper adds --verbose and a log file per start so the
+        # artifact shows exactly how msedgedriver launched the app and why it
+        # gave up. HC_NATIVE_DRIVER may point at a .cmd (tauri-driver only
+        # checks that the file exists).
+        run: |
+          $diag = Join-Path $env:GITHUB_WORKSPACE 'diag'
+          New-Item -ItemType Directory -Force -Path $diag | Out-Null
+          $wrapper = Join-Path $env:RUNNER_TEMP 'msedgedriver-verbose.cmd'
+          @(
+            '@echo off',
+            "`"$env:HC_NATIVE_DRIVER`" %* --verbose `"--log-path=$diag\msedgedriver-%RANDOM%%RANDOM%.log`""
+          ) | Set-Content -Path $wrapper -Encoding ascii
+          Get-Content $wrapper
+          "HC_NATIVE_DRIVER=$wrapper" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Run one spec through wdio
+        # Fail fast: no session retries, bail after the first failed spec file.
+        # HC_E2E_INTEGRITY (Medium by default) is honoured by win-e2e-run.ps1.
+        env:
+          HC_E2E_TARGET: windows
+          HC_E2E_OUTDIR: ${{ github.workspace }}\.e2e-out
+          HC_APP_BINARY: ${{ github.workspace }}\target\debug\homeoclinic-desktop.exe
+          HC_SEED_BIN: ${{ github.workspace }}\target\debug\hc-seed.exe
+          HC_E2E_BAIL: "1"
+          HC_E2E_CONNECTION_RETRY_COUNT: "0"
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:HC_E2E_OUTDIR | Out-Null
+          & "$env:GITHUB_WORKSPACE\.github\scripts\win-e2e-run.ps1" -Spec $env:HC_DEBUG_SPEC *>&1 |
+            Tee-Object -FilePath (Join-Path $env:HC_E2E_OUTDIR 'wdio-console.log')
+          exit $LASTEXITCODE
+        working-directory: tests/e2e
+
+      - name: Upload diagnostics and E2E output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-e2e-debug
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            diag/**
+            .e2e-out/**

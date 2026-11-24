@@ -353,6 +353,12 @@ jobs:
     # Self-contained like the Linux E2E job: it rebuilds the debug binary with
     # e2e-test-keys; the build matrix artifacts are not downloaded.
     runs-on: windows-2025-vs2026
+    # Hard cap. Build ~15 min cold; a healthy suite finishes well inside this.
+    # The first-ever run of this job burned 1h42m on a systemic failure
+    # (every session failed after ~4 min of retries), so a hang or a systemic
+    # failure must cost minutes, not hours. The canary step below fails the job
+    # in ~2 min if no session can be created at all.
+    timeout-minutes: 45
     defaults:
       run:
         shell: pwsh
@@ -372,6 +378,11 @@ jobs:
 
       - name: Cache cargo and target
         uses: Swatinem/rust-cache@v2
+        with:
+          # Keep the ~12 min cold target dir even when a later E2E step fails;
+          # otherwise a failing run never populates the cache and every retry
+          # rebuilds from scratch.
+          cache-on-failure: true
 
       - name: Install Edge WebDriver matching the WebView2 runtime
         # msedgedriver must match the Chromium build of the webview it drives.
@@ -435,6 +446,21 @@ jobs:
           }
           "HC_NATIVE_DRIVER=$drv" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Install gsudo (Medium integrity launcher for wdio)
+        # ROOT CAUSE of the first Windows E2E failure (run 45180582138, every
+        # session: "session not created: DevToolsActivePort file doesn't
+        # exist"): hosted Windows steps run as an elevated admin (High
+        # integrity, UAC off), and WebView2 ignores the WEBVIEW2_* environment
+        # overrides at High integrity. msedgedriver relies on exactly those
+        # variables (WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS carries
+        # --remote-debugging-port), so the app never exposes a DevTools port.
+        # wdio, tauri-driver, msedgedriver and the app therefore have to run at
+        # Medium integrity: .github/scripts/win-e2e-run.ps1 starts wdio through
+        # `gsudo --direct --integrity Medium`. This step fails in seconds, not
+        # after the build, if gsudo is unavailable or does not lower the level.
+        # Validate/diagnose with .github/workflows/ci-windows-debug.yml.
+        run: ./.github/scripts/win-e2e-install-gsudo.ps1
+
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
 
@@ -468,18 +494,41 @@ jobs:
           $sel | ForEach-Object { Write-Host "windows spec: $($_.FullName.Substring($PWD.Path.Length + 1))" }
         working-directory: tests/e2e
 
+      - name: Canary - boot-gate alone (fail fast on a systemic failure)
+        # One spec, no session retries. If the driver chain cannot create a
+        # single session (wrong integrity level, bad msedgedriver, app dies at
+        # start) this fails in ~2 minutes and skips the 25-spec run instead of
+        # grinding through every spec's retries. boot-gate is also the first
+        # spec of the full run below.
+        timeout-minutes: 10
+        env:
+          HC_E2E_TARGET: windows
+          HC_E2E_OUTDIR: ${{ github.workspace }}\.e2e-out\canary
+          HC_APP_BINARY: ${{ github.workspace }}\target\debug\homeoclinic-desktop.exe
+          HC_SEED_BIN: ${{ github.workspace }}\target\debug\hc-seed.exe
+          HC_E2E_CONNECTION_RETRY_COUNT: "0"
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:HC_E2E_OUTDIR | Out-Null
+          & "$env:GITHUB_WORKSPACE\.github\scripts\win-e2e-run.ps1" -Spec specs/app/boot-gate.e2e.ts
+          exit $LASTEXITCODE
+        working-directory: tests/e2e
+
       - name: Run Windows-targeted specs
         # HC_E2E_TARGET=windows: wdio.conf.ts filters specs by @targets.
         # HC_NATIVE_DRIVER was exported by the Edge WebDriver step. Binaries
-        # are the .exe paths in the workspace-root target dir.
+        # are the .exe paths in the workspace-root target dir. wdio starts at
+        # Medium integrity via win-e2e-run.ps1 (see the gsudo step). One
+        # session-create retry instead of three: a healthy session is created
+        # on the first try, and a systemic failure must not multiply by 4.
         env:
           HC_E2E_TARGET: windows
           HC_E2E_OUTDIR: ${{ github.workspace }}\.e2e-out
           HC_APP_BINARY: ${{ github.workspace }}\target\debug\homeoclinic-desktop.exe
           HC_SEED_BIN: ${{ github.workspace }}\target\debug\hc-seed.exe
+          HC_E2E_CONNECTION_RETRY_COUNT: "1"
         run: |
           New-Item -ItemType Directory -Force -Path $env:HC_E2E_OUTDIR | Out-Null
-          npx wdio run wdio.conf.ts
+          & "$env:GITHUB_WORKSPACE\.github\scripts\win-e2e-run.ps1"
           exit $LASTEXITCODE
         working-directory: tests/e2e
 
