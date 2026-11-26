@@ -43,8 +43,14 @@ App shell; single scrollable form, two columns. Content area 1366 px.
 |---|---|---|---|
 | Patient ID | readonly | auto prefix + running number, unique, never reused (PAT-002) | patient-form-code |
 | Photo | image (webcam/file) | optional (PAT-001) | patient-form-photo |
-| Capture webcam | button | opens webcam capture (PAT-001) | patient-form-photo-webcam |
-| Choose file | button | picks an image file (PAT-001) | patient-form-photo-file |
+| Capture webcam | button | opens webcam capture (PAT-001, SET-007). The ONE camera button: reads "Use webcam", and "Retake" once a webcam photo is attached (there is no separate retake button; a file photo keeps "Use webcam"). A click while a capture runs is ignored | patient-form-photo-webcam |
+| Choose file | button | picks an image file (PAT-001); also the swap path for a file photo | patient-form-photo-file |
+| Remove photo | button | only while a photo is attached (PAT-001). Afterwards keyboard focus moves to the webcam button, which stays mounted | patient-form-photo-remove |
+| Photo status | live region (`role=status`) | always mounted, empty when idle; holds exactly one of the two progress messages below (opening, captured); failures are announced by the alert, not here. 14 px body text, i.e. `text-base` (R-UI-005) | patient-form-photo-status |
+| Capturing | text in the live region | "Opening the camera…" while a capture runs | patient-form-photo-capturing |
+| Captured | text in the live region | "Photo captured." after a successful webcam capture; cleared by Remove, Choose file or a new capture | patient-form-photo-captured |
+| Camera failed | alert (`role=alert`) | "No camera was available. Try again or choose a file." when a capture fails; the photo (if any) is unchanged | patient-form-photo-denied |
+| Failure reason | text inside the failure alert | ONE plain sentence in its own element inside the alert, so the message and the reason are one announcement, never a code (R-UI-008). See "Webcam capture" | patient-form-photo-denied-reason |
 | Name | text | required (PAT-001); drives phonetic key | patient-form-name |
 | Sex | radio | PAT-001 | patient-form-sex |
 | DOB | date | DOB or Age (PAT-001); DD-MM-YYYY | patient-form-dob |
@@ -84,6 +90,27 @@ App shell; single scrollable form, two columns. Content area 1366 px.
   (PAT-009).
 - Consent records the checkbox and date and offers a printable consent form
   (PAT-012, DPDP).
+- Webcam capture (PAT-001, SET-007). States of the photo column:
+  idle (status empty) -> capturing ("Opening the camera…", button still
+  clickable but a second click is ignored) -> either captured (photo shown,
+  button reads "Retake", status "Photo captured.") or denied (one alert with
+  the message and, inside it, one reason sentence). Starting a capture clears
+  the previous failure. A running capture is cancelled, and the camera
+  released at once, by Cancel, when a file is chosen, by Remove photo and by
+  leaving the screen (clicking Choose file alone does not cancel it); nothing
+  is shown for a cancelled capture. When the saved camera fails the system
+  default is tried once, except after a refusal (the doctor pressed Deny, or a
+  SecurityError): then there is no retry, so no second prompt follows a Deny.
+  The photo buttons (Use webcam / Retake, Choose file, Remove photo) are 14 px
+  (`text-base`), wrap inside the 140 px photo column and keep one button per
+  row when they do not fit side by side.
+- Failure reason sentences (one per outcome; when the saved camera and the
+  system default fail differently the more specific one is shown, in this
+  order): "Camera access was not allowed." (permission denied or blocked),
+  "No camera was found.", "The camera did not send a picture. Another app may
+  be using it." (busy, or opened but no frame), "The camera took too long to
+  start.", "The camera could not be opened." (anything else). The browser
+  error names (NotReadableError etc.) are never shown.
 - A newly saved patient is indexed in the same transaction and is findable
   immediately in global search (PSR-012).
 

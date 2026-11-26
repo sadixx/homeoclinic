@@ -92,6 +92,108 @@ export class PatientsPage {
     return byTestId("patient-form-photo-denied");
   }
 
+  /** Permanently mounted live region (role=status); empty when idle. */
+  get photoStatus(): ChainablePromiseElement {
+    return byTestId("patient-form-photo-status");
+  }
+
+  /** "Opening the camera…" (inside the live region, only while capturing). */
+  get photoCapturing(): ChainablePromiseElement {
+    return byTestId("patient-form-photo-capturing");
+  }
+
+  /** "Photo captured." (inside the live region, after a webcam capture). */
+  get photoCaptured(): ChainablePromiseElement {
+    return byTestId("patient-form-photo-captured");
+  }
+
+  /** The plain-language failure reason sentence (inside the live region). */
+  get photoDeniedReason(): ChainablePromiseElement {
+    return byTestId("patient-form-photo-denied-reason");
+  }
+
+  /**
+   * Text of the live region, or null when the page has none. One DOM read so
+   * a test can assert plain wording (never a DOMException name) at one instant.
+   */
+  async photoStatusText(): Promise<string | null> {
+    return browser.execute(() => {
+      const el = document.querySelector('[data-testid="patient-form-photo-status"]');
+      return el === null ? null : (el.textContent ?? "").trim();
+    });
+  }
+
+  get photoFileBtn(): ChainablePromiseElement {
+    return byTestId("patient-form-photo-file");
+  }
+
+  /**
+   * Snapshot of the photo column's button layout (PAT-038, UI change
+   * "webcam button doubles as Retake"): how many webcam buttons exist, whether
+   * the removed duplicate `patient-form-photo-retake` is gone, the webcam
+   * button's text ('Use webcam' / 'Retake'), whether Choose file / Remove photo
+   * are present, whether a capture is in flight (the 'Opening the camera…' status is shown)
+   * and the preview <img> src.
+   * One DOM read so the whole layout is judged at a single instant.
+   */
+  async photoColumnState(): Promise<{
+    webcamCount: number;
+    legacyRetakeCount: number;
+    webcamLabel: string | null;
+    chooseFileCount: number;
+    removeCount: number;
+    capturing: boolean;
+    imgSrc: string | null;
+  }> {
+    return browser.execute(() => {
+      const count = (id: string): number =>
+        document.querySelectorAll(`[data-testid="${id}"]`).length;
+      const webcam = document.querySelector(
+        '[data-testid="patient-form-photo-webcam"]',
+      );
+      const img = document.querySelector(
+        '[data-testid="patient-form-photo-img"]',
+      );
+      return {
+        webcamCount: count("patient-form-photo-webcam"),
+        legacyRetakeCount: count("patient-form-photo-retake"),
+        webcamLabel: webcam === null ? null : (webcam.textContent ?? "").trim(),
+        chooseFileCount: count("patient-form-photo-file"),
+        removeCount: count("patient-form-photo-remove"),
+        capturing: count("patient-form-photo-capturing") > 0,
+        imgSrc: img === null ? null : img.getAttribute("src"),
+      };
+    });
+  }
+
+  /**
+   * Wait until the photo column shows the expected webcam-button label
+   * ('Retake' once a webcam photo exists; 'Use webcam' with no photo or a file
+   * photo) with exactly ONE webcam button, no legacy retake button and no
+   * capture in flight. Returns the settled state for further assertions.
+   */
+  async waitForWebcamButtonLabel(
+    label: "Retake" | "Use webcam",
+    timeout = 10000,
+  ): Promise<Awaited<ReturnType<PatientsPage["photoColumnState"]>>> {
+    await browser.waitUntil(
+      async () => {
+        const s = await this.photoColumnState();
+        return (
+          s.webcamCount === 1 &&
+          s.legacyRetakeCount === 0 &&
+          s.webcamLabel === label &&
+          !s.capturing
+        );
+      },
+      {
+        timeout,
+        timeoutMsg: `photo column did not settle to one webcam button labelled "${label}" (and no patient-form-photo-retake)`,
+      },
+    );
+    return this.photoColumnState();
+  }
+
   // ---- S07 dashboard -----------------------------------------------------
   get dashDemographics(): ChainablePromiseElement {
     return byTestId("patient-dash-demographics");

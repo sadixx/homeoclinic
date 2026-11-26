@@ -58,8 +58,11 @@ describe('R2 patient register with photo (S06)', () => {
       timeoutMsg: 'photo preview did not appear after file attach',
     });
     await expect(patientsPage.photoImg).toBeDisplayed();
+    // A FILE photo keeps the webcam button on 'Use webcam' (not 'Retake'), still
+    // exactly one webcam button and no legacy retake button.
+    await expectPhotoColumn('Use webcam', 'blob:');
     // eslint-disable-next-line no-console
-    console.log('[R2-photo] file attach -> preview shown');
+    console.log('[R2-photo] file attach -> preview shown; webcam button still "Use webcam"');
 
     // 2) Forced-grant webcam capture: override the sim to GRANT, then capture.
     await patientsPage.setCameraOverride('grant');
@@ -74,8 +77,18 @@ describe('R2 patient register with photo (S06)', () => {
         timeoutMsg: 'webcam capture did not attach a data-URL frame after forced grant',
       },
     );
+    // After a webcam capture the SAME webcam button reads 'Retake': exactly one
+    // such button, the duplicate patient-form-photo-retake is gone, and Choose
+    // file + Remove photo are still offered.
+    await expectPhotoColumn('Retake', 'data:image/png');
     // eslint-disable-next-line no-console
-    console.log('[R2-photo] forced-grant webcam capture -> data-URL frame attached');
+    console.log('[R2-photo] forced-grant webcam capture -> data-URL frame attached; ONE button, text "Retake"');
+
+    // 2b) Click the 'Retake' (webcam) button once: the preview stays attached
+    //     and there is still exactly ONE retake/webcam button.
+    await patientsPage.clickWebcam();
+    await patientsPage.waitForWebcamButtonLabel('Retake');
+    await expectPhotoColumn('Retake', 'data:image/png');
 
     // 3) Delete the photo.
     await patientsPage.removePhoto();
@@ -84,8 +97,14 @@ describe('R2 patient register with photo (S06)', () => {
       timeoutMsg: 'photo was not removed',
     });
     await expect(patientsPage.photoNone).toBeDisplayed();
+    // With no photo the webcam button is back to 'Use webcam' (one button, no
+    // legacy retake) and Remove photo is gone while Choose file remains.
+    const afterDelete = await patientsPage.waitForWebcamButtonLabel('Use webcam');
+    expect(afterDelete.imgSrc).toBeNull();
+    expect(afterDelete.removeCount).toBe(0);
+    expect(afterDelete.chooseFileCount).toBe(1);
     // eslint-disable-next-line no-console
-    console.log('[R2-photo] delete -> photo removed, empty placeholder shown');
+    console.log('[R2-photo] delete -> photo removed, empty placeholder shown; webcam button "Use webcam"');
 
     // 4) Recapture via webcam (still forced-grant).
     await patientsPage.clickWebcam();
@@ -94,8 +113,9 @@ describe('R2 patient register with photo (S06)', () => {
       timeoutMsg: 'photo was not re-captured after delete',
     });
     await expect(patientsPage.photoImg).toBeDisplayed();
+    await expectPhotoColumn('Retake', 'data:image/png');
     // eslint-disable-next-line no-console
-    console.log('[R2-photo] recapture -> photo attached again');
+    console.log('[R2-photo] recapture -> photo attached again; ONE button, text "Retake"');
 
     // ---- Save + findability -----------------------------------------------
     await patientsPage.saveAndWaitForDashboard();
@@ -117,6 +137,23 @@ describe('R2 patient register with photo (S06)', () => {
     console.log('[R2-photo] saved patient is immediately findable by name search');
   });
 });
+
+/**
+ * Assert the photo column layout after the duplicate Retake button was removed:
+ * exactly ONE webcam button carrying `label`, zero `patient-form-photo-retake`,
+ * Choose file + Remove photo present, and a preview <img> whose src starts with
+ * `srcPrefix` ('data:image/png' for a webcam frame, 'blob:' for a file photo).
+ */
+async function expectPhotoColumn(label: 'Retake' | 'Use webcam', srcPrefix: string): Promise<void> {
+  const state = await patientsPage.waitForWebcamButtonLabel(label);
+  expect(state.webcamCount).toBe(1);
+  expect(state.legacyRetakeCount).toBe(0);
+  expect(state.webcamLabel).toBe(label);
+  expect(state.chooseFileCount).toBe(1);
+  expect(state.removeCount).toBe(1);
+  expect(state.imgSrc).not.toBeNull();
+  expect((state.imgSrc as string).startsWith(srcPrefix)).toBe(true);
+}
 
 /**
  * Write a tiny valid 1x1 PNG to the spec temp area and return its absolute

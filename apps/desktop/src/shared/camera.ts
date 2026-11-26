@@ -14,7 +14,17 @@ const UNLOCK_TIMEOUT_MS = 5000;
 /** One camera the webview exposes. */
 export interface CameraDevice {
   readonly deviceId: string;
+  /**
+   * Display name, unique within one list: a name shared by several cameras
+   * is numbered (" (2)", " (3)"). This is the name Settings shows and the
+   * name stored in the saved {@link CameraChoice}.
+   */
   readonly label: string;
+  /**
+   * The name as the webview reported it (never numbered). Absent on the E2E
+   * fake list, where `label` is the raw name.
+   */
+  readonly rawLabel?: string;
 }
 
 /** Result of {@link listCameras}. Never throws. */
@@ -29,17 +39,60 @@ declare global {
   }
 }
 
-/** The `videoinput` devices, with numbered names for unlabelled ones. */
+/** Labels that say the camera is an infrared / face-unlock sensor. */
+const INFRARED_LABEL = /\b(ir|infrared)\b/i;
+
+/**
+ * Name duplicate labels apart: the first keeps its name, the next ones get
+ * " (2)", " (3)" in enumeration order (stable while the device order is), so
+ * the Settings list never shows two identical entries. A number is skipped
+ * when it would collide with another camera's own name or an earlier number
+ * ("Cam", "Cam", "Cam (2)" -> "Cam", "Cam (3)", "Cam (2)"). The reported
+ * name stays in `rawLabel`.
+ */
+function numberDuplicateLabels(
+  cameras: readonly { deviceId: string; label: string }[],
+): CameraDevice[] {
+  const reserved = new Set(cameras.map((c) => c.label));
+  const used = new Set<string>();
+  const seen = new Set<string>();
+  return cameras.map((c) => {
+    if (!seen.has(c.label)) {
+      seen.add(c.label);
+      used.add(c.label);
+      return { ...c, rawLabel: c.label };
+    }
+    let n = 2;
+    while (reserved.has(`${c.label} (${n})`) || used.has(`${c.label} (${n})`)) {
+      n += 1;
+    }
+    const label = `${c.label} (${n})`;
+    used.add(label);
+    return { deviceId: c.deviceId, label, rawLabel: c.label };
+  });
+}
+
+/**
+ * The `videoinput` devices, with numbered names for unlabelled ones and for
+ * duplicates. A camera whose name says infrared is listed after the others;
+ * otherwise the enumeration order is kept (laptops list the colour node
+ * first, but both nodes often share one name, so the order is all there is).
+ */
 async function enumerateVideoInputs(
   media: MediaDevices,
 ): Promise<CameraDevice[]> {
   const devices = await media.enumerateDevices();
-  return devices
+  const named = devices
     .filter((d) => d.kind === 'videoinput')
     .map((d, i) => ({
       deviceId: d.deviceId,
       label: d.label.trim() || `${t('settings.camera.unnamed')} ${i + 1}`,
     }));
+  const colourFirst = [
+    ...named.filter((c) => !INFRARED_LABEL.test(c.label)),
+    ...named.filter((c) => INFRARED_LABEL.test(c.label)),
+  ];
+  return numberDuplicateLabels(colourFirst);
 }
 
 /** True when the webview hid at least one label or id (no grant yet). */
@@ -104,8 +157,15 @@ export async function listCameras(opts?: {
 }
 
 /**
- * Saved choice -> deviceId to request: exact id match, else same label, else
- * undefined (system default).
+ * Saved choice -> deviceId to request. Settings saves the display name of the
+ * picked entry (`CameraDevice.label`, numbered when a name is shared), so:
+ *   1. the saved id still present -> exactly that camera;
+ *   2. else the saved name as the reported (raw) name of exactly one camera;
+ *   3. else the saved name as the display name of exactly one camera (a saved
+ *      "HP Camera (2)" finds that node);
+ *   4. else undefined (system default).
+ * A name reported by several cameras is never guessed between (step 2 fails
+ * and step 3 is skipped): that could pick the infrared node.
  */
 export function resolvePreferredCamera(
   saved: CameraChoice | null,
@@ -115,5 +175,9 @@ export function resolvePreferredCamera(
   const byId = cameras.find((c) => c.deviceId === saved.deviceId);
   if (byId) return byId.deviceId;
   if (saved.label.trim() === '') return undefined;
-  return cameras.find((c) => c.label === saved.label)?.deviceId;
+  const byRaw = cameras.filter((c) => (c.rawLabel ?? c.label) === saved.label);
+  if (byRaw.length > 0)
+    return byRaw.length === 1 ? byRaw[0]?.deviceId : undefined;
+  const byDisplay = cameras.filter((c) => c.label === saved.label);
+  return byDisplay.length === 1 ? byDisplay[0]?.deviceId : undefined;
 }

@@ -276,8 +276,10 @@ describe('PatientForm (S06) — photo lifecycle (HC-MVP1-038)', () => {
     expect(
       await screen.findByTestId('patient-form-photo-img'),
     ).toBeInTheDocument();
-    // A retake control is offered once a photo exists.
-    expect(screen.getByTestId('patient-form-photo-retake')).toBeInTheDocument();
+    // The webcam button itself becomes the single Retake control.
+    expect(screen.getByTestId('patient-form-photo-webcam')).toHaveTextContent(
+      en['patient.form.photo.retake'],
+    );
   });
 
   it('simulates a DENIED webcam and shows a no-camera message, no photo attached', async () => {

@@ -15,14 +15,19 @@
 // and render DISABLED with a no-dead-end note; the form saves without them.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Upload, Trash2, RefreshCw } from 'lucide-react';
+import { Camera, Upload, Trash2 } from 'lucide-react';
 
 import { useAppPrefs } from '@/app/useAppPrefs';
 import { commands } from '@/bindings';
 import { run } from '@/shared/command';
 import { PatientAvatar, avatarKindForSex } from '@/shared/PatientAvatar';
 import { t } from '@/shared/strings';
-import { type AttachedPhoto, captureWebcamPhoto, webcamRef } from './photo';
+import {
+  type AttachedPhoto,
+  captureWebcamPhoto,
+  plainReasonKey,
+  webcamRef,
+} from './photo';
 
 /** How the form is opened. */
 export type PatientFormMode = 'new' | 'edit';
@@ -153,6 +158,18 @@ export function PatientForm({
   const [code, setCode] = useState<string>('');
   const [photo, setPhoto] = useState<AttachedPhoto | null>(null);
   const [cameraDenied, setCameraDenied] = useState(false);
+  // Internal reason code of the last failed capture (no patient data). Only
+  // its plain-language sentence is shown, never the code (R-UI-008).
+  const [cameraReason, setCameraReason] = useState<string | undefined>();
+  // True while a webcam capture is running; a second click is ignored.
+  const [capturing, setCapturing] = useState(false);
+  // True after a webcam capture succeeded (announced in the live region).
+  const [captured, setCaptured] = useState(false);
+  // The running capture, if any. Aborted on Cancel, on a new photo source and
+  // on unmount, so the camera is released and nothing updates afterwards.
+  const captureAbortRef = useRef<AbortController | null>(null);
+  // The webcam button stays mounted; it takes focus when Remove photo unmounts.
+  const webcamButtonRef = useRef<HTMLButtonElement | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicateMatch[]>([]);
   const [dismissedDuplicate, setDismissedDuplicate] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -247,6 +264,24 @@ export function PatientForm({
   }, [form.name, form.mobile, form.dob]);
 
   // ---- Photo (HC-MVP1-038) -------------------------------------------------
+  // Stop a running capture now (camera released) and reset its status.
+  const cancelCapture = useCallback((): void => {
+    const running = captureAbortRef.current;
+    if (running === null) return;
+    captureAbortRef.current = null;
+    running.abort();
+    setCapturing(false);
+  }, []);
+
+  // Leaving the screen cancels a running capture; no state is touched after.
+  useEffect(
+    () => () => {
+      captureAbortRef.current?.abort();
+      captureAbortRef.current = null;
+    },
+    [],
+  );
+
   const onChooseFile = useCallback((): void => {
     fileInputRef.current?.click();
   }, []);
@@ -255,7 +290,10 @@ export function PatientForm({
     (event: React.ChangeEvent<HTMLInputElement>): void => {
       const file = event.target.files?.[0];
       if (file === undefined) return;
+      cancelCapture();
       setCameraDenied(false);
+      setCameraReason(undefined);
+      setCaptured(false);
       setPhoto((prev) => {
         if (prev && prev.previewUrl.startsWith('blob:')) {
           URL.revokeObjectURL(prev.previewUrl);
@@ -269,32 +307,52 @@ export function PatientForm({
       // Allow re-selecting the same file name later.
       event.target.value = '';
     },
-    [],
+    [cancelCapture],
   );
 
   const onUseWebcam = useCallback(async (): Promise<void> => {
-    // Capture from the camera chosen in Settings, else the system default
-    // (real getUserMedia; simulated fallback in headless/E2E, SET-007).
-    const result = await captureWebcamPhoto(defaultCamera);
-    if (!result.ok || result.previewUrl === undefined) {
-      setCameraDenied(true);
-      return;
-    }
+    // One capture at a time: a second click while the camera is still opening
+    // must not start a second stream.
+    if (captureAbortRef.current !== null) return;
+    const controller = new AbortController();
+    captureAbortRef.current = controller;
+    setCapturing(true);
     setCameraDenied(false);
-    const previewUrl = result.previewUrl;
-    setPhoto((prev) => {
-      if (prev && prev.previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(prev.previewUrl);
+    setCameraReason(undefined);
+    setCaptured(false);
+    try {
+      // Capture from the camera chosen in Settings, else the system default
+      // (real getUserMedia; simulated fallback in headless/E2E, SET-007).
+      const result = await captureWebcamPhoto(defaultCamera, controller.signal);
+      // Cancelled (Cancel, new photo source, unmount): nothing to show.
+      if (controller.signal.aborted) return;
+      if (!result.ok || result.previewUrl === undefined) {
+        setCameraReason(result.reason);
+        setCameraDenied(true);
+        return;
       }
-      return {
-        previewUrl,
-        ref: webcamRef(),
-        source: 'webcam',
-      };
-    });
+      const previewUrl = result.previewUrl;
+      setPhoto((prev) => {
+        if (prev && prev.previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(prev.previewUrl);
+        }
+        return {
+          previewUrl,
+          ref: webcamRef(),
+          source: 'webcam',
+        };
+      });
+      setCaptured(true);
+    } finally {
+      if (captureAbortRef.current === controller) {
+        captureAbortRef.current = null;
+        setCapturing(false);
+      }
+    }
   }, [defaultCamera]);
 
   const onRemovePhoto = useCallback((): void => {
+    cancelCapture();
     setPhoto((prev) => {
       if (prev && prev.previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(prev.previewUrl);
@@ -302,7 +360,12 @@ export function PatientForm({
       return null;
     });
     setCameraDenied(false);
-  }, []);
+    setCameraReason(undefined);
+    setCaptured(false);
+    // The Remove button unmounts with the photo: keep keyboard focus in the
+    // photo column instead of dropping it to the page.
+    webcamButtonRef.current?.focus();
+  }, [cancelCapture]);
 
   // ---- Submit --------------------------------------------------------------
   const validate = useCallback((): FieldErrors => {
@@ -382,6 +445,7 @@ export function PatientForm({
   const title =
     mode === 'new' ? t('patient.form.newTitle') : t('patient.form.editTitle');
   const nameValid = form.name.trim() !== '';
+  const reasonKey = plainReasonKey(cameraReason);
 
   return (
     <section
@@ -403,7 +467,10 @@ export function PatientForm({
           <button
             type="button"
             data-testid="patient-form-cancel"
-            onClick={() => onCancel?.()}
+            onClick={() => {
+              cancelCapture();
+              onCancel?.();
+            }}
             className="rounded border border-slate-300 px-3 py-1.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
           >
             {t('patient.form.cancel')}
@@ -465,10 +532,11 @@ export function PatientForm({
           </div>
           <div className="flex flex-wrap justify-center gap-1">
             <button
+              ref={webcamButtonRef}
               type="button"
               data-testid="patient-form-photo-webcam"
               onClick={() => void onUseWebcam()}
-              className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-base hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
             >
               <Camera className="h-3.5 w-3.5" aria-hidden="true" />
               {photo?.source === 'webcam'
@@ -479,36 +547,21 @@ export function PatientForm({
               type="button"
               data-testid="patient-form-photo-file"
               onClick={onChooseFile}
-              className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-base hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
             >
               <Upload className="h-3.5 w-3.5" aria-hidden="true" />
               {t('patient.form.photo.file')}
             </button>
             {photo ? (
-              <>
-                <button
-                  type="button"
-                  data-testid="patient-form-photo-retake"
-                  onClick={
-                    photo.source === 'webcam'
-                      ? () => void onUseWebcam()
-                      : onChooseFile
-                  }
-                  className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                  {t('patient.form.photo.retake')}
-                </button>
-                <button
-                  type="button"
-                  data-testid="patient-form-photo-remove"
-                  onClick={onRemovePhoto}
-                  className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  {t('patient.form.photo.remove')}
-                </button>
-              </>
+              <button
+                type="button"
+                data-testid="patient-form-photo-remove"
+                onClick={onRemovePhoto}
+                className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-base text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('patient.form.photo.remove')}
+              </button>
             ) : null}
           </div>
           <input
@@ -520,15 +573,40 @@ export function PatientForm({
             className="sr-only"
             aria-label={t('patient.form.photo.file')}
           />
+          {/* One announcement: the failure sentence and its reason are one alert. */}
           {cameraDenied ? (
             <p
               role="alert"
               data-testid="patient-form-photo-denied"
-              className="text-center text-xs text-red-700"
+              className="break-words text-center text-base text-red-700"
             >
               {t('patient.form.photo.cameraDenied')}
+              {reasonKey !== undefined ? (
+                <span
+                  data-testid="patient-form-photo-denied-reason"
+                  className="mt-1 block text-base"
+                >
+                  {t(reasonKey)}
+                </span>
+              ) : null}
             </p>
           ) : null}
+          {/* Permanently mounted live region: progress and success only. */}
+          <p
+            role="status"
+            data-testid="patient-form-photo-status"
+            className="break-words text-center text-base text-slate-700"
+          >
+            {capturing ? (
+              <span data-testid="patient-form-photo-capturing">
+                {t('patient.form.photo.capturing')}
+              </span>
+            ) : captured ? (
+              <span data-testid="patient-form-photo-captured">
+                {t('patient.form.photo.captured')}
+              </span>
+            ) : null}
+          </p>
         </div>
 
         {/* Fields column */}
